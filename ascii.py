@@ -1,3 +1,4 @@
+import argparse
 import itertools
 from random import randrange
 import sys
@@ -72,9 +73,9 @@ class TransparentAnimatedGifConverter:
 
 
 class AsciiArtConverter:
-    def __init__(self, new_width, ascii_chars, font, fill):
+    def __init__(self, new_width, chars, font, fill):
         self._new_width = new_width
-        self._ascii_chars = ascii_chars
+        self._chars = chars
         self._font = font
         self._fill = fill
 
@@ -87,7 +88,7 @@ class AsciiArtConverter:
         image_color = np.asarray(image)
         alpha_channel = np.asarray(image.split()[-1])
 
-        scale_factor = len(self._ascii_chars) / 256
+        scale_factor = len(self._chars) / 256
 
         output_image = Image.new('RGBA', (self._new_width * 10, new_height * 20))
         draw = ImageDraw.Draw(output_image)
@@ -96,9 +97,9 @@ class AsciiArtConverter:
             for x in range(self._new_width):
                 pixel = image_grey[y, x]
                 color = image_color[y, x]
-                ascii_char = self._ascii_chars[int(pixel * scale_factor)]
+                ascii_char = self._chars[int(pixel * scale_factor)]
                 if alpha_channel[y, x] > 128:
-                    if self._fill != "none":
+                    if self._fill != None:
                         draw.rectangle([x * 10, y * 20, (x + 1) * 10, (y + 1) * 20], fill=self._fill)
                     draw.text((x * 10, y * 20), ascii_char, fill=tuple(color[:3]), font=self._font)
 
@@ -150,17 +151,26 @@ class AsciiArtConverter:
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: script.py <input file/directory> <output file/directory> [new_width] [ascii_chars] [font_path] [font_colour]")
+        print("Usage: ascii.py <input file/directory> <output file/directory> [new_width] [chars] [font_path] [font_colour]")
         return
 
-    input_path = sys.argv[1]
-    output_path = sys.argv[2]
-    new_width = int(sys.argv[3]) if len(sys.argv) > 3 else 100
-    ascii_chars = sys.argv[4] if len(sys.argv) > 4 else ".:-=+*#%@"
-    font = ImageFont.truetype(sys.argv[5], 10) if len(sys.argv) > 5 else ImageFont.load_default()
-    fill = sys.argv[6] if len(sys.argv) > 6 else "none"
+    parser = argparse.ArgumentParser(description="converts images/gifs to their ascii equivelant")
+    parser.add_argument("input_path",type=str)
+    parser.add_argument("output_path",type=str)
+    parser.add_argument("--width",type=int,default=100)
+    parser.add_argument("--chars",type=str,default=".:-=+*#%@")
+    parser.add_argument("--font",type=str,default=None)
+    parser.add_argument("--fill",type=str,default=None)
 
-    converter = AsciiArtConverter(new_width, ascii_chars, font, fill)
+    args = parser.parse_args()
+    input_path = args.input_path
+    output_path = args.output_path
+    new_width = args.width
+    chars = args.chars
+    fill = args.fill
+    font = ImageFont.truetype(args.font,10) if args.font else ImageFont.load_default()
+    
+    converter = AsciiArtConverter(new_width, chars, font, fill)
     start_time = time.time()
     
     if os.path.isdir(input_path):
