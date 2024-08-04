@@ -87,7 +87,7 @@ class AsciiArtConverter:
 
     def _image_to_ascii(self, image):
         aspect_ratio = image.height / image.width
-        new_height = int(aspect_ratio * self._new_width * 0.55)
+        new_height = int(aspect_ratio * self._new_width * 0.5)
         image = image.resize((self._new_width, new_height), Image.ANTIALIAS)
 
         image_grey = np.asarray(image.convert("L"))
