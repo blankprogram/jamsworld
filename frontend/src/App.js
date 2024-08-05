@@ -23,10 +23,19 @@ function App() {
     const [intervalId, setIntervalId] = useState(null);
 
     useEffect(() => {
-        fetch('http://localhost:5000/fonts')
-            .then((response) => response.json())
-            .then((data) => setFonts(data))
-            .catch((error) => console.error('Error fetching fonts:', error));
+        const loadFonts = async () => {
+            try {
+                await document.fonts.ready;
+                const fontFaces = Array.from(document.fonts);
+                const additionalFonts = ['Arial', 'Courier New', 'Times New Roman', 'Verdana'];
+                const allFonts = [...fontFaces.map(fontFace => fontFace.family), ...additionalFonts];
+                setFonts([...new Set(allFonts)]);
+            } catch (error) {
+                console.error('Error fetching fonts:', error);
+            }
+        };
+
+        loadFonts();
     }, []);
 
     const handleColorChange = (color) => {
@@ -40,7 +49,9 @@ function App() {
             console.error("No file selected!");
             return;
         }
-
+        setGifFrames([]);
+        setGifFrameIndex(0);
+        setOutputPath("");
         if (file.type === 'image/gif') {
             convertGIFToASCII(fileURL, width, chars, font, fill, (asciiFrames) => {
                 setGifFrames(asciiFrames);
@@ -171,7 +182,7 @@ function App() {
                                 <select value={font} onChange={(e) => setFont(e.target.value)} className="field">
                                     <option value="">Select a font</option>
                                     {fonts.map((font, index) => (
-                                        <option key={index} value={font.path}>{font.name}</option>
+                                        <option key={index} value={font}>{font}</option>
                                     ))}
                                 </select>
                             </div>

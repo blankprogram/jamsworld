@@ -69,11 +69,11 @@ export function convertGIFToASCII(gifURL, width, chars, font, fill, callback) {
 
             const asciiFrames = frames.map((frame) => {
                 context.putImageData(previousFrameImageData, 0, 0);
-                context.clearRect(0,0,canvas.width,canvas.height);
+                context.clearRect(0, 0, canvas.width, canvas.height);
 
                 const imageData = new ImageData(new Uint8ClampedArray(frame.patch), frame.dims.width, frame.dims.height);
                 context.putImageData(imageData, frame.dims.left, frame.dims.top);
-                
+
                 const asciiStr = convertImageToASCII(canvas, width, chars, font, fill);
                 previousFrameImageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 return { asciiStr, delay: frame.delay };
