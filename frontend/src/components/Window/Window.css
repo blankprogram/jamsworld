@@ -1,0 +1,23 @@
+.window {
+  width: 90%;
+  max-width: 1200px;
+  height: 90%;
+  max-height: 700px;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+}
+
+
+.title-bar {
+  cursor: move;
+  user-select: none;
+}
+
+.window-body {
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
