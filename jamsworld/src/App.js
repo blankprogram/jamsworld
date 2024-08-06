@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import './App.css';
-import 'xp.css/dist/XP.css';
+import 'xp.css';
 import Background from './components/Background/Background';
 import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
 import AsciiApp from './applications/AsciiApp/AsciiApp';
+
+const apps = [
+  { name: 'AsciiApp', component: AsciiApp },
+  { name: 'AnotherApp', component: AsciiApp },
+];
 
 function App() {
   const [openApps, setOpenApps] = useState([]);
@@ -38,19 +43,17 @@ function App() {
   };
 
   const renderApplication = (appName) => {
-    switch (appName) {
-      case 'AsciiApp':
-        return <AsciiApp onClose={() => closeApplication(appName)} />;
-      default:
-        return null;
-    }
+    const app = apps.find(a => a.name === appName);
+    if (!app) return null;
+    const AppComponent = app.component;
+    return <AppComponent onClose={() => closeApplication(appName)} />;
   };
 
   return (
     <div className="App">
-      <Background openApplication={openApplication} />
+      <Background apps={apps} openApplication={openApplication} />
       <Taskbar 
-        minimizedApps={minimizedApps}
+        openApps={openApps} 
         restoreApplication={restoreApplication}
       />
       {openApps.map((app, index) => (

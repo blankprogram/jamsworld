@@ -14,7 +14,6 @@ const AsciiApp = ({ onClose }) => {
     const [outputPath, setOutputPath] = useState("");
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [fonts, setFonts] = useState([]);
-    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
     const colorPickerRef = useRef(null);
 
     useEffect(() => {
@@ -100,7 +99,7 @@ const AsciiApp = ({ onClose }) => {
                             </div>
                     <div className="form-group field-row">
                         <label>Select file:</label>
-                        <input type="file" id="file" onChange={(e) => handleFileChange(e, setFile, setFileURL, setImageDimensions)} className="field" />
+                        <input type="file" id="file" onChange={(e) => handleFileChange(e, setFile, setFileURL)} className="field" />
                         <button type="button" className="button" onClick={() => document.getElementById('file').click()}>Choose File</button>
                     </div>
                     <div className="form-group field-row">

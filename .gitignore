@@ -6,12 +6,4 @@ test/
 CMakeLists.txt
 cpp/
 settings.json
-build/
-/backend/fonts/
-/backend/output/
-/backend/uploads/
-
-/frontend/node_modules/
-/frontend/build/
-/frontend/.env
-/frontend/.cache
+.vscode

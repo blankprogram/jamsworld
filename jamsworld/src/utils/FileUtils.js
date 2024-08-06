@@ -1,4 +1,4 @@
-export const handleFileChange = (e, setFile, setFileURL, setImageDimensions) => {
+export const handleFileChange = (e, setFile, setFileURL) => {
     const uploadedFile = e.target.files[0];
     if (uploadedFile) {
         setFile(uploadedFile);
@@ -6,9 +6,6 @@ export const handleFileChange = (e, setFile, setFileURL, setImageDimensions) => 
         setFileURL(objectURL);
 
         const img = new Image();
-        img.onload = () => {
-            setImageDimensions({ width: img.width, height: img.height });
-        };
         img.src = objectURL;
     } else {
         console.error("No file selected!");
