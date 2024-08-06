@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
 import './App.css';
 import 'xp.css/dist/XP.css';
-import { convertImageToASCII, handleFileChange, convertGIFToASCII } from './ascii';
+import { convertImageToASCII, convertGIFToASCII, encodeAsciiGIF } from './ascii';
 
 function App() {
     const [file, setFile] = useState(null);
@@ -14,13 +14,11 @@ function App() {
     const [outputPath, setOutputPath] = useState("");
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [fonts, setFonts] = useState([]);
-    const [_, setImageDimensions] = useState({ width: 0, height: 0 });
-    const windowRef = useRef(null);
-    const colorPickerRef = useRef(null);
-    const gifRef = useRef(null);
+    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
     const [gifFrames, setGifFrames] = useState([]);
     const [gifFrameIndex, setGifFrameIndex] = useState(0);
-    const [intervalId, setIntervalId] = useState(null);
+    const windowRef = useRef(null);
+    const colorPickerRef = useRef(null);
 
     useEffect(() => {
         const loadFonts = async () => {
@@ -43,6 +41,23 @@ function App() {
         setShowColorPicker(false);
     };
 
+    const handleFileChange = (e, setFile, setFileURL, setImageDimensions) => {
+        const uploadedFile = e.target.files[0];
+        if (uploadedFile) {
+            setFile(uploadedFile);
+            const objectURL = URL.createObjectURL(uploadedFile);
+            setFileURL(objectURL);
+
+            const img = new Image();
+            img.onload = () => {
+                setImageDimensions({ width: img.width, height: img.height });
+            };
+            img.src = objectURL;
+        } else {
+            console.error("No file selected!");
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!file) {
@@ -53,13 +68,10 @@ function App() {
         setGifFrameIndex(0);
         setOutputPath("");
         if (file.type === 'image/gif') {
-            convertGIFToASCII(fileURL, width, chars, font, fill, (asciiFrames) => {
-                setGifFrames(asciiFrames);
-                setGifFrameIndex(0);
-                if (intervalId) clearInterval(intervalId);
-                const newIntervalId = playGif(asciiFrames);
-                setIntervalId(newIntervalId);
+            convertGIFToASCII(fileURL, width, chars, font, fill, (gifURL) => {
+                setOutputPath(gifURL);
             });
+        
         } else {
             const img = new Image();
             img.onload = () => {
@@ -204,11 +216,7 @@ function App() {
                                 {fileURL && <img src={fileURL} alt="Uploaded" className="image" />}
                             </div>
                             <div className="image-box">
-                                {gifFrames.length > 0 ? (
-                                    <div ref={gifRef} dangerouslySetInnerHTML={{ __html: gifFrames[gifFrameIndex].asciiStr }} />
-                                ) : (
-                                    outputPath && <img src={outputPath} alt="ASCII Art" className="image" />
-                                )}
+                                {fileURL && <img src={outputPath} alt="Uploaded" className="image" />}
                             </div>
                         </div>
                     </div>
