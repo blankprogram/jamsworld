@@ -8,54 +8,72 @@ export function convertImageToASCII(img, width, chars, font, fill) {
     const newHeight = Math.floor(aspectRatio * width * 0.5);
     canvas.width = width;
     canvas.height = newHeight;
+
     context.drawImage(img, 0, 0, width, newHeight);
     const imageData = context.getImageData(0, 0, width, newHeight).data;
     const scaleFactor = chars.length / 256;
+
     let asciiStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${width * 10}" height="${newHeight * 20}" font-family="${font}" font-size="10">`;
 
     for (let y = 0; y < newHeight; y++) {
         for (let x = 0; x < width; x++) {
             const offset = (y * width + x) * 4;
-            const [r, g, b, alpha] = imageData.slice(offset, offset + 4);
+            const [r, g, b, alpha] = [imageData[offset], imageData[offset + 1], imageData[offset + 2], imageData[offset + 3]];
+
             if (alpha > 128) {
                 const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
                 const charIndex = Math.floor(brightness * scaleFactor);
                 const asciiChar = chars[charIndex];
+
                 asciiStr += `<rect x="${x * 10}" y="${y * 20}" width="11" height="21" fill="${fill}" stroke="none"></rect>`;
                 asciiStr += `<text x="${x * 10}" y="${y * 20 + 15}" fill="rgb(${r},${g},${b})">${asciiChar}</text>`;
             }
         }
     }
+
     asciiStr += '</svg>';
     return asciiStr;
 }
 
-export function convertGIFToASCII(gifURL, width, chars, font, fill, callback) {
+function decodeGIF(buffer) {
+    const gifReader = new GifReader(new Uint8Array(buffer));
+    const frames = [];
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = gifReader.width;
+    canvas.height = gifReader.height;
+
+    for (let i = 0; i < gifReader.numFrames(); i++) {
+        const frameInfo = gifReader.frameInfo(i);
+        const imageData = new Uint8Array(gifReader.width * gifReader.height * 4);
+        gifReader.decodeAndBlitFrameRGBA(i, imageData);
+
+        const imgData = context.createImageData(gifReader.width, gifReader.height);
+        imgData.data.set(imageData);
+        context.putImageData(imgData, 0, 0);
+
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = gifReader.width;
+        frameCanvas.height = gifReader.height;
+        frameCanvas.getContext('2d').putImageData(imgData, 0, 0);
+
+        frames.push({ img: frameCanvas, frameInfo });
+    }
+
+    return { frames, width: gifReader.width, height: gifReader.height };
+}
+
+export function convertGIFtoASCII(gifURL, width, chars, font, fill, callback) {
     fetch(gifURL)
         .then(resp => resp.arrayBuffer())
         .then(buff => {
-            const gifReader = new GifReader(new Uint8Array(buff));
-            const asciiFrameData = [];
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = gifReader.width;
-            canvas.height = gifReader.height;
+            const { frames, width: gifWidth, height: gifHeight } = decodeGIF(buff);
+            const asciiFrameData = frames.map(({ img, frameInfo }) => {
+                const asciiStr = convertImageToASCII(img, width, chars, font, fill);
+                return { asciiStr, frameInfo };
+            });
 
-            for (let i = 0; i < gifReader.numFrames(); i++) {
-                const frameInfo = gifReader.frameInfo(i);
-                const imageData = new Uint8Array(gifReader.width * gifReader.height * 4);
-                gifReader.decodeAndBlitFrameRGBA(i, imageData);
-
-                const imgData = context.createImageData(gifReader.width, gifReader.height);
-                imgData.data.set(imageData);
-                context.putImageData(imgData, 0, 0);
-                const asciiStr = convertImageToASCII(canvas, width, chars, font, fill);
-
-                asciiFrameData.push({ asciiStr, frameInfo });
-            }
-
-            encodeAsciiGIF(asciiFrameData, gifReader.width, gifReader.height, callback);
+            encodeAsciiGIF(asciiFrameData, gifWidth, gifHeight, callback);
         });
 }
 
@@ -76,16 +94,19 @@ export function encodeAsciiGIF(frames, width, height, callback) {
         const { asciiStr, frameInfo } = frame;
         const img = new Image();
         img.src = `data:image/svg+xml;base64,${btoa(asciiStr)}`;
+
         img.onload = () => {
             context.clearRect(0, 0, width, height);
             context.drawImage(img, 0, 0, width, height);
+
             encoder.setDelay(frameInfo.delay * 10);
             encoder.setDispose(frameInfo.disposal);
+
             if (frameInfo.transparent_index !== undefined) {
                 encoder.setTransparent(frameInfo.transparent_index);
             }
-            encoder.addFrame(context);
 
+            encoder.addFrame(context);
             frameCounter++;
 
             if (frameCounter === frames.length) {

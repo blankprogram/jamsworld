@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
 import './App.css';
 import 'xp.css/dist/XP.css';
-import { convertImageToASCII, convertGIFToASCII, encodeAsciiGIF } from './ascii';
+import { convertImageToASCII, convertGIFtoASCII } from './ascii';
 
 function App() {
     const [file, setFile] = useState(null);
@@ -68,7 +68,7 @@ function App() {
         setGifFrameIndex(0);
         setOutputPath("");
         if (file.type === 'image/gif') {
-            convertGIFToASCII(fileURL, width, chars, font, fill, (gifURL) => {
+            convertGIFtoASCII(fileURL, width, chars, font, fill, (gifURL) => {
                 setOutputPath(gifURL);
             });
         
