@@ -1,7 +1,7 @@
 const generateCartoonyA = () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = 100;
+    canvas.height = 100;
     const ctx = canvas.getContext('2d');
   
     ctx.fillStyle = '#ff6347';
@@ -17,8 +17,8 @@ const generateCartoonyA = () => {
     switch (appName) {
       case 'AsciiApp':
         return generateCartoonyA();
-      case 'AnotherApp':
-        return require('../assets/Icons/heart-icon.png');
+      case 'Paint':
+        return require('../assets/Icons/paint.png');
       default:
         return require('../assets/Icons/start.png');
     }

@@ -10,6 +10,7 @@
 
 .form-container {
     padding: 20px;
+    user-select: none;
   }
   
   .form {
@@ -17,6 +18,7 @@
     align-items: center;
     width: 100%;
     justify-content: space-around;
+    
   }
   
   
@@ -38,6 +40,7 @@
     border: 2px solid #999;
     justify-content: center;
     align-items: center;
+    user-select: none;
   }
   
   .image {

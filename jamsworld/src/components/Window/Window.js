@@ -2,9 +2,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import './Window.css';
 import useDraggable from '../../hooks/useDraggable';
 
-const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximized }) => {
+const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximized, onFocus, isFocused }) => {
   const windowRef = useRef(null);
-  const [originalState, setOriginalState] = useState(null);
+  const [originalState, setOriginalState] = useState({});
 
   useDraggable(windowRef);
 
@@ -12,46 +12,40 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
     const element = windowRef.current;
 
     if (maximized) {
-      if (!originalState) {
-        setOriginalState({
-          width: element.style.width,
-          height: element.style.height,
-          top: element.style.top,
-          left: element.style.left,
-          maxWidth: element.style.maxWidth,
-          maxHeight: element.style.maxHeight,
-          position: element.style.position,
-          transition: element.style.transition,
-        });
-      }
+      const { width, height, top, left, maxWidth, maxHeight, position } = element.style;
+      setOriginalState({ width, height, top, left, maxWidth, maxHeight, position });
 
       element.classList.add('maximized');
-      element.style.width = '100vw';
-      element.style.height = '100vh';
-      element.style.top = '0';
-      element.style.left = '0';
-      element.style.maxWidth = '100vw';
-      element.style.maxHeight = '100vh';
-      element.style.position = 'fixed';
-      element.style.transition = 'all 0.3s ease';
-    } else if (originalState) {
+      Object.assign(element.style, {
+        width: '100vw',
+        height: 'calc(100vh - 30px)',
+        top: '0',
+        left: '0',
+        maxWidth: '100vw',
+        maxHeight: 'calc(100vh - 30px)',
+        position: 'fixed',
+      });
+    } else if (Object.keys(originalState).length) {
       element.classList.remove('maximized');
-      element.style.width = originalState.width;
-      element.style.height = originalState.height;
-      element.style.top = originalState.top;
-      element.style.left = originalState.left;
-      element.style.maxWidth = originalState.maxWidth;
-      element.style.maxHeight = originalState.maxHeight;
-      element.style.position = originalState.position;
-      element.style.transition = originalState.transition;
+      Object.assign(element.style, originalState);
     }
-
+    
     (() => element.offsetHeight)();
-  }, [maximized, originalState]);
+  }, [maximized]);
+
+  const handleFocus = (e) => {
+    if (!e.target.closest('.title-bar-controls')) {
+      onFocus();
+    }
+  };
 
   return (
-    <div className={`window ${maximized ? 'maximized' : ''}`} ref={windowRef}>
-      <div className="title-bar">
+    <div
+      className={`window ${maximized ? 'maximized' : ''} ${isFocused ? 'focused' : 'unfocused'}`}
+      ref={windowRef}
+      onMouseDown={handleFocus}
+    >
+      <div className={`title-bar ${isFocused ? 'focused-title-bar' : 'unfocused-title-bar'}`}>
         <div className="title-bar-text">{title}</div>
         <div className="title-bar-controls">
           <button aria-label="Minimize" onClick={onMinimize}></button>
@@ -60,7 +54,7 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
         </div>
       </div>
       <div className="window-body">
-        {children}
+        {React.cloneElement(children, { isFocused })}
       </div>
     </div>
   );

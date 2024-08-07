@@ -5,29 +5,29 @@ import Background from './components/Background/Background';
 import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
 import AsciiApp from './applications/AsciiApp/AsciiApp';
+import Paint from './applications/Paint/Paint';
 
 const apps = [
   { name: 'AsciiApp', component: AsciiApp },
-  { name: 'AnotherApp', component: AsciiApp },
+  { name: 'Paint', component: Paint },
 ];
 
 function App() {
   const [openApps, setOpenApps] = useState([]);
   const [minimizedApps, setMinimizedApps] = useState([]);
-  const [maximizedApp, setMaximizedApp] = useState(null);
+  const [focusedApp, setFocusedApp] = useState(null);
 
   const openApplication = (appName) => {
-    if (!openApps.includes(appName)) {
-      setOpenApps([...openApps, appName]);
+    if (!openApps.some(app => app.name === appName)) {
+      setOpenApps([...openApps, { name: appName, id: Date.now(), maximized: false }]);
     }
+    setFocusedApp(appName);
   };
 
   const closeApplication = (appName) => {
-    setOpenApps(openApps.filter(app => app !== appName));
+    setOpenApps(openApps.filter(app => app.name !== appName));
     setMinimizedApps(minimizedApps.filter(app => app !== appName));
-    if (maximizedApp === appName) {
-      setMaximizedApp(null);
-    }
+    if (focusedApp === appName) setFocusedApp(null);
   };
 
   const minimizeApplication = (appName) => {
@@ -36,10 +36,16 @@ function App() {
 
   const restoreApplication = (appName) => {
     setMinimizedApps(minimizedApps.filter(app => app !== appName));
+    setFocusedApp(appName);
   };
 
   const toggleMaximizeApplication = (appName) => {
-    setMaximizedApp(prevMaximizedApp => (prevMaximizedApp === appName ? null : appName));
+    setOpenApps(openApps.map(app => app.name === appName ? { ...app, maximized: !app.maximized } : app));
+    setFocusedApp(appName);
+  };
+
+  const handleFocus = (appName) => {
+    setFocusedApp(appName);
   };
 
   const renderApplication = (appName) => {
@@ -53,20 +59,23 @@ function App() {
     <div className="App">
       <Background apps={apps} openApplication={openApplication} />
       <Taskbar 
-        openApps={openApps} 
+        openApps={openApps.map(app => app.name)} 
         restoreApplication={restoreApplication}
+        focusedApp={focusedApp}
       />
-      {openApps.map((app, index) => (
-        !minimizedApps.includes(app) && (
+      {openApps.map(({ name, id, maximized }) => (
+        !minimizedApps.includes(name) && (
           <Window 
-            key={index} 
-            title={app} 
-            onClose={() => closeApplication(app)}
-            onMinimize={() => minimizeApplication(app)}
-            onToggleMaximize={() => toggleMaximizeApplication(app)}
-            maximized={maximizedApp === app}
+            key={id} 
+            title={name} 
+            onClose={() => closeApplication(name)}
+            onMinimize={() => minimizeApplication(name)}
+            onToggleMaximize={() => toggleMaximizeApplication(name)}
+            onFocus={() => handleFocus(name)}
+            maximized={maximized}
+            isFocused={focusedApp === name}
           >
-            {renderApplication(app)}
+            {renderApplication(name)}
           </Window>
         )
       ))}

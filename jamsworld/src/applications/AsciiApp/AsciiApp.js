@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
 import { convertImageToASCII, convertGIFtoASCII } from '../../utils/ascii';
+import { svgToPng } from '../../utils/svgConverter';
 import { handleFileChange } from '../../utils/FileUtils';
+import { loadFonts } from '../../utils/fontUtils';
 import './AsciiApp.css';
 
-const AsciiApp = ({ onClose }) => {
+const AsciiApp = () => {
     const [file, setFile] = useState(null);
     const [fileURL, setFileURL] = useState(null);
     const [width, setWidth] = useState(50);
@@ -17,19 +19,11 @@ const AsciiApp = ({ onClose }) => {
     const colorPickerRef = useRef(null);
 
     useEffect(() => {
-        const loadFonts = async () => {
-            try {
-                await document.fonts.ready;
-                const fontFaces = Array.from(document.fonts);
-                const additionalFonts = ['Arial', 'Courier New', 'Times New Roman', 'Verdana'];
-                const allFonts = [...fontFaces.map(fontFace => fontFace.family), ...additionalFonts];
-                setFonts([...new Set(allFonts)]);
-            } catch (error) {
-                console.error('Error fetching fonts:', error);
-            }
+        const fetchFonts = async () => {
+            const loadedFonts = await loadFonts();
+            setFonts(loadedFonts);
         };
-
-        loadFonts();
+        fetchFonts();
     }, []);
 
     const handleColorChange = (color) => {
@@ -45,15 +39,13 @@ const AsciiApp = ({ onClose }) => {
         }
         setOutputPath("");
         if (file.type === 'image/gif') {
-            convertGIFtoASCII(fileURL, width, chars, font, fill, (gifURL) => {
-                setOutputPath(gifURL);
-            });
+            convertGIFtoASCII(fileURL, width, chars, font, fill, setOutputPath);
         } else {
             const img = new Image();
-            img.onload = () => {
+            img.onload = async () => {
                 const asciiStr = convertImageToASCII(img, width, chars, font, fill);
-                const asciiDataURL = `data:image/svg+xml;base64,${btoa(asciiStr)}`;
-                setOutputPath(asciiDataURL);
+                const pngDataUrl = await svgToPng(asciiStr);
+                setOutputPath(pngDataUrl);
             };
             img.src = fileURL;
         }
@@ -61,11 +53,7 @@ const AsciiApp = ({ onClose }) => {
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (
-                colorPickerRef.current &&
-                !colorPickerRef.current.contains(event.target) &&
-                !event.target.closest('.color-select-icon')
-            ) {
+            if (colorPickerRef.current && !colorPickerRef.current.contains(event.target) && !event.target.closest('.color-select-icon')) {
                 setShowColorPicker(false);
             }
         };
@@ -80,23 +68,23 @@ const AsciiApp = ({ onClose }) => {
         <>
             <div className="form-container">
                 <form onSubmit={handleSubmit} className="form">
-                            <div className="form-group field-row">
-                                <div className="rainbow-text-container">
-                                    <div className="rainbow-text">
-                                        {'ASCIIFY'.split('').map((char, index) => (
-                                            <span key={index} style={{ animationDelay: `${index * 0.1}s, ${index * 0.7}s` }}>
-                                                {char}
-                                            </span>
-                                        ))}
-                                        <span>&nbsp;</span>
-                                        {':)'.split('').map((char, index) => (
-                                            <span key={index + 7} style={{ animationDelay: `${(index + 7) * 0.1}s, ${(index + 7) * 0.7}s` }}>
-                                                {char}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                    <div className="form-group field-row">
+                        <div className="rainbow-text-container">
+                            <div className="rainbow-text">
+                                {'ASCIIFY'.split('').map((char, index) => (
+                                    <span key={index} style={{ animationDelay: `${index * 0.1}s, ${index * 0.7}s` }}>
+                                        {char}
+                                    </span>
+                                ))}
+                                <span>&nbsp;</span>
+                                {':)'.split('').map((char, index) => (
+                                    <span key={index + 7} style={{ animationDelay: `${(index + 7) * 0.1}s, ${(index + 7) * 0.7}s` }}>
+                                        {char}
+                                    </span>
+                                ))}
                             </div>
+                        </div>
+                    </div>
                     <div className="form-group field-row">
                         <label>Select file:</label>
                         <input type="file" id="file" onChange={(e) => handleFileChange(e, setFile, setFileURL)} className="field" />
