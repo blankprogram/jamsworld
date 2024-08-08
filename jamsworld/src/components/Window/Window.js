@@ -1,10 +1,10 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect} from 'react';
 import './Window.css';
 import useDraggable from '../../hooks/useDraggable';
 
 const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximized, onFocus, isFocused }) => {
   const windowRef = useRef(null);
-  const [originalState, setOriginalState] = useState({});
+  const originalStateRef = useRef(null);
 
   useDraggable(windowRef);
 
@@ -12,8 +12,10 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
     const element = windowRef.current;
 
     if (maximized) {
-      const { width, height, top, left, maxWidth, maxHeight, position } = element.style;
-      setOriginalState({ width, height, top, left, maxWidth, maxHeight, position });
+      if (!originalStateRef.current) {
+        const { width, height, top, left, maxWidth, maxHeight, position } = element.style;
+        originalStateRef.current = { width, height, top, left, maxWidth, maxHeight, position };
+      }
 
       element.classList.add('maximized');
       Object.assign(element.style, {
@@ -25,11 +27,12 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
         maxHeight: 'calc(100vh - 30px)',
         position: 'fixed',
       });
-    } else if (Object.keys(originalState).length) {
+    } else if (originalStateRef.current) {
       element.classList.remove('maximized');
-      Object.assign(element.style, originalState);
+      Object.assign(element.style, originalStateRef.current);
+      originalStateRef.current = null;
     }
-    
+
     (() => element.offsetHeight)();
   }, [maximized]);
 
