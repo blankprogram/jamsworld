@@ -4,9 +4,7 @@ export const handleFileChange = (e, setFile, setFileURL) => {
         setFile(uploadedFile);
         const objectURL = URL.createObjectURL(uploadedFile);
         setFileURL(objectURL);
-
-        const img = new Image();
-        img.src = objectURL;
+        console.log("File URL set:", objectURL);
     } else {
         console.error("No file selected!");
     }

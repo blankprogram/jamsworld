@@ -4,13 +4,17 @@ import 'xp.css';
 import Background from './components/Background/Background';
 import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
-import AsciiApp from './applications/AsciiApp/AsciiApp';
+import Asciify from './applications/Asciify/Asciify';
+import Pixort from './applications/Pixort/Pixort';
 import Paint from './applications/Paint/Paint';
 
+
 const apps = [
-  { name: 'AsciiApp', component: AsciiApp },
+  { name: 'Asciify', component: Asciify },
   { name: 'Paint', component: Paint },
+  { name: 'Pixort', component: Pixort },
 ];
+
 
 function App() {
   const [openApps, setOpenApps] = useState([]);

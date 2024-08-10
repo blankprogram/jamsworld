@@ -29,50 +29,48 @@ export function decodeGIF(buffer) {
     return { frames, width: gifReader.width, height: gifReader.height };
 }
 
-export function encodeGIF(frames, width, height) {
-    return new Promise((resolve, reject) => {
-        const encoder = new GIFEncoder(width, height, 'neuquant', true);
-        encoder.setRepeat(0);
-        encoder.setQuality(30);
-        encoder.start();
+export async function encodeGIF(frames, width, height) {
+    const encoder = new GIFEncoder(width, height, 'neuquant', true);
+    encoder.setRepeat(0);
+    encoder.setQuality(30);
+    encoder.start();
 
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = width;
-        canvas.height = height;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = width;
+    canvas.height = height;
 
-        let frameCounter = 0;
+    for (const frame of frames) {
+        const { imgData, asciiStr, frameInfo } = frame;
 
-        frames.forEach((frame, index) => {
-            const { asciiStr, frameInfo } = frame;
+        context.clearRect(0, 0, width, height);
+
+        if (imgData) {
+            context.putImageData(imgData, 0, 0);
+        } else if (asciiStr) {
             const img = new Image();
             img.src = `data:image/svg+xml;base64,${btoa(asciiStr)}`;
+            await new Promise((resolve, reject) => {
+                img.onload = () => {
+                    context.drawImage(img, 0, 0, width, height);
+                    resolve();
+                };
+                img.onerror = (err) => reject(err);
+            });
+        }
 
-            img.onload = () => {
-                context.clearRect(0, 0, width, height);
-                context.drawImage(img, 0, 0, width, height);
+        encoder.setDelay(frameInfo.delay * 10);
+        encoder.setDispose(frameInfo.disposal);
 
-                encoder.setDelay(frameInfo.delay * 10);
-                encoder.setDispose(frameInfo.disposal);
+        if (frameInfo.transparent_index !== undefined) {
+            encoder.setTransparent(frameInfo.transparent_index);
+        }
 
-                if (frameInfo.transparent_index !== undefined) {
-                    encoder.setTransparent(frameInfo.transparent_index);
-                }
+        encoder.addFrame(context);
+    }
 
-                encoder.addFrame(context);
-                frameCounter++;
-
-                if (frameCounter === frames.length) {
-                    encoder.finish();
-                    const binaryGif = encoder.out.getData();
-                    const blob = new Blob([binaryGif], { type: 'image/gif' });
-                    resolve(URL.createObjectURL(blob));
-                }
-            };
-
-            img.onerror = (err) => {
-                reject(err);
-            };
-        });
-    });
+    encoder.finish();
+    const binaryGif = encoder.out.getData();
+    const blob = new Blob([binaryGif], { type: 'image/gif' });
+    return URL.createObjectURL(blob);
 }

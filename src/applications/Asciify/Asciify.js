@@ -2,11 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
 import { convertImageToASCII, convertGIFtoASCII } from '../../utils/ascii';
 import { svgToPng } from '../../utils/svgConverter';
-import { handleFileChange } from '../../utils/FileUtils';
 import { loadFonts } from '../../utils/fontUtils';
-import './AsciiApp.css';
+import './Asciify.css';
 
-const AsciiApp = () => {
+const Asciify = () => {
     const [file, setFile] = useState(null);
     const [fileURL, setFileURL] = useState(null);
     const [width, setWidth] = useState(50);
@@ -17,6 +16,7 @@ const AsciiApp = () => {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [fonts, setFonts] = useState([]);
     const colorPickerRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         const fetchFonts = async () => {
@@ -25,6 +25,18 @@ const AsciiApp = () => {
         };
         fetchFonts();
     }, []);
+
+    const handleFileChange = (e) => {
+        const uploadedFile = e.target.files[0];
+        if (uploadedFile) {
+            setFile(uploadedFile);
+            const objectURL = URL.createObjectURL(uploadedFile);
+            setFileURL(objectURL);
+            console.log("File URL set:", objectURL);
+        } else {
+            console.error("No file selected!");
+        }
+    };
 
     const handleColorChange = (color) => {
         setFill(color.hex);
@@ -39,7 +51,12 @@ const AsciiApp = () => {
         }
         setOutputPath("");
         if (file.type === 'image/gif') {
-            convertGIFtoASCII(fileURL, width, chars, font, fill, setOutputPath);
+            try {
+                const gifPath = await convertGIFtoASCII(fileURL, width, chars, font, fill);
+                setOutputPath(gifPath);
+            } catch (err) {
+                console.error("Error converting GIF:", err);
+            }
         } else {
             const img = new Image();
             img.onload = async () => {
@@ -87,8 +104,8 @@ const AsciiApp = () => {
                     </div>
                     <div className="form-group field-row">
                         <label>Select file:</label>
-                        <input type="file" id="file" onChange={(e) => handleFileChange(e, setFile, setFileURL)} className="field" />
-                        <button type="button" className="button" onClick={() => document.getElementById('file').click()}>Choose File</button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="field" />
+                        <button type="button" className="button" onClick={() => fileInputRef.current.click()}>Choose File</button>
                     </div>
                     <div className="form-group field-row">
                         <label>Width:</label>
@@ -133,4 +150,4 @@ const AsciiApp = () => {
     );
 };
 
-export default AsciiApp;
+export default Asciify;
