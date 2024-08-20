@@ -36,28 +36,24 @@ export async function encodeGIF(frames, width, height) {
     encoder.start();
 
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d',{ willReadFrequently: true });
     canvas.width = width;
     canvas.height = height;
 
     for (const frame of frames) {
-        const { imgData, asciiStr, frameInfo } = frame;
+        const { imgDataUrl, frameInfo } = frame;
 
         context.clearRect(0, 0, width, height);
 
-        if (imgData) {
-            context.putImageData(imgData, 0, 0);
-        } else if (asciiStr) {
-            const img = new Image();
-            img.src = `data:image/svg+xml;base64,${btoa(asciiStr)}`;
-            await new Promise((resolve, reject) => {
-                img.onload = () => {
-                    context.drawImage(img, 0, 0, width, height);
-                    resolve();
-                };
-                img.onerror = (err) => reject(err);
-            });
-        }
+        const img = new Image();
+        img.src = imgDataUrl;
+        await new Promise((resolve, reject) => {
+            img.onload = () => {
+                context.drawImage(img, 0, 0, width, height);
+                resolve();
+            };
+            img.onerror = (err) => reject(err);
+        });
 
         encoder.setDelay(frameInfo.delay * 10);
         encoder.setDispose(frameInfo.disposal);
@@ -74,3 +70,5 @@ export async function encodeGIF(frames, width, height) {
     const blob = new Blob([binaryGif], { type: 'image/gif' });
     return URL.createObjectURL(blob);
 }
+
+

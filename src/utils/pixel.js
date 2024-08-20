@@ -129,7 +129,7 @@ const getLaplace = (pixels, width, x, y) => {
 
 const convertImageToPIXEL = async (img, direction, intervalType, sortMethod, lowerThreshold, upperThreshold) => {
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
     const { width, height } = img;
     canvas.width = width;
     canvas.height = height;
@@ -151,17 +151,8 @@ const convertGIFtoPIXEL = async (gifURL, direction, intervalType, sortMethod, lo
     const sortedFrames = await Promise.all(
         frames.map(async ({ img, frameInfo }) => {
             const imgBitmap = await createImageBitmap(img);
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = gifWidth;
-            canvas.height = gifHeight;
-
-            context.drawImage(imgBitmap, 0, 0, gifWidth, gifHeight);
-            const imageData = context.getImageData(0, 0, gifWidth, gifHeight);
-
-            const sortedData = sortPixels(imageData.data, gifWidth, gifHeight, direction, sortMethod, lowerThreshold, upperThreshold, intervalType);
-            context.putImageData(new ImageData(sortedData, gifWidth, gifHeight), 0, 0);
-            return { imgData: context.getImageData(0, 0, gifWidth, gifHeight), frameInfo };
+            const imgDataUrl = await convertImageToPIXEL(imgBitmap, direction, intervalType, sortMethod, lowerThreshold, upperThreshold);
+            return { imgDataUrl, frameInfo };
         })
     );
 

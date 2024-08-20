@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
 import { convertImageToASCII, convertGIFtoASCII } from '../../utils/ascii';
-import { svgToPng } from '../../utils/svgConverter';
 import { loadFonts } from '../../utils/fontUtils';
 import './Asciify.css';
 
@@ -60,9 +59,8 @@ const Asciify = () => {
         } else {
             const img = new Image();
             img.onload = async () => {
-                const asciiStr = convertImageToASCII(img, width, chars, font, fill);
-                const pngDataUrl = await svgToPng(asciiStr);
-                setOutputPath(pngDataUrl);
+                const asciiDataUrl = await convertImageToASCII(img, width, chars, font, fill);
+                setOutputPath(asciiDataUrl);
             };
             img.src = fileURL;
         }

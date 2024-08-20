@@ -7,12 +7,14 @@ import Window from './components/Window/Window';
 import Asciify from './applications/Asciify/Asciify';
 import Pixort from './applications/Pixort/Pixort';
 import Paint from './applications/Paint/Paint';
+import PixelPass from './applications/PixelPass/PixelPass';
 
 
 const apps = [
   { name: 'Asciify', component: Asciify },
   { name: 'Paint', component: Paint },
   { name: 'Pixort', component: Pixort },
+  { name: 'PixelPass', component: PixelPass },
 ];
 
 
