@@ -8,6 +8,7 @@
     "@testing-library/user-event": "^14.5.2",
     "gif-encoder-2-browser": "^1.0.5",
     "omggif": "^1.0.10",
+    "p5": "^1.10.0",
     "react": "^18.3.1",
     "react-color": "^2.19.3",
     "react-dom": "^18.3.1",

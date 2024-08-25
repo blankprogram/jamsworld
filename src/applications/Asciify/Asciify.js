@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
-import { convertImageToASCII, convertGIFtoASCII } from '../../utils/ascii';
+import { asciiFilter } from '../../utils/ascii';
+import { processMediaWithFilters, processGIFWithFilters } from '../../utils/processMediaWithFilters';
 import { loadFonts } from '../../utils/fontUtils';
 import './Asciify.css';
 
@@ -9,7 +10,7 @@ const Asciify = () => {
     const [fileURL, setFileURL] = useState(null);
     const [width, setWidth] = useState(50);
     const [chars, setChars] = useState(".:-=+*#%@");
-    const [font, setFont] = useState("");
+    const [font, setFont] = useState("Arial");
     const [fill, setFill] = useState("#000000");
     const [outputPath, setOutputPath] = useState("");
     const [showColorPicker, setShowColorPicker] = useState(false);
@@ -49,20 +50,23 @@ const Asciify = () => {
             return;
         }
         setOutputPath("");
-        if (file.type === 'image/gif') {
-            try {
-                const gifPath = await convertGIFtoASCII(fileURL, width, chars, font, fill);
-                setOutputPath(gifPath);
-            } catch (err) {
-                console.error("Error converting GIF:", err);
+
+        const filters = [
+            (context) => asciiFilter(context, width, chars, font, fill),
+        ];
+
+        try {
+            let result;
+            if (file.type === 'image/gif') {
+                result = await processGIFWithFilters(fileURL, filters);
+            } else {
+                const img = new Image();
+                img.src = fileURL;
+                result = await processMediaWithFilters(img, filters);
             }
-        } else {
-            const img = new Image();
-            img.onload = async () => {
-                const asciiDataUrl = await convertImageToASCII(img, width, chars, font, fill);
-                setOutputPath(asciiDataUrl);
-            };
-            img.src = fileURL;
+            setOutputPath(result);
+        } catch (err) {
+            console.error("Error converting media:", err);
         }
     };
 
