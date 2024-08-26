@@ -1,11 +1,15 @@
 .window {
-  width: 90%;
-  max-width: 1200px;
-  height: 90%;
-  max-height: 700px;
-  box-shadow: var(--border-window-outer), var(--border-window-inner);
-  user-select: none;
+  width: 1200px;
+  height: 700px;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
 }
+
+.window.minimized {
+  display: none;
+}
+
 
 .window.focused {
   z-index: 10;
@@ -19,7 +23,6 @@
 
 .title-bar {
   cursor: move;
-  user-select: none;
 }
 
 .title-bar.focused-title-bar {
@@ -44,6 +47,85 @@
   background-color: rgba(255, 255, 255, 0.7);
 }
 
+button, .button {
+  cursor: pointer;
+}
+
 .window-body {
+  height: 100%;
+  overflow: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
   padding: 0 !important;
+}
+
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 100;
+}
+
+.resize-handle.top-left {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle.top-right {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle.bottom-left {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle.bottom-right {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle.top {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.resize-handle.right {
+  top: 10px;
+  right: 0;
+  bottom: 10px;
+  width: 5px;
+  cursor: ew-resize;
+}
+
+.resize-handle.bottom {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.resize-handle.left {
+  top: 10px;
+  left: 0;
+  bottom: 10px;
+  width: 5px;
+  cursor: ew-resize;
 }

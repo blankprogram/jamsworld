@@ -1,50 +1,114 @@
-import { useEffect } from 'react';
+import { useRef } from 'react';
 
-const useDraggable = (ref) => {
-  useEffect(() => {
-    const element = ref.current;
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
-    let offsetX = 0;
-    let offsetY = 0;
+export const useResizableAndDraggable = () => {
+  const windowRef = useRef(null);
+  const minSize = { width: 200, height: 150 };
 
-    const onMouseDown = (e) => {
-      if (e.target.closest('.title-bar')) {
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        const rect = element.getBoundingClientRect();
-        offsetX = startX - rect.left;
-        offsetY = startY - rect.top;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+  const addEventListeners = (moveHandler, stopHandler) => {
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', stopHandler);
+  };
+
+  const removeEventListeners = (moveHandler, stopHandler) => {
+    window.removeEventListener('mousemove', moveHandler);
+    window.removeEventListener('mouseup', stopHandler);
+  };
+
+  const startDrag = (e) => {
+    e.preventDefault();
+    if (!windowRef.current) return;
+
+    const { clientX: startX, clientY: startY } = e;
+    const { offsetLeft: startLeft, offsetTop: startTop } = windowRef.current;
+
+    const handleDrag = (event) => {
+      if (!windowRef.current) return;
+
+      const newLeft = Math.max(0, Math.min(window.innerWidth - windowRef.current.offsetWidth, startLeft + event.clientX - startX));
+      const newTop = Math.max(0, Math.min(window.innerHeight - windowRef.current.offsetHeight, startTop + event.clientY - startY));
+
+      windowRef.current.style.left = `${newLeft}px`;
+      windowRef.current.style.top = `${newTop}px`;
+    };
+
+    addEventListeners(handleDrag, () => removeEventListeners(handleDrag, handleDrag));
+  };
+
+  const handleResize = (e, direction) => {
+    e.preventDefault();
+    if (!windowRef.current) return;
+
+    const element = windowRef.current;
+    const { clientX: startX, clientY: startY } = e;
+    const { offsetWidth: startWidth, offsetHeight: startHeight, offsetLeft: startLeft, offsetTop: startTop } = element;
+
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newLeft = startLeft;
+    let newTop = startTop;
+
+    const updateSizeAndPosition = (event) => {
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+
+      const maxDeltaX = startWidth - minSize.width;
+      const maxDeltaY = startHeight - minSize.height;
+
+      if (direction.includes('right')) {
+        newWidth = Math.max(minSize.width, startWidth + deltaX);
+      }
+
+      if (direction.includes('left')) {
+        if (deltaX <= maxDeltaX && startLeft + deltaX >= 0) {
+          newWidth = startWidth - deltaX;
+          newLeft = startLeft + deltaX;
+        } else if (deltaX > maxDeltaX) {
+          newWidth = minSize.width;
+          newLeft = startLeft + maxDeltaX;
+        } else {
+          newLeft = 0;
+          newWidth = startLeft + startWidth;
+        }
+      }
+
+      if (direction.includes('bottom')) {
+        newHeight = Math.max(minSize.height, startHeight + deltaY);
+      }
+
+      if (direction.includes('top')) {
+        if (deltaY <= maxDeltaY && startTop + deltaY >= 0) {
+          newHeight = startHeight - deltaY;
+          newTop = startTop + deltaY;
+        } else if (deltaY > maxDeltaY) {
+          newHeight = minSize.height;
+          newTop = startTop + maxDeltaY;
+        } else {
+          newTop = 0;
+          newHeight = startTop + startHeight;
+        }
+      }
+
+      newWidth = Math.min(newWidth, window.innerWidth - newLeft);
+      newHeight = Math.min(newHeight, window.innerHeight - newTop);
+
+      element.style.width = `${newWidth}px`;
+      element.style.height = `${newHeight}px`;
+
+      if (direction.includes('left')) {
+        element.style.left = `${newLeft}px`;
+      }
+
+      if (direction.includes('top')) {
+        element.style.top = `${newTop}px`;
       }
     };
 
-    const onMouseMove = (e) => {
-      if (isDragging) {
-        const left = e.clientX - offsetX;
-        const top = e.clientY - offsetY;
-        const rightBound = window.innerWidth - element.offsetWidth;
-        const bottomBound = window.innerHeight - element.offsetHeight;
-        element.style.left = `${Math.min(Math.max(left, 0), rightBound)}px`;
-        element.style.top = `${Math.min(Math.max(top, 0), bottomBound)}px`;
-      }
-    };
+    addEventListeners(updateSizeAndPosition, () => removeEventListeners(updateSizeAndPosition, updateSizeAndPosition));
+  };
 
-    const onMouseUp = () => {
-      isDragging = false;
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    element.addEventListener('mousedown', onMouseDown);
-
-    return () => {
-      element.removeEventListener('mousedown', onMouseDown);
-    };
-  }, [ref]);
+  return {
+    windowRef,
+    startDrag,
+    startResize: handleResize,
+  };
 };
-
-export default useDraggable;

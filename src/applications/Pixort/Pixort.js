@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { processMediaWithFilters, processGIFWithFilters } from '../../utils/processMediaWithFilters';
-import { pixelSortFilter } from '../../utils/pixel';
+import { pixelSortFilter } from '../../utils/filters';
 
 const Pixort = () => {
     const [file, setFile] = useState(null);
@@ -27,9 +27,11 @@ const Pixort = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!file) return;
-
-        const filters = [(context) => pixelSortFilter(context, direction, sortMethod, lowerThreshold, upperThreshold, intervalType)];
-
+    
+        const filters = [
+            (context) => pixelSortFilter(context, { direction, sortMethod, lowerThreshold, upperThreshold, intervalType }),
+        ];
+    
         let result;
         if (file.type === 'image/gif') {
             result = await processGIFWithFilters(fileURL, filters);
@@ -40,6 +42,7 @@ const Pixort = () => {
         }
         setOutputPath(result);
     };
+    
 
     return (
         <>

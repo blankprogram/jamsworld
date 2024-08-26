@@ -1,40 +1,52 @@
-import React, { useRef, useEffect} from 'react';
+import React, { useRef, useEffect } from 'react';
 import './Window.css';
-import useDraggable from '../../hooks/useDraggable';
+import { useResizableAndDraggable } from '../../hooks/useDraggable';
 
-const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximized, onFocus, isFocused }) => {
-  const windowRef = useRef(null);
+const Window = ({
+  title,
+  children,
+  onClose,
+  onMinimize,
+  onToggleMaximize,
+  maximized,
+  onFocus,
+  isFocused,
+  isMinimized,
+  taskbarHeight = 30,
+}) => {
+  const { windowRef, startDrag, startResize } = useResizableAndDraggable();
   const originalStateRef = useRef(null);
-
-  useDraggable(windowRef);
 
   useEffect(() => {
     const element = windowRef.current;
 
+    if (!element) return;
+
     if (maximized) {
       if (!originalStateRef.current) {
-        const { width, height, top, left, maxWidth, maxHeight, position } = element.style;
-        originalStateRef.current = { width, height, top, left, maxWidth, maxHeight, position };
+        originalStateRef.current = {
+          width: element.style.width,
+          height: element.style.height,
+          top: element.style.top,
+          left: element.style.left,
+          position: element.style.position,
+          maxWidth: element.style.maxWidth,
+          maxHeight: element.style.maxHeight,
+        };
       }
 
-      element.classList.add('maximized');
-      Object.assign(element.style, {
-        width: '100vw',
-        height: 'calc(100vh - 30px)',
-        top: '0',
-        left: '0',
-        maxWidth: '100vw',
-        maxHeight: 'calc(100vh - 30px)',
-        position: 'fixed',
-      });
+      element.style.position = 'fixed';
+      element.style.top = '0';
+      element.style.left = '0';
+      element.style.width = '100vw';
+      element.style.height = `calc(100vh - ${taskbarHeight}px)`;
+      element.style.maxWidth = '100vw';
+      element.style.maxHeight = `calc(100vh - ${taskbarHeight}px)`;
     } else if (originalStateRef.current) {
-      element.classList.remove('maximized');
       Object.assign(element.style, originalStateRef.current);
       originalStateRef.current = null;
     }
-
-    (() => element.offsetHeight)();
-  }, [maximized]);
+  }, [maximized, taskbarHeight, windowRef]);
 
   const handleFocus = (e) => {
     if (!e.target.closest('.title-bar-controls')) {
@@ -42,13 +54,21 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
     }
   };
 
+  const handleDoubleClick = () => {
+    onToggleMaximize();
+  };
+
   return (
     <div
-      className={`window ${maximized ? 'maximized' : ''} ${isFocused ? 'focused' : 'unfocused'}`}
+      className={`window ${maximized ? 'maximized' : ''} ${isFocused ? 'focused' : 'unfocused'} ${isMinimized ? 'minimized' : ''}`}
       ref={windowRef}
       onMouseDown={handleFocus}
     >
-      <div className={`title-bar ${isFocused ? 'focused-title-bar' : 'unfocused-title-bar'}`}>
+      <div
+        className={`title-bar ${isFocused ? 'focused-title-bar' : 'unfocused-title-bar'}`}
+        onMouseDown={startDrag}
+        onDoubleClick={handleDoubleClick}
+      >
         <div className="title-bar-text">{title}</div>
         <div className="title-bar-controls">
           <button aria-label="Minimize" onClick={onMinimize}></button>
@@ -59,6 +79,15 @@ const Window = ({ title, children, onClose, onMinimize, onToggleMaximize, maximi
       <div className="window-body">
         {React.cloneElement(children, { isFocused })}
       </div>
+
+      <div className="resize-handle top-left" onMouseDown={(e) => startResize(e, 'top left')}></div>
+      <div className="resize-handle top-right" onMouseDown={(e) => startResize(e, 'top right')}></div>
+      <div className="resize-handle bottom-left" onMouseDown={(e) => startResize(e, 'bottom left')}></div>
+      <div className="resize-handle bottom-right" onMouseDown={(e) => startResize(e, 'bottom right')}></div>
+      <div className="resize-handle top" onMouseDown={(e) => startResize(e, 'top')}></div>
+      <div className="resize-handle right" onMouseDown={(e) => startResize(e, 'right')}></div>
+      <div className="resize-handle bottom" onMouseDown={(e) => startResize(e, 'bottom')}></div>
+      <div className="resize-handle left" onMouseDown={(e) => startResize(e, 'left')}></div>
     </div>
   );
 };

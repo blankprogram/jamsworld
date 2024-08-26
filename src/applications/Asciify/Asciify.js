@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchPicker } from 'react-color';
-import { asciiFilter } from '../../utils/ascii';
+import { asciiFilter } from '../../utils/filters';
 import { processMediaWithFilters, processGIFWithFilters } from '../../utils/processMediaWithFilters';
 import { loadFonts } from '../../utils/fontUtils';
 import './Asciify.css';
@@ -50,11 +50,11 @@ const Asciify = () => {
             return;
         }
         setOutputPath("");
-
+    
         const filters = [
-            (context) => asciiFilter(context, width, chars, font, fill),
+            (context) => asciiFilter(context, { newWidth: width, chars, font, fill }),
         ];
-
+    
         try {
             let result;
             if (file.type === 'image/gif') {

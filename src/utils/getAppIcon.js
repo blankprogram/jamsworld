@@ -13,7 +13,7 @@ const generateCartoonyA = () => {
   return canvas.toDataURL('image/png');
 };
 
-const generatePixels = () => {
+const generatePixort = () => {
   const canvas = document.createElement('canvas');
   canvas.width = 100;
   canvas.height = 100;
@@ -35,6 +35,27 @@ const generatePixels = () => {
   return canvas.toDataURL('image/png');
 };
 
+const generatePixelPass = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 100;
+  canvas.height = 100;
+  const ctx = canvas.getContext('2d');
+
+  const squareSize = 12;
+  const offset = 20;
+  const numSquares = 5;
+
+  for (let y = 0; y < numSquares; y++) {
+    for (let x = 0; x < numSquares; x++) {
+      ctx.fillStyle = (x + y) % 2 === 0 ? 'black' : 'white';
+      ctx.fillRect(offset + x * squareSize, offset + y * squareSize, squareSize, squareSize);
+    }
+  }
+
+  return canvas.toDataURL('image/png');
+};
+
+
 export const getAppIcon = (appName) => {
   switch (appName) {
       case 'Asciify':
@@ -42,7 +63,9 @@ export const getAppIcon = (appName) => {
       case 'Paint':
           return require('../assets/Icons/paint.png');
       case 'Pixort':
-          return generatePixels();
+          return generatePixort();
+      case 'PixelPass':
+            return generatePixelPass();
       default:
           return require('../assets/Icons/start.png');
   }
