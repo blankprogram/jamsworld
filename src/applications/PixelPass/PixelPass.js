@@ -1,8 +1,15 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { processMediaWithFilters, processGIFWithFilters } from "../../utils/processMediaWithFilters";
 import { pixelSortFilter } from "../../utils/pixel";
 import { asciiFilter } from "../../utils/ascii";
 import { loadFonts } from "../../utils/fontUtils";
+import {
+  invertColors,
+  grayscale,
+  blur,
+  sharpen,
+  dithering,
+} from "../../utils/basicFilters";
 import styles from "./PixelPass.module.css";
 
 const FilterControl = ({ label, type, name, value, options, onChange, props }) => (
@@ -28,7 +35,15 @@ const FilterControl = ({ label, type, name, value, options, onChange, props }) =
   </label>
 );
 
-const FilterOptions = ({ filter, index, fonts, toggleFilter, handleOptionChange, removeFilterFromStack }) => {
+const FilterOptions = ({
+  filter,
+  index,
+  fonts,
+  toggleFilter,
+  handleOptionChange,
+  removeFilterFromStack,
+  getFilterFunction,
+}) => {
   const filterOptions = {
     ASCII: {
       title: "ASCII Filter",
@@ -45,19 +60,38 @@ const FilterOptions = ({ filter, index, fonts, toggleFilter, handleOptionChange,
         { label: "Direction", type: "select", name: "direction", options: ["Right", "Left", "Down", "Up"] },
         { label: "Sort Method", type: "select", name: "sortMethod", options: ["rgb", "hue", "sat", "laplace", "luminance"] },
         { label: "Interval Type", type: "select", name: "intervalType", options: ["none", "threshold"] },
-        {
-          label: "Lower Threshold", type: "range", name: "lowerThreshold",
-          showIf: () => filter.options.intervalType === "threshold", props: { min: 0, max: 100 }
-        },
-        {
-          label: "Upper Threshold", type: "range", name: "upperThreshold",
-          showIf: () => filter.options.intervalType === "threshold", props: { min: 0, max: 100 }
-        },
+        { label: "Lower Threshold", type: "range", name: "lowerThreshold", showIf: () => filter.options.intervalType === "threshold", props: { min: 0, max: 100 } },
+        { label: "Upper Threshold", type: "range", name: "upperThreshold", showIf: () => filter.options.intervalType === "threshold", props: { min: 0, max: 100 } },
       ],
+    },
+    INVERT: {
+      title: "Invert Colors",
+      options: [],
+    },
+    GRAYSCALE: {
+      title: "Grayscale",
+      options: [],
+    },
+    BLUR: {
+      title: "Blur",
+      options: [
+        { label: "Strength", type: "range", name: "strength", props: { min: 0, max: 20 } },
+
+      ],
+    },
+    SHARPEN: {
+      title: "Sharpen",
+      options: [{ label: "Strength", type: "range", name: "strength", props: { min: 0, max: 20 } }],
+    },
+    DITHERING: {
+      title: "Dithering",
+      options: [],
     },
   };
 
-  const filterType = filter.filterFunc === asciiFilter ? "ASCII" : "PIXEL";
+  const filterType = Object.keys(filterOptions).find(
+    (key) => filter.filterFunc === getFilterFunction(key)
+  );
   const { title, options } = filterOptions[filterType];
 
   return (
@@ -100,6 +134,11 @@ const PixelPass = () => {
 
   const fileInputRef = useRef(null);
 
+  const resetFilters = useCallback(() => {
+    setOutputURL(null);
+    setFilterStack([]);
+  }, []);
+
   useEffect(() => {
     const fetchFonts = async () => {
       const loadedFonts = await loadFonts();
@@ -118,28 +157,28 @@ const PixelPass = () => {
     } else {
       console.error("No file selected!");
     }
+  }, [resetFilters]);
+
+  const getFilterFunction = useCallback((filterType) => {
+    return {
+      ASCII: asciiFilter,
+      PIXEL: pixelSortFilter,
+      INVERT: invertColors,
+      GRAYSCALE: grayscale,
+      BLUR: blur,
+      SHARPEN: sharpen,
+      DITHERING: dithering,
+    }[filterType];
   }, []);
 
-  const resetFilters = useCallback(() => {
-    setOutputURL(null);
-    setFilterStack([]);
-  }, []);
-
-  const addFilterToStack = useCallback((filterType, options) => {
+  const addFilterToStack = useCallback((filterType, options = {}) => {
     const filterFunc = getFilterFunction(filterType);
     setFilterStack((prevStack) => [
       ...prevStack,
       { filterFunc, options, isOpen: false },
     ]);
     setShowFilterOptions(false);
-  }, []);
-
-  const getFilterFunction = (filterType) => {
-    return {
-      ASCII: asciiFilter,
-      PIXEL: pixelSortFilter,
-    }[filterType];
-  };
+  }, [getFilterFunction]);
 
   const toggleFilter = useCallback((index) => {
     setFilterStack((prevStack) =>
@@ -153,14 +192,16 @@ const PixelPass = () => {
     setFilterStack((prevStack) => prevStack.filter((_, i) => i !== index));
   }, []);
 
-  const argumentOrder = {
+  const argumentOrder = useMemo(() => ({
     pixelSortFilter: ['direction', 'sortMethod', 'lowerThreshold', 'upperThreshold', 'intervalType'],
     asciiFilter: ['newWidth', 'chars', 'font', 'fill'],
-  };
+    blur: ['strength'],
+    sharpen: ['strength'],
+  }), []);
 
-  const orderOptions = (filterName, options) => {
-    return argumentOrder[filterName].map(key => options[key]);
-  };
+  const orderOptions = useCallback((filterName, options) => {
+    return (argumentOrder[filterName] || []).map(key => options[key]);
+  }, [argumentOrder]);
 
   const applyFilters = useCallback(async () => {
     if (!fileURL) return;
@@ -177,21 +218,23 @@ const PixelPass = () => {
       const img = new Image();
       img.src = fileURL;
       await new Promise((resolve) => {
-        img.onload = resolve;
+        img.onload = resolve();
       });
       console.log("Image loaded for PixelPass:", img);
       result = await processMediaWithFilters(img, filters);
     }
     setOutputURL(result);
-  }, [fileURL, fileType, filterStack]);
+  }, [fileURL, fileType, filterStack, orderOptions]);
 
   const handleOptionChange = useCallback((index, optionName, value) => {
     setFilterStack((prevStack) => {
       const updatedStack = [...prevStack];
-      updatedStack[index].options[optionName] = value;
+      // no clue how to make sure the range is type int : |
+      updatedStack[index].options[optionName] = optionName === 'strength' ? Number(value) : value;
       return updatedStack;
     });
   }, []);
+
 
   return (
     <div className={styles.mainContainer}>
@@ -232,6 +275,7 @@ const PixelPass = () => {
               toggleFilter={toggleFilter}
               handleOptionChange={handleOptionChange}
               removeFilterFromStack={removeFilterFromStack}
+              getFilterFunction={getFilterFunction}
             />
           ))}
           <button
@@ -268,6 +312,36 @@ const PixelPass = () => {
                 className="xpButton"
               >
                 Pixel Sort Filter
+              </button>
+              <button
+                onClick={() => addFilterToStack("INVERT")}
+                className="xpButton"
+              >
+                Invert Colors
+              </button>
+              <button
+                onClick={() => addFilterToStack("GRAYSCALE")}
+                className="xpButton"
+              >
+                Grayscale
+              </button>
+              <button
+                onClick={() => addFilterToStack("BLUR", { strength: 1 })}
+                className="xpButton"
+              >
+                Blur
+              </button>
+              <button
+                onClick={() => addFilterToStack("SHARPEN", { strength: 1 })}
+                className="xpButton"
+              >
+                Sharpen
+              </button>
+              <button
+                onClick={() => addFilterToStack("DITHERING")}
+                className="xpButton"
+              >
+                Dithering
               </button>
             </div>
           )}
