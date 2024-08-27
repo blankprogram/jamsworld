@@ -62,6 +62,10 @@ export const getAppIcon = (appName) => {
           return generateCartoonyA();
       case 'Paint':
           return require('../assets/Icons/paint.png');
+      case 'Minesweeper':
+            return require('../assets/Icons/minesweeper.png');
+      case 'Winamp':
+            return require('../assets/Icons/winamp.png');
       case 'Pixort':
           return generatePixort();
       case 'PixelPass':

@@ -18,6 +18,7 @@ import {
 import { loadFonts } from "../../utils/fontUtils";
 import styles from "./PixelPass.module.css";
 
+
 const FILTER_FUNCTIONS = {
   ASCII: asciiFilter,
   PIXEL: pixelSortFilter,

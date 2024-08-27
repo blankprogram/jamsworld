@@ -18,6 +18,11 @@ export const useResizableAndDraggable = () => {
     e.preventDefault();
     if (!windowRef.current) return;
 
+    const iframe = windowRef.current.querySelector('iframe');
+    if (iframe) {
+      iframe.style.pointerEvents = 'none';
+    }
+
     const { clientX: startX, clientY: startY } = e;
     const { offsetLeft: startLeft, offsetTop: startTop } = windowRef.current;
 
@@ -31,7 +36,15 @@ export const useResizableAndDraggable = () => {
       windowRef.current.style.top = `${newTop}px`;
     };
 
-    addEventListeners(handleDrag, () => removeEventListeners(handleDrag, handleDrag));
+    const stopDrag = () => {
+      removeEventListeners(handleDrag, stopDrag);
+
+      if (iframe) {
+        iframe.style.pointerEvents = 'auto';
+      }
+    };
+
+    addEventListeners(handleDrag, stopDrag);
   };
 
   const handleResize = (e, direction) => {

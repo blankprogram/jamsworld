@@ -1,14 +1,15 @@
+html, body {
+  overflow: hidden;
+}
+
 .App {
-  text-align: center;
+
   height: 100vh;
   width: 100vw;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-size: cover;
-  background-position: center;
   overflow: hidden;
   position: relative;
   user-select: none;
 }
-
