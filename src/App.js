@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import 'xp.css';
 import Background from './components/Background/Background';
@@ -6,10 +6,6 @@ import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
 
 function App() {
-  const [openApps, setOpenApps] = useState([]);
-  const [minimizedApps, setMinimizedApps] = useState([]);
-  const [focusedApp, setFocusedApp] = useState(null);
-
   const appsContext = require.context('./applications', true, /\.js$/);
   const apps = appsContext.keys().map(key => {
     const segments = key.split('/');
@@ -24,38 +20,52 @@ function App() {
   }).filter(Boolean);
 
   const nonStylizedApps = ['Winamp'];
+
+  const initialOpenApps = ['Winamp'].map(appName => ({
+    name: appName,
+    id: Date.now(),
+    maximized: false,
+  }));
+
+  const [openApps, setOpenApps] = useState(initialOpenApps);
+  const [minimizedApps, setMinimizedApps] = useState([]);
+  const [focusedApp, setFocusedApp] = useState(initialOpenApps[0]?.id || null);
+
   const openApplication = appName => {
     const newApp = { name: appName, id: Date.now(), maximized: false };
-    setOpenApps([...openApps, newApp]);
+    setOpenApps(prevApps => [...prevApps, newApp]);
     setFocusedApp(newApp.id);
-    setMinimizedApps(minimizedApps.filter(app => app !== newApp.id));
+    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== newApp.id));
   };
 
   const closeApplication = appId => {
-    setOpenApps(openApps.filter(app => app.id !== appId));
-    setMinimizedApps(minimizedApps.filter(app => app !== appId));
+    setOpenApps(prevApps => prevApps.filter(app => app.id !== appId));
+    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== appId));
     if (focusedApp === appId) setFocusedApp(null);
   };
 
   const minimizeApplication = appId => {
-    setMinimizedApps([...minimizedApps, appId]);
+    setMinimizedApps(prevMinimized => [...prevMinimized, appId]);
     if (focusedApp === appId) setFocusedApp(null);
   };
 
   const restoreApplication = appId => {
-
-    setMinimizedApps(minimizedApps.filter(app => app !== appId));
+    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== appId));
     setFocusedApp(appId);
 
-    setOpenApps(openApps.map(app =>
-      app.id === appId ? { ...app, isMinimized: false } : app
-    ));
+    setOpenApps(prevApps =>
+      prevApps.map(app =>
+        app.id === appId ? { ...app, isMinimized: false } : app
+      )
+    );
   };
 
   const toggleMaximizeApplication = appId => {
-    setOpenApps(openApps.map(app => 
-      app.id === appId ? { ...app, maximized: !app.maximized } : app
-    ));
+    setOpenApps(prevApps =>
+      prevApps.map(app =>
+        app.id === appId ? { ...app, maximized: !app.maximized } : app
+      )
+    );
     setFocusedApp(appId);
   };
 
@@ -75,11 +85,6 @@ function App() {
       />
     );
   };
-
-
-  useEffect(() => {
-    openApplication('Winamp'); // open at boot
-  }, []);
 
   return (
     <div className="App">
