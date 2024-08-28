@@ -272,12 +272,13 @@ const PixelPass = () => {
   const moveFilter = useCallback(
     (fromIndex, toIndex) => {
       if (fromIndex === toIndex || fromIndex === null || toIndex === null) return;
-
+  
       const updatedStack = [...filterStack];
-      const [movedFilter] = updatedStack.splice(fromIndex, 1);
-      updatedStack.splice(toIndex, 0, movedFilter);
-
+  
+      [updatedStack[fromIndex], updatedStack[toIndex]] = [updatedStack[toIndex], updatedStack[fromIndex]];
+  
       setFilterStack(updatedStack);
+  
     },
     [filterStack]
   );
