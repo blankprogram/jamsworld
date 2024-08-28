@@ -13,3 +13,7 @@ html, body {
   position: relative;
   user-select: none;
 }
+
+button {
+  cursor: pointer;
+}
