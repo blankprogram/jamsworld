@@ -5,16 +5,24 @@ import { getAppIcon } from '../../utils/getAppIcon';
 const Background = ({ apps, openApplication, setFocusedApp }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [box, setBox] = useState(null);
-  const startPoint = useRef(null);
   const [selectedApps, setSelectedApps] = useState([]);
+  const startPoint = useRef(null);
 
   const handleMouseDown = (e) => {
-    if (!e.target.closest('.icon')) {
+    const icon = e.target.closest('.icon');
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    if (icon) {
+      const appName = icon.id;
+      setSelectedApps([appName]);
+      setFocusedApp(appName);
+    } else {
       setSelectedApps([]);
       setFocusedApp(null);
+      startPoint.current = { x: clientX, y: clientY };
+      setIsDragging(true);
     }
-    setIsDragging(true);
-    startPoint.current = { x: e.clientX, y: e.clientY };
   };
 
   const handleMouseMove = (e) => {
@@ -26,8 +34,8 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
         height: Math.abs(e.clientY - startPoint.current.y),
       };
       setBox(newBox);
-      
-      const selected = apps.filter(app => {
+
+      const selected = apps.filter((app) => {
         const appElement = document.getElementById(app.name);
         const appRect = appElement.getBoundingClientRect();
         return !(
@@ -47,11 +55,6 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
     setBox(null);
   };
 
-  const handleIconClick = (appName) => {
-    setSelectedApps([appName]);
-    setFocusedApp(appName);
-  };
-
   const handleIconDoubleClick = (appName) => {
     setSelectedApps([]);
     openApplication(appName);
@@ -69,7 +72,6 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
           key={app.name}
           id={app.name}
           className={`icon ${selectedApps.includes(app.name) ? 'selected' : ''}`}
-          onClick={() => handleIconClick(app.name)}
           onDoubleClick={() => handleIconDoubleClick(app.name)}
         >
           <img src={getAppIcon(app.name)} alt={app.name} className="app-icon" />
