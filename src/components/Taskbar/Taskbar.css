@@ -81,3 +81,39 @@
   color: white;
   text-align: center;
 }
+
+.system-tray {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background-color: #0b77e9;
+  background: linear-gradient(
+    to bottom,
+    #0c59b9 1%,
+    #139ee9 6%,
+    #18b5f2 10%,
+    #139beb 14%,
+    #1290e8 19%,
+    #0d8dea 63%,
+    #0d9ff1 81%,
+    #0f9eed 88%,
+    #119be9 91%,
+    #1392e2 94%,
+    #137ed7 97%,
+    #095bc9 100%
+  );
+  border-left: 1px solid #1042af;
+  box-shadow: inset 1px 0 1px #18bbff;
+}
+
+.system-tray-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+}
+
+.system-tray-time {
+  color: #fff;
+  font-size: 11px;
+  font-weight: lighter;
+}
