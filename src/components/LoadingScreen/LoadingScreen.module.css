@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto:100,300,700');
+
+body {
+  background: #000;
+  font-family: 'Roboto', sans-serif;
+  color: #fff;
+}
+
+.loadingScreenContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+}
+
+.window {
+  text-align: center;
+}
+
+.container {
+  width: 150px;
+  height: 10px;
+  border: 2px solid #b2b2b2;
+  border-radius: 7px;
+  margin: 0 auto;
+  padding: 2px 1px;
+  overflow: hidden;
+  font-size: 0;
+  margin-top: 100px;
+}
+
+.box {
+  width: 9px;
+  height: 100%;
+  background: linear-gradient(to bottom, #2838c7 0%, #5979ef 17%, #869ef3 32%, #869ef3 45%, #5979ef 59%, #2838c7 100%);
+  display: inline-block;
+  margin-right: 2px;
+  animation: loader 2s infinite;
+  animation-timing-function: linear;
+}
+
+.logo {
+  width: 220px;
+  margin: 50px auto 0;
+  text-align: left;
+}
+
+.microsoftWithIcon {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.top {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 16px;
+  margin-right: 8px;
+}
+
+.xpIcon {
+  width: 110px;
+  height: auto;
+}
+
+.top:after {
+  content: "\00a9";
+  font-size: 10px;
+  position: relative;
+  top: -5px;
+  margin-left: 2px;
+}
+
+.mid {
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 36px;
+  margin-top: -10px;
+}
+
+.mid span {
+  font-size: 22px;
+  display: inline-block;
+  vertical-align: top;
+  color: #ff6821;
+  margin-top: -8px;
+}
+
+@keyframes loader {
+  0% {
+    transform: translate(-30px);
+  }
+  100% {
+    transform: translate(150px);
+  }
+}
+
+.clickText {
+  margin-top: 20px;
+  font-size: 18px;
+  font-weight: 300;
+  color: #fff;
+  font-family: 'Tahoma', 'Verdana', 'Segoe UI', sans-serif;
+}

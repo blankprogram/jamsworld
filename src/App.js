@@ -1,11 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import 'xp.css';
 import Background from './components/Background/Background';
 import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
+import LoadingScreen from './components/LoadingScreen/LoadingScreen';
+import WelcomeScreen from './components/WelcomeScreen/WelcomeScreen';
+import startupSound from './assets/Sounds/startup.mp3';
+
+const SCREEN_STATE = {
+  LOADING: 'LOADING',
+  WELCOME: 'WELCOME',
+  MAIN: 'MAIN'
+};
 
 function App() {
+  const [screenState, setScreenState] = useState(SCREEN_STATE.LOADING);
+  const audioRef = useRef(null);
+
+  const handleLoadingScreenClick = () => {
+    setScreenState(SCREEN_STATE.WELCOME);
+  };
+
+  useEffect(() => {
+    if (screenState === SCREEN_STATE.WELCOME) {
+      const welcomeTimer = setTimeout(() => {
+        setScreenState(SCREEN_STATE.MAIN);
+      }, 3000);
+      return () => clearTimeout(welcomeTimer);
+    }
+  }, [screenState]);
+
+  useEffect(() => {
+    if (screenState === SCREEN_STATE.MAIN && audioRef.current) {
+      audioRef.current.volume = 0.25;
+      console.log('Attempting to play audio...');
+      audioRef.current.play().then(() => {
+        console.log('Audio played successfully');
+      }).catch((error) => {
+        console.error('Failed to play audio:', error);
+      });
+    }
+  }, [screenState]);
+
   const appsContext = require.context('./applications', true, /\.js$/);
   const apps = appsContext.keys().map(key => {
     const segments = key.split('/');
@@ -86,33 +123,42 @@ function App() {
     );
   };
 
-  return (
-    <div className="App">
-      <Background apps={apps} openApplication={openApplication} setFocusedApp={setFocusedApp} />
-      <Taskbar
-        openApps={openApps}
-        restoreApplication={restoreApplication}
-        minimizeApplication={minimizeApplication}
-        focusedApp={focusedApp}
-      />
-      {openApps.map(({ name, id, maximized }) => (
-        <Window
-          key={id}
-          title={name}
-          onClose={() => closeApplication(id)}
-          onMinimize={() => minimizeApplication(id)}
-          onToggleMaximize={() => toggleMaximizeApplication(id)}
-          onFocus={() => handleFocus(id)}
-          maximized={maximized}
-          isFocused={focusedApp === id}
-          isMinimized={minimizedApps.includes(id)}
-          useStyledWindow={!nonStylizedApps.includes(name)}
-        >
-          {renderApplication(name, id)}
-        </Window>
-      ))}
-    </div>
-  );
+  switch (screenState) {
+    case SCREEN_STATE.LOADING:
+      return <div onClick={handleLoadingScreenClick}><LoadingScreen /></div>;
+    case SCREEN_STATE.WELCOME:
+      return <WelcomeScreen />;
+    case SCREEN_STATE.MAIN:
+    default:
+      return (
+        <div className="App">
+          <audio ref={audioRef} src={startupSound} />
+          <Background apps={apps} openApplication={openApplication} setFocusedApp={setFocusedApp} />
+          <Taskbar
+            openApps={openApps}
+            restoreApplication={restoreApplication}
+            minimizeApplication={minimizeApplication}
+            focusedApp={focusedApp}
+          />
+          {openApps.map(({ name, id, maximized }) => (
+            <Window
+              key={id}
+              title={name}
+              onClose={() => closeApplication(id)}
+              onMinimize={() => minimizeApplication(id)}
+              onToggleMaximize={() => toggleMaximizeApplication(id)}
+              onFocus={() => handleFocus(id)}
+              maximized={maximized}
+              isFocused={focusedApp === id}
+              isMinimized={minimizedApps.includes(id)}
+              useStyledWindow={!nonStylizedApps.includes(name)}
+            >
+              {renderApplication(name, id)}
+            </Window>
+          ))}
+        </div>
+      );
+  }
 }
 
 export default App;

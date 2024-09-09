@@ -5,6 +5,7 @@ import { processMediaWithFilters, processGIFWithFilters } from '../../utils/proc
 import { loadFonts } from '../../utils/fontUtils';
 import './Asciify.css';
 
+
 const Asciify = () => {
     const [file, setFile] = useState(null);
     const [fileURL, setFileURL] = useState(null);

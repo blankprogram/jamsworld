@@ -1,0 +1,51 @@
+.welcomeScreen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  height: 10vh;
+  background-color: #131e84;
+  border-bottom: 5px solid transparent;
+  border-image: linear-gradient(90deg, #4a72d2, #7888ad 50%, #4a72d2) 1;
+}
+
+.bottomBar {
+  height: 10vh;
+  background-color: #131e84;
+  border-top: 5px solid transparent;
+  border-image: linear-gradient(90deg, #4a72d2, #907465 50%, #4a72d2) 1;
+}
+
+.middleSection {
+  flex-grow: 1;
+  background-color: #4a72d2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.fullCircle {
+  position: absolute;
+  top: -250px;
+  left: -250px;
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, #9ab2f2 10%, #4a72d2 70%, #4a72d2 100%); /* Full circle gradient with faster transition */
+  border-radius: 50%;
+}
+
+.welcomeMessage {
+  font-size: 48px;
+  font-weight: 700;
+  font-style: italic;
+  color: #fff;
+  margin-left: 300px;
+}
