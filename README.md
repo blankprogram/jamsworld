@@ -1,70 +1,83 @@
-# Getting Started with Create React App
+# Windows XP Style React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A Windows XP-styled web application replica using React, emulating the look and feel of the classic OS.
+Specializes in image processing features, allowing users to apply various filters such as pixel sorting, ASCII art
+conversion, and color manipulation.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Windows & Applications**: Multiple applications can be opened in separate draggable & resizable windows.
+- **Focused state**: Applications z index is properly managed across applications.
+- **Ascii Processing**: Image/Gif processing to Ascii art.
+- **Pixel Processing**: Incoperates Pixel Sorting to apply effects to Image/Gif's.
+- **Image/Gif Processing Pipelines**: Ability to process Image/Gif's with multiple layers of processing effects which can be reordered
 
-### `npm start`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Demo
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+![XP Style App Demo](example.gif)
 
-### `npm test`
+## Installation
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+To set up the project locally, follow these steps:
 
-### `npm run build`
+1. Clone the repository:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+   ```bash
+   git clone https://github.com/blankprogram/jamsworld.git
+   ```
+2. Install dependencies:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+   ```bash
+   npm install
+   ```
+2. Start the server:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+   ```bash
+   npm start
+   ```
 
-### `npm run eject`
+## Usage
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Asciify
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The **Asciify** app transforms images and GIFs into stunning ASCII art.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+1. **Select a file**: Upload an image or GIF.
+2. **Adjust width**: Control the width to change the ASCII art density.
+3. **Choose characters**: Pick which characters will represent the image.
+4. **Pick a font**: Select from preset fonts to style your ASCII art.
+5. **Fill color**: Optionally, choose a background color for the characters.
+6. **Upload**: Submit and wait for the image or GIF to be converted into ASCII art.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+---
 
-## Learn More
+### Pixort
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+The **Pixort** app applies pixel-sorting effects to images for a unique visual style.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+1. **Select a file**: Upload an image or GIF.
+2. **Choose direction**: Decide the direction in which you want the pixels sorted (e.g., horizontal, vertical).
+3. **Select interval type**: Choose an interval type for sorting (e.g., block, threshold).
+4. **Set thresholds**: If using the threshold interval type, define the threshold values.
+5. **Select sorting method**: Pick from various sorting methods, such as brightness or hue.
+6. **Upload**: Submit and wait for the pixel-sorted image or GIF to appear.
 
-### Code Splitting
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### PixelPass
 
-### Analyzing the Bundle Size
+The **PixelPass** app allows you to apply multiple filters to an image in sequence, giving you full control over the effects.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+1. **Select a file**: Upload an image or GIF.
+2. **Add filters**: Use the "Add Filter" button to select filters.
+3. **Adjust filter settings**: Click on any filter to open and modify its specific settings.
+4. **Reorder filters**: Drag and drop filters to change their order of application.
+5. **Apply filters**: Click "Apply Filters" and wait for the processed image or GIF to appear.
 
-### Making a Progressive Web App
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Other
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Dont expect the best performance for processing its js afterall.
+- Inspired by [ShizukuIchi's winXP project](https://github.com/ShizukuIchi/winXP).
+- GIF transparency encoding isn't perfect due to the use of a third-party decoder.

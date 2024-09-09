@@ -3,10 +3,11 @@
 body {
   background: #000;
   font-family: 'Roboto', sans-serif;
-  color: #fff;
+
 }
 
 .loadingScreenContainer {
+  color: #fff;
   position: absolute;
   top: 0;
   left: 0;
