@@ -1,6 +1,6 @@
 {
   "files": {
-    "main.css": "/jamsworld/static/css/main.0a2b11df.css",
+    "main.css": "/jamsworld/static/css/main.0be4dad9.css",
     "main.js": "/jamsworld/static/js/main.e32c79cf.js",
     "static/js/488.6bfe5bab.chunk.js": "/jamsworld/static/js/488.6bfe5bab.chunk.js",
     "static/media/startup.mp3": "/jamsworld/static/media/startup.2d0dbc795c637e2bd8ec.mp3",
@@ -12,12 +12,12 @@
     "static/media/ms_sans_serif.woff2": "/jamsworld/static/media/ms_sans_serif.0348082abb503fb6a8c2.woff2",
     "static/media/ms_sans_serif_bold.woff2": "/jamsworld/static/media/ms_sans_serif_bold.7fcf57cc6e87ecddbf64.woff2",
     "index.html": "/jamsworld/index.html",
-    "main.0a2b11df.css.map": "/jamsworld/static/css/main.0a2b11df.css.map",
+    "main.0be4dad9.css.map": "/jamsworld/static/css/main.0be4dad9.css.map",
     "main.e32c79cf.js.map": "/jamsworld/static/js/main.e32c79cf.js.map",
     "488.6bfe5bab.chunk.js.map": "/jamsworld/static/js/488.6bfe5bab.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.0a2b11df.css",
+    "static/css/main.0be4dad9.css",
     "static/js/main.e32c79cf.js"
   ]
 }
