@@ -16,9 +16,12 @@
     display: flex;
     align-items: center;
     width: 100%;
-    justify-content: space-around;
+    justify-content: space-between; 
+    flex-wrap: wrap; 
+
     
   }
+  
   
   
   .images-container {
@@ -67,6 +70,7 @@
     top: 100px;
     z-index: 2;
   }
+  
   
   @keyframes rainbow {
     0%, 100% { color: #FF0000; }

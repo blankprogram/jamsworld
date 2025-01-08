@@ -2,7 +2,7 @@ import { useRef } from 'react';
 
 export const useResizableAndDraggable = () => {
   const windowRef = useRef(null);
-  const minSize = { width: 200, height: 150 };
+  const minSize = { width: 600, height: 200 };
 
   const addEventListeners = (moveHandler, stopHandler) => {
     window.addEventListener('mousemove', moveHandler);
