@@ -66,6 +66,8 @@ export const getAppIcon = (appName) => {
             return require('../assets/Icons/minesweeper.png');
       case 'Winamp':
             return require('../assets/Icons/winamp.png');
+      case 'ElementSim':
+            return require('../assets/Icons/sand.png');
       case 'Pixort':
           return generatePixort();
       case 'PixelPass':
