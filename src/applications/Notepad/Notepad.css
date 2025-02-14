@@ -1,0 +1,36 @@
+.notepad-xp {
+    display: flex;
+    flex-direction: column;
+    height: 99.9%;
+    background-color: #fff;
+    font-family: 'Tahoma', sans-serif;
+  }
+  
+  .notepad-menu-bar {
+    display: flex;
+    background: #edead8;
+    font-size: 12px;
+    color: black;
+    border-bottom: 1px solid #96abff;
+  }
+  
+  .notepad-menu-bar span {
+    padding: 4px 8px;
+    cursor: pointer;
+
+  }
+  
+  .notepad-menu-bar span:hover {
+    background-color: #1660e8;
+    color: white;
+  }
+  
+  
+  .notepad-textarea {
+
+    overflow: auto;
+
+    font-size: 14px;
+    margin-left: 5px;
+  }
+  

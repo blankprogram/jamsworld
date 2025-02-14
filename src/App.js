@@ -58,11 +58,10 @@ function App() {
 
   const nonStylizedApps = ['Winamp'];
 
-  const initialOpenApps = ['Winamp'].map(appName => ({
-    name: appName,
-    id: Date.now(),
-    maximized: false,
-  }));
+  const initialOpenApps = [
+    { name: 'Notepad', id: Date.now(), maximized: false },
+    { name: 'Winamp', id: Date.now() + 1, maximized: false },
+  ];
 
   const [openApps, setOpenApps] = useState(initialOpenApps);
   const [minimizedApps, setMinimizedApps] = useState([]);

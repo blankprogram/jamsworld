@@ -43,7 +43,7 @@ export const StyledHeader = styled.header`
   .app__header__icon {
     width: 15px;
     height: 15px;
-    margin-left: 1px;
+
     margin-right: 3px;
   }
 
