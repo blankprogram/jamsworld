@@ -34,12 +34,7 @@ function App() {
   useEffect(() => {
     if (screenState === SCREEN_STATE.MAIN && audioRef.current) {
       audioRef.current.volume = 0.25;
-      console.log('Attempting to play audio...');
-      audioRef.current.play().then(() => {
-        console.log('Audio played successfully');
-      }).catch((error) => {
-        console.error('Failed to play audio:', error);
-      });
+      audioRef.current.play();
     }
   }, [screenState]);
 
