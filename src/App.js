@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import 'xp.css';
+import Clippy from './components/Clippy/Clippy';
 import Background from './components/Background/Background';
 import Taskbar from './components/Taskbar/Taskbar';
 import Window from './components/Window/Window';
@@ -61,6 +62,8 @@ function App() {
   const [openApps, setOpenApps] = useState(initialOpenApps);
   const [minimizedApps, setMinimizedApps] = useState([]);
   const [focusedApp, setFocusedApp] = useState(initialOpenApps[0]?.id || null);
+    const focusedAppName = openApps.find(app => app.id === focusedApp)?.name || '';
+    console.log(focusedAppName)
 
   const openApplication = appName => {
     const newApp = { name: appName, id: Date.now(), maximized: false };
@@ -150,6 +153,7 @@ function App() {
               {renderApplication(name, id)}
             </Window>
           ))}
+          <Clippy appName={focusedAppName} />
         </div>
       );
   }

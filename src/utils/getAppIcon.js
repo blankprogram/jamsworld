@@ -96,6 +96,8 @@ export const getAppIcon = (appName) => {
 
     case 'Notepad':
       return require('../assets/Icons/notepad.png');
+      case 'Minecraft':
+        return require('../assets/Icons/minecraft.png');
 
     default:
       return require('../assets/Icons/start.png');
