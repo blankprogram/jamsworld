@@ -14,6 +14,9 @@ function Minesweeper({ isFocused }) {
             width: '100%',
             height: '100%',
             pointerEvents: isFocused ? 'auto' : 'none',
+            margin: 0,
+            padding: 0,
+            border: 'none',
           }}
         />
       </div>

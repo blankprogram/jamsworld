@@ -87,7 +87,6 @@ function Clippy({ appName }) {
           }, text, hold);
         };
 
-        console.log(agent.animations());
         agent.play('GetAttention');
 
         const lines = introText.split('\n').filter((line) => line.trim() !== '');
