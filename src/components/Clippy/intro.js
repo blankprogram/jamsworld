@@ -1,6 +1,6 @@
 const introText = `
 Welcome to jamsworld!
-This application lets you manage your apps in a nostalgic Windows XP style.
-Enjoy exploring all the features!
+I built this to showcase different projects i've built.
+Enjoy exploring : )
 `;
 export default introText;

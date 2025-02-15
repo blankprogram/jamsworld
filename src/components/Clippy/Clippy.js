@@ -23,7 +23,6 @@ const playDialogueNote = (audioCtx) => {
   gainNode.connect(audioCtx.destination);
 
   oscillator.start();
-  // Stop after 70ms to create a quick "blip"
   oscillator.stop(audioCtx.currentTime + 0.07);
 };
 
@@ -38,7 +37,8 @@ function Clippy({ appName }) {
     if (didInit.current) return;
     didInit.current = true;
 
-    audioCtxRef.current = new window.AudioContext();
+    // Initialize AudioContext
+    audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
 
     const resumeAudio = () => {
       if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
@@ -57,12 +57,9 @@ function Clippy({ appName }) {
         const taskbarHeight = 30;
         const clippyWidth = 150;
         const clippyHeight = 150;
-        
         const x = window.innerWidth - clippyWidth;
         const y = window.innerHeight - taskbarHeight - clippyHeight;
-        
         agent.moveTo(x, y, 0);
-        
 
         const originalBalloonSpeak = agent._balloon.speak.bind(agent._balloon);
         agent._balloon.speak = (complete, text, hold) => {
@@ -90,20 +87,22 @@ function Clippy({ appName }) {
           }, text, hold);
         };
 
-        idleIntervalRef.current = setInterval(() => {
-          if (agentRef.current) {
-            agentRef.current.animate();
-          }
-        }, 10000);
+        console.log(agent.animations());
+        agent.play('Greeting');
 
         const lines = introText.split('\n').filter((line) => line.trim() !== '');
-        let delay = 0;
+        let delay = 2000;
         lines.forEach((line) => {
           setTimeout(() => {
             agent.speak(line);
           }, delay);
           delay += 4000;
         });
+        setTimeout(() => {
+          idleIntervalRef.current = setInterval(() => {
+            agent.animate();
+          }, 10000);
+        }, delay);
       },
       failCb: (e) => {
         console.error(e);
@@ -117,14 +116,7 @@ function Clippy({ appName }) {
     };
   }, []);
 
-  return (
-    <div
-      className="my-clippy"
-      style={{
-        zIndex:1000
-      }}
-    ></div>
-  );
+  return <div className="my-clippy" style={{ zIndex: 1000 }}></div>;
 }
 
 export default Clippy;
