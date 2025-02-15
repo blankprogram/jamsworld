@@ -38,10 +38,8 @@ function Clippy({ appName }) {
     if (didInit.current) return;
     didInit.current = true;
 
-    // Initialize AudioContext (may be suspended initially)
-    audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtxRef.current = new window.AudioContext();
 
-    // Resume AudioContext on any user click
     const resumeAudio = () => {
       if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
@@ -56,8 +54,16 @@ function Clippy({ appName }) {
         agentRef.current = agent;
         agent.show();
 
-        // Monkey-patch balloon.speak to attach a new MutationObserver
-        // that plays a beep each time the text is updated.
+        const taskbarHeight = 30;
+        const clippyWidth = 150;
+        const clippyHeight = 150;
+        
+        const x = window.innerWidth - clippyWidth;
+        const y = window.innerHeight - taskbarHeight - clippyHeight;
+        
+        agent.moveTo(x, y, 0);
+        
+
         const originalBalloonSpeak = agent._balloon.speak.bind(agent._balloon);
         agent._balloon.speak = (complete, text, hold) => {
           if (agent._balloon && agent._balloon._content) {
@@ -75,10 +81,8 @@ function Clippy({ appName }) {
               subtree: true,
             });
           }
-
           originalBalloonSpeak(() => {
             complete();
-            // Disconnect observer when speech is finished.
             if (observerRef.current) {
               observerRef.current.disconnect();
               observerRef.current = null;
@@ -86,14 +90,12 @@ function Clippy({ appName }) {
           }, text, hold);
         };
 
-        // Trigger an idle animation every 10 seconds.
         idleIntervalRef.current = setInterval(() => {
           if (agentRef.current) {
             agentRef.current.animate();
           }
         }, 10000);
 
-        // Speak each line from introText with a delay.
         const lines = introText.split('\n').filter((line) => line.trim() !== '');
         let delay = 0;
         lines.forEach((line) => {
@@ -108,7 +110,6 @@ function Clippy({ appName }) {
       },
     });
 
-    // Cleanup: clear intervals and remove event listeners.
     return () => {
       if (idleIntervalRef.current) clearInterval(idleIntervalRef.current);
       window.removeEventListener('click', resumeAudio);
@@ -116,7 +117,14 @@ function Clippy({ appName }) {
     };
   }, []);
 
-  return <div className="my-clippy" style={{ position: 'absolute' }}></div>;
+  return (
+    <div
+      className="my-clippy"
+      style={{
+        zIndex:1000
+      }}
+    ></div>
+  );
 }
 
 export default Clippy;
