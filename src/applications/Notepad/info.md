@@ -6,7 +6,7 @@ Passionate about mostly everything, especially when there's something new to lea
 
 ---
 
-
+![Kirby](/kirby.gif)
 
 ---
 

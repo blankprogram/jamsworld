@@ -3,14 +3,12 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import fileContent from './info.md';
 
-
 import './Notepad.css';
 
 const Notepad = () => {
   const [markdown, setMarkdown] = useState('');
 
   useEffect(() => {
-
     fetch(fileContent)
       .then(response => response.text())
       .then(mdText => setMarkdown(mdText))
@@ -28,7 +26,9 @@ const Notepad = () => {
       </div>
       
       <div className="notepad-textarea">
-        <ReactMarkdown rehypePlugins={[rehypeRaw]} >{markdown}</ReactMarkdown>
+        <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+          {markdown}
+        </ReactMarkdown>
       </div>
     </div>
   );
