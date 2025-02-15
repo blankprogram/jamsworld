@@ -88,7 +88,7 @@ function Clippy({ appName }) {
         };
 
         console.log(agent.animations());
-        agent.play('Greeting');
+        agent.play('GetAttention');
 
         const lines = introText.split('\n').filter((line) => line.trim() !== '');
         let delay = 2000;
@@ -98,6 +98,9 @@ function Clippy({ appName }) {
           }, delay);
           delay += 4000;
         });
+
+        agent.play('LookUpRight');
+
         setTimeout(() => {
           idleIntervalRef.current = setInterval(() => {
             agent.animate();
