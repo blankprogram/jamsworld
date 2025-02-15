@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import 'xp.css';
-import Clippy from './components/Clippy/Clippy';
-import Background from './components/Background/Background';
-import Taskbar from './components/Taskbar/Taskbar';
-import Window from './components/Window/Window';
-import LoadingScreen from './components/LoadingScreen/LoadingScreen';
-import WelcomeScreen from './components/WelcomeScreen/WelcomeScreen';
+
+import React, { useEffect, useRef, useState } from 'react';
+
 import startupSound from './assets/Sounds/startup.mp3';
+import Background from './components/Background/Background';
+import Clippy from './components/Clippy/Clippy';
+import LoadingScreen from './components/LoadingScreen/LoadingScreen';
+import Taskbar from './components/Taskbar/Taskbar';
+import WelcomeScreen from './components/WelcomeScreen/WelcomeScreen';
+import Window from './components/Window/Window';
 
 const SCREEN_STATE = {
   LOADING: 'LOADING',
@@ -40,17 +42,20 @@ function App() {
   }, [screenState]);
 
   const appsContext = require.context('./applications', true, /\.js$/);
-  const apps = appsContext.keys().map(key => {
-    const segments = key.split('/');
-    const folderName = segments[segments.length - 2];
-    const fileName = segments[segments.length - 1].replace('.js', '');
+  const apps = appsContext.keys()
+    .map(key => {
+      const segments = key.split('/');
+      const folderName = segments[segments.length - 2];
+      const fileName =
+        segments[segments.length - 1].replace('.js', '');
 
-    if (fileName === folderName) {
-      const component = appsContext(key).default;
-      return { name: fileName, component };
-    }
-    return null;
-  }).filter(Boolean);
+      if (fileName === folderName) {
+        const component = appsContext(key).default;
+        return { name: fileName, component };
+      }
+      return null;
+    })
+    .filter(Boolean);
 
   const nonStylizedApps = ['Winamp'];
 
@@ -62,19 +67,21 @@ function App() {
   const [openApps, setOpenApps] = useState(initialOpenApps);
   const [minimizedApps, setMinimizedApps] = useState([]);
   const [focusedApp, setFocusedApp] = useState(initialOpenApps[0]?.id || null);
-    const focusedAppName = openApps.find(app => app.id === focusedApp)?.name || '';
-    console.log(focusedAppName)
+  const focusedAppName =
+    openApps.find(app => app.id === focusedApp)?.name || '';
 
   const openApplication = appName => {
     const newApp = { name: appName, id: Date.now(), maximized: false };
     setOpenApps(prevApps => [...prevApps, newApp]);
     setFocusedApp(newApp.id);
-    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== newApp.id));
+    setMinimizedApps(
+      prevMinimized => prevMinimized.filter(app => app !== newApp.id));
   };
 
   const closeApplication = appId => {
     setOpenApps(prevApps => prevApps.filter(app => app.id !== appId));
-    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== appId));
+    setMinimizedApps(
+      prevMinimized => prevMinimized.filter(app => app !== appId));
     if (focusedApp === appId) setFocusedApp(null);
   };
 
@@ -84,22 +91,20 @@ function App() {
   };
 
   const restoreApplication = appId => {
-    setMinimizedApps(prevMinimized => prevMinimized.filter(app => app !== appId));
+    setMinimizedApps(
+      prevMinimized => prevMinimized.filter(app => app !== appId));
     setFocusedApp(appId);
 
-    setOpenApps(prevApps =>
-      prevApps.map(app =>
-        app.id === appId ? { ...app, isMinimized: false } : app
-      )
-    );
+    setOpenApps(
+      prevApps => prevApps.map(
+        app => app.id === appId ? { ...app, isMinimized: false } : app));
   };
 
   const toggleMaximizeApplication = appId => {
-    setOpenApps(prevApps =>
-      prevApps.map(app =>
-        app.id === appId ? { ...app, maximized: !app.maximized } : app
-      )
-    );
+    setOpenApps(
+      prevApps => prevApps.map(
+        app =>
+          app.id === appId ? { ...app, maximized: !app.maximized } : app));
     setFocusedApp(appId);
   };
 
@@ -115,7 +120,8 @@ function App() {
       <AppComponent
         onClose={() => closeApplication(appId)}
         onMinimize={() => minimizeApplication(appId)}
-        isMinimized={minimizedApps.includes(appId)}
+        isMinimized={
+          minimizedApps.includes(appId)}
       />
     );
   };
@@ -128,14 +134,16 @@ function App() {
     case SCREEN_STATE.MAIN:
     default:
       return (
-        <div className="App">
-          <audio ref={audioRef} src={startupSound} />
+        <div className='App'>
+          <audio ref={audioRef} src={
+            startupSound} />
           <Background apps={apps} openApplication={openApplication} setFocusedApp={setFocusedApp} />
           <Taskbar
             openApps={openApps}
             restoreApplication={restoreApplication}
             minimizeApplication={minimizeApplication}
-            focusedApp={focusedApp}
+            focusedApp={
+              focusedApp}
           />
           {openApps.map(({ name, id, maximized }) => (
             <Window
