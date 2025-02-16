@@ -11,6 +11,8 @@ import {
 
 let highestZIndex = 1;
 
+
+
 const HeaderButtons = ({ buttons, onMaximize, onMinimize, onClose, maximized, resizable, isFocus }) => {
   const buttonElements = {
     minimize: (
@@ -50,6 +52,7 @@ const Window = memo(({ title, children, onClose, onMinimize, onToggleMaximize, o
   const originalStateRef = useRef(null);
   const [initialPosition, setInitialPosition] = useState({ top: 0, left: 0 });
 
+  
   useEffect(() => {
     const { innerWidth, innerHeight } = window;
     const windowWidth = windowRef.current?.offsetWidth || 1200;
@@ -133,7 +136,7 @@ const Window = memo(({ title, children, onClose, onMinimize, onToggleMaximize, o
   }
 
   return (
-    <StyledWindow {...containerProps} isFocused={isFocused} isMinimized={isMinimized}>
+    <StyledWindow {...containerProps} isFocused={isFocused} isMinimized={isMinimized}  isMaximized={maximized}>
       <StyledHeader onMouseDown={startDrag} onDoubleClick={handleDoubleClick} isFocused={isFocused}>
         <img src={getAppIcon(title)} alt={title} className="app__header__icon" draggable={false} />
         <div className="app__header__title">{title}</div>

@@ -23,7 +23,7 @@ const playDialogueNote = (audioCtx) => {
   gainNode.connect(audioCtx.destination);
 
   oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.07);
+  oscillator.stop(audioCtx.currentTime + 0.14);
 };
 
 function Clippy({ appName }) {

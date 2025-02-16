@@ -3,13 +3,16 @@ import styled from 'styled-components';
 export const StyledWindow = styled.div`
   display: ${({ isMinimized }) => (isMinimized ? 'none' : 'flex')};
   position: absolute;
-  padding: ${({ header }) => (header?.invisible ? 0 : 3)}px;
+  padding: ${({ isMaximized, header }) =>
+    isMaximized ? 0 : header?.invisible ? 0 : 3}px;
   background-color: ${({ isFocused }) => (isFocused ? '#0831d9' : '#6582f5')};
   flex-direction: column;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  width: ${({ width }) => width || '1200px'};
-  height: ${({ height }) => height || '700px'};
+  border-top-left-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
+  border-top-right-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
+  border: ${({ isMaximized }) => (isMaximized ? 'none' : '1px solid #000')};
+  width: ${({ width, isMaximized }) => (isMaximized ? '100vw' : width || '1200px')};
+  height: ${({ height, isMaximized }) =>
+    isMaximized ? 'calc(100vh - 30px)' : height || '700px'};
   max-width: 100vw;
   max-height: 100vh;
   overflow: hidden;
