@@ -9,7 +9,6 @@ export const StyledWindow = styled.div`
   flex-direction: column;
   border-top-left-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
   border-top-right-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
-  border: ${({ isMaximized }) => (isMaximized ? 'none' : '1px solid #000')};
   width: ${({ width, isMaximized }) => (isMaximized ? '100vw' : width || '1200px')};
   height: ${({ height, isMaximized }) =>
     isMaximized ? 'calc(100vh - 30px)' : height || '700px'};

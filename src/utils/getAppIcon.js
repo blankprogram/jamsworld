@@ -9,7 +9,7 @@ const generateCartoonyA = () => {
 
   ctx.textAlign = 'center';
 
-  ctx.fillText('A', canvas.width / 2, canvas.height );
+  ctx.fillText('A', canvas.width / 2, canvas.height);
 
   return canvas.toDataURL('image/png');
 };
@@ -29,19 +29,12 @@ const generatePixort = () => {
 
   ctx.fillStyle = 'green';
   ctx.fillRect(
-    canvas.width - offset - squareSize, 
-    offset, 
-    squareSize, 
-    squareSize
-  );
+      canvas.width - offset - squareSize, offset, squareSize, squareSize);
 
   ctx.fillStyle = 'blue';
   ctx.fillRect(
-    canvas.width - offset - squareSize, 
-    canvas.height - offset - squareSize, 
-    squareSize, 
-    squareSize
-  );
+      canvas.width - offset - squareSize, canvas.height - offset - squareSize,
+      squareSize, squareSize);
 
   return canvas.toDataURL('image/png');
 };
@@ -60,11 +53,8 @@ const generatePixelPass = () => {
     for (let x = 0; x < numSquares; x++) {
       ctx.fillStyle = (x + y) % 2 === 0 ? 'black' : 'white';
       ctx.fillRect(
-        offset + x * squareSize,
-        offset + y * squareSize,
-        squareSize,
-        squareSize
-      );
+          offset + x * squareSize, offset + y * squareSize, squareSize,
+          squareSize);
     }
   }
 
@@ -96,8 +86,10 @@ export const getAppIcon = (appName) => {
 
     case 'Notepad':
       return require('../assets/Icons/notepad.png');
-      case 'Minecraft':
-        return require('../assets/Icons/minecraft.png');
+    case 'Minecraft':
+      return require('../assets/Icons/minecraft.png');
+    case 'Internet Explorer':
+      return require('../assets/Icons/internetexplorer.png');
 
     default:
       return require('../assets/Icons/start.png');

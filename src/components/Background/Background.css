@@ -1,26 +1,28 @@
 .background {
-  display: grid;
-  grid-template-rows: repeat(auto-fill, minmax(60px, 1fr));
-  grid-auto-columns: 60px;
-  gap: 20px;
-  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
   width: 100vw;
+  height: 100vh;
+  gap: 20px;
   padding: 40px;
   box-sizing: border-box;
 }
-
 .icon {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 60px;
+  margin-bottom: 20px;
+  text-align: center;
   cursor: pointer;
-  padding: 10px;
   font-family: 'Tahoma', sans-serif;
-  text-shadow: 1px 1px 2px black;
   font-size: 10px;
   color: white;
   position: relative;
+  text-shadow: 1px 1px 2px black;
 }
 
 .icon img {
@@ -31,15 +33,14 @@
 
 .icon.selected img {
   mix-blend-mode: multiply;
-  filter: brightness(0.5) sepia(1) hue-rotate(170deg) saturate(10) opacity(0.7);
+  filter: brightness(0.9) sepia(1) hue-rotate(170deg) saturate(10) opacity(1);
 }
 
 .icon.selected span {
-  
   background-color: #0b61ff;
   opacity: 0.5;
-  padding: 1px 1px;
-
+  padding-right: 1px;
+  padding-left: 1px;
 }
 
 .selection-box {
