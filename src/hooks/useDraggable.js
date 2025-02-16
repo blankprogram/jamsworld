@@ -50,27 +50,32 @@ export const useResizableAndDraggable = () => {
   const handleResize = (e, direction) => {
     e.preventDefault();
     if (!windowRef.current) return;
-
+  
     const element = windowRef.current;
+    const iframe = element.querySelector('iframe');
+    if (iframe) {
+      iframe.style.pointerEvents = 'none';
+    }
+  
     const { clientX: startX, clientY: startY } = e;
     const { offsetWidth: startWidth, offsetHeight: startHeight, offsetLeft: startLeft, offsetTop: startTop } = element;
-
+  
     let newWidth = startWidth;
     let newHeight = startHeight;
     let newLeft = startLeft;
     let newTop = startTop;
-
+  
     const updateSizeAndPosition = (event) => {
       const deltaX = event.clientX - startX;
       const deltaY = event.clientY - startY;
-
+  
       const maxDeltaX = startWidth - minSize.width;
       const maxDeltaY = startHeight - minSize.height;
-
+  
       if (direction.includes('right')) {
         newWidth = Math.max(minSize.width, startWidth + deltaX);
       }
-
+  
       if (direction.includes('left')) {
         if (deltaX <= maxDeltaX && startLeft + deltaX >= 0) {
           newWidth = startWidth - deltaX;
@@ -83,11 +88,11 @@ export const useResizableAndDraggable = () => {
           newWidth = startLeft + startWidth;
         }
       }
-
+  
       if (direction.includes('bottom')) {
         newHeight = Math.max(minSize.height, startHeight + deltaY);
       }
-
+  
       if (direction.includes('top')) {
         if (deltaY <= maxDeltaY && startTop + deltaY >= 0) {
           newHeight = startHeight - deltaY;
@@ -100,24 +105,32 @@ export const useResizableAndDraggable = () => {
           newHeight = startTop + startHeight;
         }
       }
-
+  
       newWidth = Math.min(newWidth, window.innerWidth - newLeft);
       newHeight = Math.min(newHeight, window.innerHeight - newTop);
-
+  
       element.style.width = `${newWidth}px`;
       element.style.height = `${newHeight}px`;
-
+  
       if (direction.includes('left')) {
         element.style.left = `${newLeft}px`;
       }
-
+  
       if (direction.includes('top')) {
         element.style.top = `${newTop}px`;
       }
     };
-
-    addEventListeners(updateSizeAndPosition, () => removeEventListeners(updateSizeAndPosition, updateSizeAndPosition));
+  
+    const stopResize = () => {
+      removeEventListeners(updateSizeAndPosition, stopResize);
+      if (iframe) {
+        iframe.style.pointerEvents = 'auto';
+      }
+    };
+  
+    addEventListeners(updateSizeAndPosition, stopResize);
   };
+  
 
   return {
     windowRef,
