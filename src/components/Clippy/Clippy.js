@@ -2,28 +2,29 @@ import clippy from 'clippyts';
 import React, { useEffect, useRef } from 'react';
 import introText from './intro';
 
-/**
- * Plays a short "blip" note using the Web Audio API.
- * @param {AudioContext} audioCtx - The audio context to use.
- */
+
 const playDialogueNote = (audioCtx) => {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
-  if (audioCtx.state === 'closed') return; // Safeguard
+  if (audioCtx.state === 'closed') return;
 
   const oscillator = audioCtx.createOscillator();
   oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(200 + Math.random() * 200, audioCtx.currentTime);
+  oscillator.frequency.value = 200 + Math.random() * 200;
 
   const gainNode = audioCtx.createGain();
-  gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  const now = audioCtx.currentTime;
+  
+  gainNode.gain.setValueAtTime(0, now);
+  gainNode.gain.linearRampToValueAtTime(0.05, now + 0.005);
+  gainNode.gain.linearRampToValueAtTime(0, now + 0.14);
 
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
 
-  oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.14);
+  oscillator.start(now);
+  oscillator.stop(now + 0.2);
 };
 
 function Clippy({ appName }) {
@@ -37,7 +38,6 @@ function Clippy({ appName }) {
     if (didInit.current) return;
     didInit.current = true;
 
-    // Initialize AudioContext
     audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
 
     const resumeAudio = () => {

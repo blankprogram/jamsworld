@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 function InternetExplorer({ isFocused }) {
-  const [url, setUrl] = useState("https://blankprogram.github.io/jamsworld/");
+  const [url, setUrl] = useState("https://blankprogram.github.io/jamsworld/"); 
   const [inputValue, setInputValue] = useState(url);
 
   const handleInputChange = (e) => {
@@ -10,9 +10,7 @@ function InternetExplorer({ isFocused }) {
 
   const navigate = () => {
     let formattedUrl = inputValue.trim();
-    if (!/^https?:\/\//i.test(formattedUrl)) {
-      formattedUrl = "https://" + formattedUrl;
-    }
+
     setUrl(formattedUrl);
   };
 
