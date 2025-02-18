@@ -47,12 +47,26 @@ function Clippy({ appName }) {
     };
     window.addEventListener('click', resumeAudio);
 
+    const availableAgentTypes = [
+      'Clippy',
+      'Bonzi',
+      'Genie',
+      'Links',
+      'Merlin',
+      'Peedy',
+      'Rocky',
+      'Rover'
+    ];
+
+    const randomIndex = Math.floor(Math.random() * availableAgentTypes.length);
+    const randomAgentType = availableAgentTypes[randomIndex];
+
     clippy.load({
-      name: 'Clippy',
+      name: randomAgentType,
       selector: 'my-clippy',
       successCb: (agent) => {
         agentRef.current = agent;
-        agent.show();
+        agent.show(true);
 
         const taskbarHeight = 30;
         const clippyWidth = 150;

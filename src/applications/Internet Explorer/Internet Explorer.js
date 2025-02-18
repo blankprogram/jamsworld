@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
 
 function InternetExplorer({ isFocused }) {
-  const [url, setUrl] = useState("https://blankprogram.github.io/jamsworld/"); 
-  const [inputValue, setInputValue] = useState(url);
+  const defaultUrl = window.location.origin + window.location.pathname;
+
+  const getNestedUrl = (baseUrl) => {
+    const urlObj = new URL(baseUrl, window.location.href);
+    const currentNest = Number(urlObj.searchParams.get('nest')) || 0;
+    urlObj.searchParams.set('nest', currentNest + 1);
+    return urlObj.toString();
+  };
+
+  const initialUrl = getNestedUrl(window.location.href);
+
+
+  const [url, setUrl] = useState(initialUrl);
+  const [inputValue, setInputValue] = useState(initialUrl);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -11,11 +23,15 @@ function InternetExplorer({ isFocused }) {
   const navigate = () => {
     let formattedUrl = inputValue.trim();
 
+    if (formattedUrl.startsWith(defaultUrl)) {
+      formattedUrl = getNestedUrl(formattedUrl);
+    }
     setUrl(formattedUrl);
+    setInputValue(formattedUrl);
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       navigate();
     }
   };
