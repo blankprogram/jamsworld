@@ -3,6 +3,7 @@ import 'xp.css';
 
 import React, { useEffect, useRef, useState } from 'react';
 
+import background from "./assets/xpwallpaper.jpeg";
 import startupSound from './assets/Sounds/startup.mp3';
 import Background from './components/Background/Background';
 import Clippy from './components/Clippy/Clippy';
@@ -134,7 +135,14 @@ function App() {
     case SCREEN_STATE.MAIN:
     default:
       return (
-        <div className='App'>
+        <div
+      className="App"
+      style={{
+        backgroundImage: `url(${background})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
           <audio ref={audioRef} src={
             startupSound} />
           <Background apps={apps} openApplication={openApplication} setFocusedApp={setFocusedApp} />
