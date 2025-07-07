@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/jamsworld/static/css/main.84f99d03.css",
-    "main.js": "/jamsworld/static/js/main.96a3b8d3.js",
+    "main.js": "/jamsworld/static/js/main.dda59506.js",
     "static/js/662.40933730.chunk.js": "/jamsworld/static/js/662.40933730.chunk.js",
     "static/js/503.2c428758.chunk.js": "/jamsworld/static/js/503.2c428758.chunk.js",
     "static/js/31.f653e207.chunk.js": "/jamsworld/static/js/31.f653e207.chunk.js",
@@ -17,6 +17,7 @@
     "static/media/minecraft.png": "/jamsworld/static/media/minecraft.2707d45890e78fc536f6.png",
     "static/media/startup.mp3": "/jamsworld/static/media/startup.2d0dbc795c637e2bd8ec.mp3",
     "static/media/internetexplorer.png": "/jamsworld/static/media/internetexplorer.9f61692bb794cdb974c9.png",
+    "static/media/circ.png": "/jamsworld/static/media/circ.544e3c32fb6e72df6dfc.png",
     "static/media/PerfectDOSVGA437Win.woff": "/jamsworld/static/media/PerfectDOSVGA437Win.86368cc9dec15d71c965.woff",
     "static/media/github.png": "/jamsworld/static/media/github.ac764b9313bcba8189d5.png",
     "static/media/PerfectDOSVGA437Win.woff2": "/jamsworld/static/media/PerfectDOSVGA437Win.7dc718899b215fa16aa7.woff2",
@@ -27,7 +28,7 @@
     "index.html": "/jamsworld/index.html",
     "static/media/info.md": "/jamsworld/static/media/info.b0622d18488180e7e91e.md",
     "main.84f99d03.css.map": "/jamsworld/static/css/main.84f99d03.css.map",
-    "main.96a3b8d3.js.map": "/jamsworld/static/js/main.96a3b8d3.js.map",
+    "main.dda59506.js.map": "/jamsworld/static/js/main.dda59506.js.map",
     "662.40933730.chunk.js.map": "/jamsworld/static/js/662.40933730.chunk.js.map",
     "503.2c428758.chunk.js.map": "/jamsworld/static/js/503.2c428758.chunk.js.map",
     "31.f653e207.chunk.js.map": "/jamsworld/static/js/31.f653e207.chunk.js.map",
@@ -42,6 +43,6 @@
   },
   "entrypoints": [
     "static/css/main.84f99d03.css",
-    "static/js/main.96a3b8d3.js"
+    "static/js/main.dda59506.js"
   ]
 }
