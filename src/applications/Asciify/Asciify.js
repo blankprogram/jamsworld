@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import { SketchPicker } from "react-color";
-import GLPipeline, { AsciiPass } from "../../utils/GLPipeline";
+import GLPipeline from "../../utils/GLPipeline";
 import { loadFonts } from "../../utils/fontUtils";
 import "./Asciify.css";
 
-const Asciify = () => {
+export default function Asciify() {
   const canvasRef = useRef(null);
   const pipelineRef = useRef(null);
   const imageRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const colorPickerRef = useRef(null);
 
-  const [file, setFile] = useState(null);
   const [fileURL, setFileURL] = useState(null);
   const [chars, setChars] = useState(".:-=+*#%@");
   const [font, setFont] = useState("Arial");
@@ -18,8 +19,7 @@ const Asciify = () => {
   const [blockSize, setBlockSize] = useState(16);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [fonts, setFonts] = useState([]);
-  const colorPickerRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [canExport, setCanExport] = useState(false);
 
   useEffect(() => {
     loadFonts().then(setFonts);
@@ -27,39 +27,47 @@ const Asciify = () => {
   }, []);
 
   const processImage = async (img) => {
-    if (!pipelineRef.current) return;
-    const pipeline = new GLPipeline(canvasRef.current);
-    pipeline.addPass(
-      new AsciiPass({
-        chars,
-        fontFamily: font,
-        blockSize,
-        bgColor: [
-          parseInt(fill.slice(1, 3), 16) / 255,
-          parseInt(fill.slice(3, 5), 16) / 255,
-          parseInt(fill.slice(5, 7), 16) / 255,
-        ],
-        density,
-      }),
-    );
+    const pipeline = GLPipeline.for(canvasRef.current).useAscii({
+      chars,
+      fontFamily: font,
+      blockSize,
+      bgColor: [
+        parseInt(fill.slice(1, 3), 16) / 255,
+        parseInt(fill.slice(3, 5), 16) / 255,
+        parseInt(fill.slice(5, 7), 16) / 255,
+      ],
+      density,
+      originalSize: { width: img.width, height: img.height },
+      alphaThreshold: 0.5,
+    });
     pipelineRef.current = pipeline;
-    await pipeline.process(img);
+    await pipeline.run(img);
+    setCanExport(true);
   };
 
   const handleFileChange = async (e) => {
-    const uploadedFile = e.target.files[0];
-    if (!uploadedFile) return;
-    setFile(uploadedFile);
-    const objectURL = URL.createObjectURL(uploadedFile);
-    setFileURL(objectURL);
-    const img = await createImageBitmap(uploadedFile);
+    const file = e.target.files[0];
+    if (!file) return;
+    setCanExport(false);
+    const url = URL.createObjectURL(file);
+    setFileURL(url);
+    const img = await createImageBitmap(file);
     imageRef.current = img;
-    processImage(img);
+    await processImage(img);
   };
 
   useEffect(() => {
     if (imageRef.current) processImage(imageRef.current);
   }, [chars, font, fill, density, blockSize]);
+
+  const handleExport = () => {
+    if (!canvasRef.current) return;
+    const dataURL = canvasRef.current.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = dataURL;
+    a.download = "asciified.png";
+    a.click();
+  };
 
   const handleColorChange = (color) => {
     setFill(color.hex);
@@ -67,17 +75,16 @@ const Asciify = () => {
   };
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const onClick = (e) => {
       if (
         colorPickerRef.current &&
-        !colorPickerRef.current.contains(event.target) &&
-        !event.target.closest(".color-select-icon")
-      ) {
+        !colorPickerRef.current.contains(e.target) &&
+        !e.target.closest(".color-select-icon")
+      )
         setShowColorPicker(false);
-      }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
   return (
@@ -87,117 +94,124 @@ const Asciify = () => {
           <div className="form-group field-row">
             <div className="rainbow-text-container">
               <div className="rainbow-text">
-                {"ASCIIFY".split("").map((char, i) => (
+                {Array.from("ASCIIFY").map((c, i) => (
                   <span
                     key={i}
                     style={{ animationDelay: `${i * 0.1}s, ${i * 0.7}s` }}
                   >
-                    {char}
+                    {c}
                   </span>
                 ))}
                 <span>&nbsp;</span>
-                {":)".split("").map((char, i) => (
+                {Array.from(":)").map((c, i) => (
                   <span
                     key={i + 7}
                     style={{
                       animationDelay: `${(i + 7) * 0.1}s, ${(i + 7) * 0.7}s`,
                     }}
                   >
-                    {char}
+                    {c}
                   </span>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="form-group field-row">
-            <label>Select file:</label>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="field"
-            />
-            <button
-              type="button"
-              className="button"
-              onClick={() => fileInputRef.current.click()}
-            >
-              Choose File
-            </button>
+          <div className="form__controls">
+            <div className="form-group field-row">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="field"
+              />
+              <button
+                type="button"
+                className="button"
+                onClick={() => fileInputRef.current.click()}
+              >
+                Choose File
+              </button>
+            </div>
+
+            <div className="form-group field-row">
+              <label>Characters:</label>
+              <input
+                type="text"
+                value={chars}
+                onChange={(e) => setChars(e.target.value)}
+                className="field"
+              />
+            </div>
+
+            <div className="form-group field-row">
+              <label>Font:</label>
+              <select
+                value={font}
+                onChange={(e) => setFont(e.target.value)}
+                className="field"
+              >
+                {fonts.map((f, i) => (
+                  <option key={i} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group field-row">
+              <label>Fill Color:</label>
+              <div
+                className="color-select-icon"
+                style={{ backgroundColor: fill }}
+                onClick={() => setShowColorPicker(!showColorPicker)}
+              />
+              {showColorPicker && (
+                <div className="color-picker-popover" ref={colorPickerRef}>
+                  <SketchPicker
+                    color={fill}
+                    onChangeComplete={handleColorChange}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="form-group field-row">
+              <label>Density:</label>
+              <input
+                type="range"
+                min="0.25"
+                max="5"
+                step="0.25"
+                value={density}
+                onChange={(e) => setDensity(parseFloat(e.target.value))}
+                className="field"
+              />
+              <span className="value-box">{density}</span>
+            </div>
+
+            <div className="form-group field-row">
+              <label>Block Size:</label>
+              <input
+                type="range"
+                min="4"
+                max="64"
+                step="1"
+                value={blockSize}
+                onChange={(e) => setBlockSize(parseInt(e.target.value))}
+                className="field"
+              />
+              <span className="value-box">{blockSize}</span>
+            </div>
           </div>
 
-          <div className="form-group field-row">
-            <label>Characters:</label>
-            <input
-              type="text"
-              value={chars}
-              onChange={(e) => setChars(e.target.value)}
-              className="field"
-            />
-          </div>
-
-          <div className="form-group field-row">
-            <label>Font:</label>
-            <select
-              value={font}
-              onChange={(e) => setFont(e.target.value)}
-              className="field"
-            >
-              {fonts.map((font, index) => (
-                <option key={index} value={font}>
-                  {font}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group field-row">
-            <label>Fill Color:</label>
-            <div
-              className="color-select-icon"
-              style={{ backgroundColor: fill }}
-              onClick={() => setShowColorPicker(!showColorPicker)}
-            />
-            {showColorPicker && (
-              <div className="color-picker-popover" ref={colorPickerRef}>
-                <SketchPicker
-                  color={fill}
-                  onChangeComplete={handleColorChange}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="form-group field-row">
-            <label>Density:</label>
-            <input
-              type="range"
-              min="0.25"
-              max="5"
-              step="0.25"
-              value={density}
-              onChange={(e) => setDensity(parseFloat(e.target.value))}
-              className="field"
-            />
-
-            <span className="value-box">{density}</span>
-          </div>
-
-          <div className="form-group field-row">
-            <label>Block Size:</label>
-            <input
-              type="range"
-              min="4"
-              max="64"
-              step="1"
-              value={blockSize}
-              onChange={(e) => setBlockSize(parseInt(e.target.value))}
-              className="field"
-            />
-
-            <span className="value-box">{blockSize}</span>
-          </div>
+          <button
+            className="button export-button"
+            onClick={handleExport}
+            disabled={!canExport}
+          >
+            Export
+          </button>
         </div>
       </div>
 
@@ -207,20 +221,10 @@ const Asciify = () => {
             {fileURL && <img src={fileURL} alt="Uploaded" className="image" />}
           </div>
           <div className="image-box">
-            <canvas
-              ref={canvasRef}
-              style={{
-                maxWidth: "100%",
-                maxHeight: "100%",
-                objectFit: "contain",
-                backgroundColor: "transparent",
-              }}
-            />
+            <canvas ref={canvasRef} />
           </div>
         </div>
       </div>
     </>
   );
-};
-
-export default Asciify;
+}
