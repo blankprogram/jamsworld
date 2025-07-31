@@ -1,7 +1,7 @@
 import React, {
   useEffect,
-  useRef,
   useState,
+  useRef,
   useCallback,
   useMemo,
 } from "react";
@@ -12,7 +12,8 @@ import {
   dropTargetForElements,
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import GLPipeline, {
+import { useProcessMedia } from "../../hooks/useProcessMedia";
+import {
   InvertPass,
   GrayscalePass,
   GaussianBlurPass,
@@ -20,104 +21,40 @@ import GLPipeline, {
   EdgePass,
   PosterizePass,
   AsciiPass,
+  DownsamplePass,
 } from "../../utils/GLPipeline";
 
-const FILTERS = {
-  INVERT: InvertPass,
-  GRAYSCALE: GrayscalePass,
-  BLUR: GaussianBlurPass,
-  SHARPEN: SharpenPass,
-  EDGE: EdgePass,
-  POSTERIZE: PosterizePass,
-  ASCII: AsciiPass,
-};
+const ALL_PASSES = [
+  InvertPass,
+  GrayscalePass,
+  GaussianBlurPass,
+  SharpenPass,
+  EdgePass,
+  PosterizePass,
+  AsciiPass,
+  DownsamplePass,
+];
 
-const getFilterOptions = (fonts) => ({
-  INVERT: { title: "Invert Colors", options: [] },
-  GRAYSCALE: { title: "Grayscale", options: [] },
-  BLUR: {
-    title: "Blur",
-    options: [
-      {
-        label: "Strength",
-        type: "range",
-        name: "strength",
-        props: { min: 0, max: 10, step: 0.01 },
-        defaultValue: 0.5,
-      },
-    ],
-  },
-  SHARPEN: {
-    title: "Sharpen",
-    options: [
-      {
-        label: "Amount",
-        type: "range",
-        name: "amount",
-        props: { min: 0, max: 10, step: 0.1 },
-        defaultValue: 1.0,
-      },
-      {
-        label: "Radius",
-        type: "range",
-        name: "radius",
-        props: { min: 0, max: 10, step: 0.5 },
-        defaultValue: 1.0,
-      },
-    ],
-  },
-  EDGE: { title: "Edge Detection", options: [] },
-  POSTERIZE: {
-    title: "Posterize",
-    options: [
-      {
-        label: "Levels",
-        type: "range",
-        name: "levels",
-        props: { min: 2, max: 20 },
-        defaultValue: 5,
-      },
-    ],
-  },
-  ASCII: {
-    title: "ASCII Filter",
-    options: [
-      {
-        label: "Block Size",
-        type: "range",
-        name: "blockSize",
-        props: { min: 1, max: 64, step: 1 },
-        defaultValue: 16,
-      },
-      {
-        label: "Density",
-        type: "range",
-        name: "density",
-        props: { min: 0.25, max: 5, step: 0.25 },
-        defaultValue: 1,
-      },
-      {
-        label: "Chars",
-        type: "text",
-        name: "chars",
-        defaultValue: ".:-=+*#%@",
-      },
-      {
-        label: "Font",
-        type: "select",
-        name: "font",
-        options: fonts,
-        defaultValue: "Arial",
-      },
-      {
-        label: "Fill",
-        type: "color",
-        name: "fill",
-        defaultValue: "#000000",
-      },
-    ],
-  },
-});
+function getFilterDefs(fonts) {
+  const defs = {};
+  ALL_PASSES.forEach((PassClass) => {
+    const def = { ...PassClass.def };
+    if (def.type === "ASCII") {
+      def.options = def.options.map((o) =>
+        o.name === "font"
+          ? {
+              ...o,
+              type: "select",
+              options: fonts,
+              defaultValue: fonts[0],
+            }
+          : o,
+      );
+    }
+    defs[def.type] = { Pass: PassClass, ...def };
+  });
+  return defs;
+}
 
 const FilterControl = ({
   label,
@@ -141,12 +78,12 @@ const FilterControl = ({
     ) : type === "range" ? (
       <div className={styles.rangeWrapper}>
         <input
-          className={styles.rangeInput}
           type="range"
           name={name}
           value={value}
           onChange={onChange}
           {...props}
+          className={styles.rangeInput}
         />
         <span className={styles.rangeValue}>{value}</span>
       </div>
@@ -170,13 +107,13 @@ const FilterOptions = ({
   handleOptionChange,
   removeFilter,
   setDraggedIndex,
+  toggleEnabled,
 }) => {
   const ref = useRef();
-  const configs = useMemo(() => getFilterOptions(fonts), [fonts]);
-  const cfg = configs[filter.type];
+  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const cfg = defs[filter.type];
 
   useEffect(() => {
-    if (!ref.current) return;
     if (!ref.current.dataset.dragInit) {
       draggable({
         element: ref.current,
@@ -194,32 +131,42 @@ const FilterOptions = ({
   }, [index, setDraggedIndex]);
 
   return (
-    <div ref={ref} className={styles.filterOptions} data-filter-index={index}>
-      <h4 className={styles.filterTitle} onClick={() => toggleFilter(index)}>
-        {cfg.title}
-      </h4>
+    <div
+      ref={ref}
+      className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""}`}
+      data-filter-index={index}
+    >
+      <div className={styles.filterHeader}>
+        <h4 className={styles.filterTitle} onClick={() => toggleFilter(index)}>
+          {cfg.title}
+        </h4>
+        <div className={styles.filterIcons}>
+          <button
+            aria-label="Toggle filter visibility"
+            className={styles.iconBtn}
+            onClick={() => toggleEnabled(index)}
+          >
+            {filter.enabled ? "👁️" : "🚫"}
+          </button>
+          <button
+            aria-label="Remove filter"
+            className={`${styles.iconBtn} ${styles.delete}`}
+            onClick={() => removeFilter(index)}
+          />
+        </div>
+      </div>
       {filter.open && (
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => (
             <FilterControl
               key={opt.name}
-              label={opt.label}
-              type={opt.type}
-              name={opt.name}
-              value={filter.opts[opt.name] ?? opt.defaultValue}
-              options={opt.options}
-              props={opt.props}
+              {...opt}
+              value={filter.opts[opt.name]}
               onChange={(e) =>
                 handleOptionChange(index, opt.name, e.target.value)
               }
             />
           ))}
-          <button
-            onClick={() => removeFilter(index)}
-            className={styles.removeFilterButton}
-          >
-            X
-          </button>
         </div>
       )}
     </div>
@@ -227,27 +174,64 @@ const FilterOptions = ({
 };
 
 export default function PixelPass() {
-  const [fileURL, setFileURL] = useState(null);
-  const [outputURL, setOutputURL] = useState(null);
-  const [filters, setFilters] = useState([]);
-  const [fonts, setFonts] = useState([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
   const fileInputRef = useRef();
+  const canvasRef = useRef(null);
+  const [fonts, setFonts] = useState([]);
+  const [filters, setFilters] = useState([]);
+  const [canExport, setCanExport] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+
+  const [showAdd, setShowAdd] = useState(false);
+
+  const [fileURL, setFileURL] = useState(null);
+  useEffect(() => {
+    return () => {
+      if (fileURL) URL.revokeObjectURL(fileURL);
+    };
+  }, [fileURL]);
 
   useEffect(() => {
     loadFonts().then(setFonts);
   }, []);
 
+  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const makePasses = useCallback(
+    (gl, { filters: fArr }) =>
+      fArr
+        .filter((f) => f.enabled)
+        .map((f) => new defs[f.type].Pass(gl, f.opts)),
+    [defs],
+  );
+
+  const { loadFile, exportResult } = useProcessMedia(canvasRef, makePasses, {
+    filters,
+  });
+
+  const handleFile = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (fileURL) URL.revokeObjectURL(fileURL);
+      const url = await loadFile(file);
+      setFileURL(url);
+      setCanExport(true);
+      setShowAdd(false);
+    },
+    [loadFile, fileURL],
+  );
+
+  const handleExport = useCallback(() => {
+    exportResult("pixelpass");
+  }, [exportResult]);
+
   useEffect(() => {
-    return monitorForElements({
+    monitorForElements({
       onDrop({ location }) {
         const to = location.current.dropTargets[0]?.data.index;
-        const from = dragIdx;
-        if (from != null && to != null && from !== to) {
+        if (dragIdx != null && to != null && dragIdx !== to) {
           setFilters((f) => {
             const a = [...f];
-            [a[from], a[to]] = [a[to], a[from]];
+            [a[dragIdx], a[to]] = [a[to], a[dragIdx]];
             return a;
           });
         }
@@ -256,63 +240,25 @@ export default function PixelPass() {
     });
   }, [dragIdx]);
 
-  const onFile = useCallback((e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    setOutputURL(null);
-    setFileURL(URL.createObjectURL(f));
-  }, []);
-
   const addFilter = useCallback(
     (type) => {
-      const cfg = getFilterOptions(fonts)[type];
+      const def = defs[type];
       const opts = {};
-      cfg.options.forEach((o) => (opts[o.name] = o.defaultValue));
-      setFilters((f) => [...f, { type, opts, open: false }]);
+      def.options.forEach((o) => (opts[o.name] = o.defaultValue));
+      setFilters((f) => [...f, { type, opts, open: false, enabled: true }]);
       setShowAdd(false);
     },
-    [fonts],
+    [defs],
   );
-  const toggleFilter = (i) =>
-    setFilters((f) =>
-      f.map((x, idx) => (idx === i ? { ...x, open: !x.open } : x)),
-    );
-  const removeFilter = (i) =>
-    setFilters((f) => f.filter((_, idx) => idx !== i));
-  const handleOptionChange = (i, name, val) => {
-    setFilters((f) => {
-      const a = [...f];
-      a[i].opts = {
-        ...a[i].opts,
-        [name]: ["amount", "radius", "strength", "levels"].includes(name)
-          ? +val
-          : val,
-      };
-      return a;
+
+  const handleOptionChange = (i, name, raw) => {
+    const val = isNaN(raw) ? raw : +raw;
+    setFilters((fs) => {
+      const next = [...fs];
+      next[i] = { ...next[i], opts: { ...next[i].opts, [name]: val } };
+      return next;
     });
   };
-
-  useEffect(() => {
-    if (!fileURL) {
-      setOutputURL(null);
-      return;
-    }
-    (async () => {
-      const img = new Image();
-      img.src = fileURL;
-      await new Promise((r) => (img.onload = r));
-      const off = document.createElement("canvas");
-      const p = GLPipeline.for(off);
-
-      for (let f of filters) {
-        p.useFilter(f.type, f.opts, img);
-      }
-
-      await p.run(img);
-      setOutputURL(off.toDataURL("image/png"));
-      p.destroy();
-    })();
-  }, [fileURL, filters]);
 
   return (
     <div className={styles.mainContainer}>
@@ -320,33 +266,23 @@ export default function PixelPass() {
         <div className={styles.filterStackFixed}>
           <h3>PixelPass</h3>
           <div className={styles.formContainer}>
-            <form className={styles.form}>
-              <div className={styles.formGroup}>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={onFile}
-                  className={styles.field}
-                />
-                <button
-                  type="button"
-                  className="xpButton"
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  Choose File
-                </button>
-              </div>
-            </form>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFile}
+              className={styles.field}
+            />
+            <button
+              className="xpButton"
+              onClick={() => fileInputRef.current.click()}
+            >
+              Choose File
+            </button>
           </div>
           <button
             className="xpButton"
-            disabled={!outputURL}
-            onClick={() => {
-              const a = document.createElement("a");
-              a.href = outputURL;
-              a.download = "pixelpass.png";
-              a.click();
-            }}
+            disabled={!canExport}
+            onClick={handleExport}
           >
             Export
           </button>
@@ -359,10 +295,23 @@ export default function PixelPass() {
               filter={f}
               index={i}
               fonts={fonts}
-              toggleFilter={toggleFilter}
+              toggleFilter={(idx) =>
+                setFilters((fs) =>
+                  fs.map((x, j) => (j === idx ? { ...x, open: !x.open } : x)),
+                )
+              }
               handleOptionChange={handleOptionChange}
-              removeFilter={removeFilter}
+              removeFilter={(idx) =>
+                setFilters((fs) => fs.filter((_, j) => j !== idx))
+              }
               setDraggedIndex={setDragIdx}
+              toggleEnabled={(idx) =>
+                setFilters((fs) =>
+                  fs.map((x, j) =>
+                    j === idx ? { ...x, enabled: !x.enabled } : x,
+                  ),
+                )
+              }
             />
           ))}
 
@@ -371,13 +320,13 @@ export default function PixelPass() {
           </button>
           {showAdd && (
             <div className={styles.filterSelection}>
-              {Object.keys(FILTERS).map((type) => (
+              {Object.keys(defs).map((type) => (
                 <button
                   key={type}
                   onClick={() => addFilter(type)}
                   className="xpButton"
                 >
-                  {getFilterOptions(fonts)[type].title}
+                  {defs[type].title}
                 </button>
               ))}
             </div>
@@ -387,13 +336,7 @@ export default function PixelPass() {
 
       <div className={styles.imagesContainer}>
         <div className={styles.imageBox}>
-          {(outputURL || fileURL) && (
-            <img
-              src={outputURL || fileURL}
-              alt="Preview"
-              className={styles.image}
-            />
-          )}
+          <canvas ref={canvasRef} className={styles.image} />
         </div>
       </div>
     </div>

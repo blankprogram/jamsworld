@@ -1,10 +1,10 @@
-import {decodeGIF, encodeGIF} from './gifUtils';
+import { decodeGIF, encodeGIF } from "./gifUtils";
 
 export async function processMediaWithFilters(img, filters) {
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d', {willReadFrequently: true});
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
 
-  let {width, height} = img;
+  let { width, height } = img;
   canvas.width = width;
   canvas.height = height;
 
@@ -19,21 +19,22 @@ export async function processMediaWithFilters(img, filters) {
     canvas.height = height;
     context.putImageData(result, 0, 0);
   }
-  const image = canvas.toDataURL('image/svg+xml');
+  const image = canvas.toDataURL("image/svg+xml");
   return image;
 }
 
 export async function processGIFWithFilters(gifURL, filters) {
   const response = await fetch(gifURL);
   const buffer = await response.arrayBuffer();
-  const {frames, width, height} = decodeGIF(buffer);
+  const { frames, width, height } = decodeGIF(buffer);
 
-  const processedFrames =
-      await Promise.all(frames.map(async ({img, frameInfo}) => {
-        const imgBitmap = await createImageBitmap(img);
-        const imgDataUrl = await processMediaWithFilters(imgBitmap, filters);
-        return {imgDataUrl, frameInfo};
-      }));
+  const processedFrames = await Promise.all(
+    frames.map(async ({ img, frameInfo }) => {
+      const imgBitmap = await createImageBitmap(img);
+      const imgDataUrl = await processMediaWithFilters(imgBitmap, filters);
+      return { imgDataUrl, frameInfo };
+    }),
+  );
 
   return encodeGIF(processedFrames, width, height);
 }

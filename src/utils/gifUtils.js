@@ -1,74 +1,73 @@
-import { GifReader } from 'omggif';
-import GIFEncoder from 'gif-encoder-2-browser';
+import { GifReader } from "omggif";
+import GIFEncoder from "gif-encoder-2-browser";
 
 export function decodeGIF(buffer) {
-    const gifReader = new GifReader(new Uint8Array(buffer));
-    const frames = [];
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = gifReader.width;
-    canvas.height = gifReader.height;
+  const gifReader = new GifReader(new Uint8Array(buffer));
+  const frames = [];
+  const width = gifReader.width;
+  const height = gifReader.height;
 
-    for (let i = 0; i < gifReader.numFrames(); i++) {
-        const frameInfo = gifReader.frameInfo(i);
-        const imageData = new Uint8Array(gifReader.width * gifReader.height * 4);
-        gifReader.decodeAndBlitFrameRGBA(i, imageData);
+  let previousFrame = new Uint8ClampedArray(width * height * 4);
+  let backupFrame = null;
 
-        const imgData = context.createImageData(gifReader.width, gifReader.height);
-        imgData.data.set(imageData);
-        context.putImageData(imgData, 0, 0);
+  for (let i = 0; i < gifReader.numFrames(); i++) {
+    const frameInfo = gifReader.frameInfo(i);
+    const rgba = new Uint8Array(width * height * 4);
 
-        const frameCanvas = document.createElement('canvas');
-        frameCanvas.width = gifReader.width;
-        frameCanvas.height = gifReader.height;
-        frameCanvas.getContext('2d').putImageData(imgData, 0, 0);
+    rgba.set(previousFrame);
 
-        frames.push({ img: frameCanvas, frameInfo });
+    gifReader.decodeAndBlitFrameRGBA(i, rgba);
+
+    const imgData = new ImageData(new Uint8ClampedArray(rgba), width, height);
+    frames.push({ imgData, frameInfo });
+
+    switch (frameInfo.disposal) {
+      case 0:
+      case 1:
+        previousFrame = rgba;
+        break;
+      case 2:
+        previousFrame = new Uint8ClampedArray(width * height * 4);
+        break;
+      case 3:
+        if (backupFrame) {
+          previousFrame = backupFrame.slice();
+        }
+        break;
+      default:
+        previousFrame = rgba;
+        break;
     }
 
-    return { frames, width: gifReader.width, height: gifReader.height };
+    if (frameInfo.disposal === 3) {
+      backupFrame = previousFrame.slice();
+    }
+  }
+
+  return { frames, width, height };
 }
 
 export async function encodeGIF(frames, width, height) {
-    const encoder = new GIFEncoder(width, height, 'neuquant', true);
-    encoder.setRepeat(0);
-    encoder.setQuality(30);
-    encoder.start();
+  const encoder = new GIFEncoder(width, height, "neuquant", true);
+  encoder.setRepeat(0);
+  encoder.setQuality(1);
+  encoder.setTransparent(0x00ff00);
+  encoder.start();
 
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d',{ willReadFrequently: true });
-    canvas.width = width;
-    canvas.height = height;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
 
-    for (const frame of frames) {
-        const { imgDataUrl, frameInfo } = frame;
+  for (const { imgData, frameInfo } of frames) {
+    ctx.putImageData(imgData, 0, 0);
+    encoder.setDelay(frameInfo.delay * 10);
+    encoder.setDispose(frameInfo.disposal);
+    encoder.addFrame(ctx);
+  }
 
-        context.clearRect(0, 0, width, height);
-
-        const img = new Image();
-        img.src = imgDataUrl;
-        await new Promise((resolve, reject) => {
-            img.onload = () => {
-                context.drawImage(img, 0, 0, width, height);
-                resolve();
-            };
-            img.onerror = (err) => reject(err);
-        });
-
-        encoder.setDelay(frameInfo.delay * 10);
-        encoder.setDispose(frameInfo.disposal);
-
-        if (frameInfo.transparent_index !== undefined) {
-            encoder.setTransparent(frameInfo.transparent_index);
-        }
-
-        encoder.addFrame(context);
-    }
-
-    encoder.finish();
-    const binaryGif = encoder.out.getData();
-    const blob = new Blob([binaryGif], { type: 'image/gif' });
-    return URL.createObjectURL(blob);
+  encoder.finish();
+  const binaryGif = encoder.out.getData();
+  return URL.createObjectURL(new Blob([binaryGif], { type: "image/gif" }));
 }
-
-
