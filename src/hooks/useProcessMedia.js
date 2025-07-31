@@ -137,7 +137,6 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
       const live = pipelineRef.current;
       if (!live) return;
 
-      // PNG fallback
       if (!frames) {
         const can = canvasRef.current;
         if (!can) return;

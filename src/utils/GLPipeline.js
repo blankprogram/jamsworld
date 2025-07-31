@@ -66,6 +66,9 @@ class ShaderProgram {
         case "3f":
           gl.uniform3f(loc, val[0], val[1], val[2]);
           break;
+        case "3fv":
+          gl.uniform3fv(loc, val);
+          break;
         case "4f":
           gl.uniform4f(loc, val[0], val[1], val[2], val[3]);
           break;
@@ -191,6 +194,10 @@ class GLPass {
   render(gl, { texture, width, height }, pool, vao) {
     const { fbo, tex } = pool.getPair(width, height).next();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.viewport(0, 0, width, height);
 
     this.prog.use();
@@ -258,9 +265,11 @@ export default class GLPipeline {
     for (let p of this.passes) {
       state = p.render(gl, state, this.pool, this.quadVAO);
     }
+
     this.canvas.width = state.width;
     this.canvas.height = state.height;
     this._blitToScreen(state);
+
     return state;
   }
 
@@ -268,7 +277,10 @@ export default class GLPipeline {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     this.copyProg.use();
     bindTexture(gl, 0, texture, this.copyProg.locs.u_texture);
 
@@ -598,6 +610,106 @@ void main() {
 }
 `;
 
+export class DitherPass extends GLPass {
+  static def = {
+    type: "DITHER",
+    title: "Dithering",
+    options: [
+      {
+        label: "Algorithm",
+        type: "select",
+        name: "algo",
+        options: ["Ordered", "Stochastic", "Halftone"],
+        defaultValue: "Ordered",
+      },
+      {
+        label: "Levels",
+        type: "range",
+        name: "levels",
+        props: { min: 1, max: 32, step: 1 },
+        defaultValue: 1,
+      },
+    ],
+    uniformKeys: ["u_algo", "u_levels"],
+    structuralKeys: ["algo", "levels"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, DitherPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      { name: "u_algo", type: "1i", value: () => this.algoIndex },
+      { name: "u_levels", type: "1f", value: () => this.levels },
+    ]);
+    this.algoIndex =
+      opts.algo === "Stochastic" ? 1 : opts.algo === "Halftone" ? 2 : 0;
+    this.levels = opts.levels ?? 2;
+  }
+
+  setOption(name, value) {
+    if (name === "algo") {
+      this.algoIndex =
+        value === "Stochastic" ? 1 : value === "Halftone" ? 2 : 0;
+    }
+    if (name === "levels") {
+      this.levels = Math.max(1, parseInt(value, 10) || 1);
+    }
+  }
+}
+
+DitherPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform int   u_algo;
+uniform float u_levels;
+out vec4 outColor;
+
+const int bayer4[16] = int[16](
+     0,  8,  2, 10,
+    12,  4, 14,  6,
+     3, 11,  1,  9,
+    15,  7, 13,  5
+);
+
+float rand(vec2 co){
+  return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453);
+}
+
+mat2 rot(float a){
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
+}
+
+void main(){
+  vec4 src = texture(u_texture, v_uv);
+
+  if(u_algo == 2){
+    bool isGray = abs(src.r - src.g) < 0.001 && abs(src.r - src.b) < 0.001;
+    float a0 = isGray ? radians(45.0) : radians(15.0);
+    float a1 = isGray ? radians(45.0) : radians(45.0);
+    float a2 = isGray ? radians(45.0) : radians(75.0);
+    vec2 p = gl_FragCoord.xy / u_levels;
+    vec2 c0 = fract(rot(a0) * p) - 0.5;
+    vec2 c1 = fract(rot(a1) * p) - 0.5;
+    vec2 c2 = fract(rot(a2) * p) - 0.5;
+    float r0 = (1.0 - src.r) * 0.5;
+    float r1 = (1.0 - src.g) * 0.5;
+    float r2 = (1.0 - src.b) * 0.5;
+    float v0 = length(c0) < r0 ? 0.0 : 1.0;
+    float v1 = length(c1) < r1 ? 0.0 : 1.0;
+    float v2 = length(c2) < r2 ? 0.0 : 1.0;
+    outColor = vec4(vec3(v0, v1, v2), src.a);
+    return;
+  }
+
+  ivec2 pix = ivec2(gl_FragCoord.xy);
+  float threshold = (u_algo == 0)
+    ? (float(bayer4[(pix.y & 3) * 4 + (pix.x & 3)]) + 0.5) / 16.0
+    : rand(gl_FragCoord.xy);
+  vec3 q = floor(src.rgb * u_levels + threshold) / u_levels;
+  outColor = vec4(q, src.a);
+}
+`;
 export class DownsamplePass extends GLPass {
   static def = {
     type: "DOWNSAMPLE",
@@ -716,7 +828,6 @@ export class AsciiPass extends GLPass {
       this.fontFamily,
     );
 
-    // Create a Downsample stage (also a GLPass)
     this.downPass = new GLPass(gl, AsciiPass.DownsampleFS, [
       { name: "u_texture", type: "1i", value: 0 },
     ]);
@@ -817,3 +928,304 @@ void main() {
   outColor = vec4(col, mask);
 }
 `;
+
+export class PalettePass extends GLPass {
+  static presets = {
+    BlackAndWhite: ["#000000", "#FFFFFF"],
+    Gruvbox: [
+      "#282828",
+      "#fb4934",
+      "#b8bb26",
+      "#fabd2f",
+      "#83a598",
+      "#d3869b",
+      "#8ec07c",
+      "#ebdbb2",
+    ],
+    Dracula: [
+      "#282a36",
+      "#ff5555",
+      "#50fa7b",
+      "#f1fa8c",
+      "#bd93f9",
+      "#ff79c6",
+      "#8be9fd",
+      "#f8f8f2",
+    ],
+    SolarizedDark: [
+      "#002b36",
+      "#dc322f",
+      "#859900",
+      "#b58900",
+      "#268bd2",
+      "#d33682",
+      "#2aa198",
+      "#eee8d5",
+    ],
+    Monokai: [
+      "#272822",
+      "#f92672",
+      "#a6e22e",
+      "#fd971f",
+      "#66d9ef",
+      "#9e6ffe",
+      "#e6db74",
+      "#f8f8f2",
+    ],
+    Nord: [
+      "#2e3440",
+      "#bf616a",
+      "#a3be8c",
+      "#ebcb8b",
+      "#81a1c1",
+      "#b48ead",
+      "#88c0d0",
+      "#eceff4",
+    ],
+
+    Material: [
+      "#F44336",
+      "#E91E63",
+      "#9C27B0",
+      "#673AB7",
+      "#3F51B5",
+      "#2196F3",
+      "#03A9F4",
+      "#00BCD4",
+    ],
+    Kanagawa: [
+      "#7f745b",
+      "#bfa95b",
+      "#d4c787",
+      "#82c0af",
+      "#29526e",
+      "#171f40",
+    ],
+    Pastel: [
+      "#AEC6CF",
+      "#FFB347",
+      "#77DD77",
+      "#FF6961",
+      "#FDFD96",
+      "#CB99C9",
+      "#C23B22",
+      "#779ECB",
+    ],
+    Vaporwave: [
+      "#FF77FF",
+      "#77FFFF",
+      "#FFDD77",
+      "#44FF44",
+      "#7744FF",
+      "#FF4444",
+      "#44DDFF",
+      "#DD44FF",
+    ],
+    WebSafe: [
+      "#000000",
+      "#003300",
+      "#006600",
+      "#009900",
+      "#00CC00",
+      "#00FF00",
+      "#33FF33",
+      "#66FF66",
+    ],
+  };
+
+  static def = {
+    type: "PALETTE",
+    title: "Palette",
+    options: [
+      {
+        label: "Preset",
+        type: "select",
+        name: "preset",
+        options: [...Object.keys(PalettePass.presets), "Custom"],
+        defaultValue: Object.keys(PalettePass.presets)[0],
+      },
+      {
+        label: "Custom Colors",
+        type: "customColors",
+        name: "customColors",
+        defaultValue: [],
+      },
+    ],
+    uniformKeys: ["u_paletteCount", "u_palette[0]"],
+    structuralKeys: ["preset", "customColors"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, PalettePass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      { name: "u_paletteCount", type: "1i", value: () => this.colors.length },
+      { name: "u_palette[0]", type: "3fv", value: () => this.flatColors },
+    ]);
+
+    this.preset = opts.preset || Object.keys(PalettePass.presets)[0];
+    this.customColors = Array.isArray(opts.customColors)
+      ? opts.customColors.slice()
+      : ["#000000"];
+    this.updateColors();
+  }
+
+  setOption(name, value) {
+    if (name === "customColors") {
+      this.customColors = value.slice();
+    } else {
+      this.preset = value;
+    }
+    this.updateColors();
+  }
+
+  updateColors() {
+    let arr;
+    if (this.preset === "Custom") {
+      arr = this.customColors.filter((h) => /^#([0-9A-F]{6})$/i.test(h));
+    } else {
+      arr = PalettePass.presets[this.preset] || [];
+    }
+
+    this.colors = arr.map(hexToRgbArray);
+
+    while (this.colors.length < 16) {
+      this.colors.push(this.colors[this.colors.length - 1] || [0, 0, 0]);
+    }
+    this.flatColors = new Float32Array(this.colors.flat());
+  }
+}
+
+PalettePass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform int u_paletteCount;
+uniform vec3 u_palette[16];
+out vec4 outColor;
+void main() {
+  vec4 src = texture(u_texture, v_uv);
+  vec3 c = src.rgb;
+  float best = 1e6;
+  vec3 pick = vec3(0.0);
+  for(int i=0;i<u_paletteCount;i++){
+    float d = distance(c, u_palette[i]);
+    if(d<best){ best=d; pick=u_palette[i]; }
+  }
+  outColor = vec4(pick, src.a);
+}`;
+
+export class EmbossPass extends GLPass {
+  static def = {
+    type: "EMBOSS",
+    title: "Emboss",
+    options: [
+      {
+        label: "Strength",
+        type: "range",
+        name: "strength",
+        props: { min: 0, max: 5, step: 0.1 },
+        defaultValue: 1,
+      },
+    ],
+    uniformKeys: ["u_strength", "u_texelSize"],
+    structuralKeys: ["strength"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, EmbossPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      { name: "u_strength", type: "1f", value: () => this.strength },
+      {
+        name: "u_texelSize",
+        type: "2f",
+        value: ({ width, height }) => [1 / width, 1 / height],
+      },
+    ]);
+    this.strength = opts.strength ?? 1;
+  }
+
+  setOption(name, value) {
+    if (name === "strength")
+      this.strength = Math.max(0, parseFloat(value) || 0);
+  }
+}
+
+EmbossPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_strength;
+uniform vec2 u_texelSize;
+out vec4 outColor;
+
+void main() {
+  vec2 uv = v_uv;
+  float s = u_strength;
+  vec3 c00 = texture(u_texture, uv + vec2(-1,-1) * u_texelSize).rgb * -2.0;
+  vec3 c10 = texture(u_texture, uv + vec2( 0,-1) * u_texelSize).rgb * -1.0;
+  vec3 c20 = texture(u_texture, uv + vec2( 1,-1) * u_texelSize).rgb *  0.0;
+  vec3 c01 = texture(u_texture, uv + vec2(-1, 0) * u_texelSize).rgb * -1.0;
+  vec3 c11 = texture(u_texture, uv                ).rgb *  1.0;
+  vec3 c21 = texture(u_texture, uv + vec2( 1, 0) * u_texelSize).rgb *  1.0;
+  vec3 c02 = texture(u_texture, uv + vec2(-1, 1) * u_texelSize).rgb *  0.0;
+  vec3 c12 = texture(u_texture, uv + vec2( 0, 1) * u_texelSize).rgb *  1.0;
+  vec3 c22 = texture(u_texture, uv + vec2( 1, 1) * u_texelSize).rgb *  2.0;
+  vec3 sum = c00 + c10 + c20 + c01 + c11 + c21 + c02 + c12 + c22;
+  vec3 embossed = 0.5 + (sum * (s / 8.0));
+  outColor = vec4(clamp(embossed, 0.0, 1.0), texture(u_texture, v_uv).a);
+}`;
+
+export class ChromaticAberrationPass extends GLPass {
+  static def = {
+    type: "CHROMA",
+    title: "Chromatic Aberration",
+    options: [
+      {
+        label: "Strength",
+        type: "range",
+        name: "strength",
+        props: { min: 0, max: 50, step: 1 },
+        defaultValue: 10,
+      },
+    ],
+    uniformKeys: ["u_strength", "u_texelSize"],
+    structuralKeys: ["strength"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, ChromaticAberrationPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      { name: "u_strength", type: "1f", value: () => this.strength },
+      {
+        name: "u_texelSize",
+        type: "2f",
+        value: ({ width, height }) => [1 / width, 1 / height],
+      },
+    ]);
+    this.strength = opts.strength ?? 10;
+  }
+
+  setOption(name, value) {
+    if (name === "strength")
+      this.strength = Math.max(0, parseFloat(value) || 0);
+  }
+}
+
+ChromaticAberrationPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_strength;
+uniform vec2 u_texelSize;
+out vec4 outColor;
+
+void main() {
+  vec2 dir = v_uv - 0.5;
+  vec2 disp = dir * u_strength;
+  vec2 off = disp * u_texelSize;
+  float r = texture(u_texture, v_uv + off).r;
+  float g = texture(u_texture, v_uv).g;
+  float b = texture(u_texture, v_uv - off).b;
+  float a = texture(u_texture, v_uv).a;
+  outColor = vec4(r, g, b, a);
+}`;

@@ -207,3 +207,20 @@
   justify-content: center;
   gap: 0.25rem;
 }
+
+.customColors > div {
+  display: flex;
+  align-items: center;
+}
+.customColors > div input[type="color"] {
+  height: 1.5rem;
+  margin-right: 0.5rem;
+}
+.customColors {
+  display: flex;
+  flex-direction: column;
+}
+
+.customColors > button {
+  align-self: center;
+}
