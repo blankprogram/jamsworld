@@ -1,107 +1,185 @@
-import React, { useState, useRef } from 'react';
-import { processMediaWithFilters, processGIFWithFilters } from '../../utils/processMediaWithFilters';
-import { pixelSortFilter } from '../../utils/filters';
+import React, { useRef, useState, useCallback } from "react";
+import GLPipeline, { PixelSortPass } from "../../utils/GLPipeline";
+import { useProcessMedia } from "../../hooks/useProcessMedia";
+import "./Pixort.css";
+const SORT_METHODS = [
+  { value: "Luminance", label: "Luminance" },
+  { value: "Hue", label: "Hue" },
+  { value: "Saturation", label: "Saturation" },
+  { value: "RGB Average", label: "RGB Average" },
+  { value: "Red", label: "Red" },
+  { value: "Green", label: "Green" },
+  { value: "Blue", label: "Blue" },
+];
 
-const Pixort = () => {
-    const [file, setFile] = useState(null);
-    const [fileURL, setFileURL] = useState(null);
-    const [outputPath, setOutputPath] = useState('');
-    const [direction, setDirection] = useState('Right');
-    const [intervalType, setIntervalType] = useState('none');
-    const [sortMethod, setSortMethod] = useState('hue');
-    const [lowerThreshold, setLowerThreshold] = useState(28);
-    const [upperThreshold, setUpperThreshold] = useState(81);
+const DIRECTIONS = [
+  { value: "Right", label: "Right" },
+  { value: "Down", label: "Down" },
+  { value: "Left", label: "Left" },
+  { value: "Up", label: "Up" },
+];
 
-    const fileInputRef = useRef(null);
+export default function Pixort() {
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-    const handleFileChange = (e) => {
-        const uploadedFile = e.target.files[0];
-        if (uploadedFile) {
-            setFile(uploadedFile);
-            setFileURL(URL.createObjectURL(uploadedFile));
-        } else {
-            console.error("No file selected!");
-        }
-    };
+  const [fileURL, setFileURL] = useState(null);
+  const [canExport, setCanExport] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!file) return;
-    
-        const filters = [
-            (context) => pixelSortFilter(context, { direction, sortMethod, lowerThreshold, upperThreshold, intervalType }),
-        ];
-    
-        let result;
-        if (file.type === 'image/gif') {
-            result = await processGIFWithFilters(fileURL, filters);
-        } else {
-            const img = new Image();
-            img.src = fileURL;
-            result = await processMediaWithFilters(img, filters);
-        }
-        setOutputPath(result);
-    };
-    
+  const [direction, setDirection] = useState("Right");
+  const [sortBy, setSortBy] = useState("Luminance");
+  const [mode, setMode] = useState("Fully Sorted");
+  const [low, setLow] = useState(0.2);
+  const [high, setHigh] = useState(0.8);
 
-    return (
-        <>
-            <div className="form-container">
-                <form onSubmit={handleSubmit} className="form">
-                    <div className="form-group field-row">
-                        <label>Select file:</label>
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="field" />
-                        <button type="button" className="button" onClick={() => fileInputRef.current.click()}>Choose File</button>
-                    </div>
-                    <div className="form-group field-row">
-                        <label>Direction:</label>
-                        <select value={direction} onChange={(e) => setDirection(e.target.value)} className="field">
-                            <option value="Right">Right</option>
-                            <option value="Down">Down</option>
-                            <option value="Left">Left</option>
-                            <option value="Up">Up</option>
-                        </select>
-                    </div>
-                    <div className="form-group field-row">
-                        <label>Interval Type:</label>
-                        <select value={intervalType} onChange={(e) => setIntervalType(e.target.value)} className="field">
-                            <option value="none">None</option>
-                            <option value="threshold">Threshold</option>
-                        </select>
-                    </div>
-                    {intervalType === 'threshold' && (
-                        <div className="form-group field-row">
-                            <label>Lower Threshold:</label>
-                            <input type="range" min="0" max="100" value={lowerThreshold} onChange={(e) => setLowerThreshold(parseInt(e.target.value))} />
-                            <label>Upper Threshold:</label>
-                            <input type="range" min="0" max="100" value={upperThreshold} onChange={(e) => setUpperThreshold(parseInt(e.target.value))} />
-                        </div>
-                    )}
-                    <div className="form-group field-row">
-                        <label>Sort Method:</label>
-                        <select value={sortMethod} onChange={(e) => setSortMethod(e.target.value)} className="field">
-                            <option value="rgb">RGB</option>
-                            <option value="hue">Hue</option>
-                            <option value="sat">Saturation</option>
-                            <option value="laplace">Laplace</option>
-                            <option value="luminance">Luminance</option>
-                        </select>
-                    </div>
-                    <button type="submit" className="button">Upload and Convert</button>
-                </form>
-            </div>
-            <div className="main-container">
-                <div className="images-container">
-                    <div className="image-box">
-                        {fileURL && <img src={fileURL} alt="Uploaded" className="image" />}
-                    </div>
-                    <div className="image-box">
-                        {outputPath && <img src={outputPath} alt="Converted" className="image" />}
-                    </div>
+  const makePixortPasses = useCallback(
+    (gl, opts) => [
+      new PixelSortPass(gl, {
+        direction: opts.direction,
+        sortBy: opts.sortBy,
+        mode: opts.mode,
+        low: opts.low,
+        high: opts.high,
+      }),
+    ],
+    [],
+  );
+
+  const pixortOpts = { direction, sortBy, mode, low, high };
+  const { loadFile, exportResult } = useProcessMedia(
+    canvasRef,
+    makePixortPasses,
+    pixortOpts,
+  );
+
+  const handleFileChange = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = await loadFile(file);
+      setFileURL(url);
+      setCanExport(true);
+    },
+    [loadFile],
+  );
+
+  const handleExport = useCallback(() => {
+    if (canExport) exportResult("pixorted");
+  }, [canExport, exportResult]);
+
+  return (
+    <>
+      <div className="form-container">
+        <div className="form-top">
+          <button
+            className="button"
+            onClick={() => fileInputRef.current.click()}
+          >
+            Choose File
+          </button>
+          <input
+            type="file"
+            accept="image/*,image/gif"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
+
+          <button
+            className="button export-button"
+            onClick={handleExport}
+            disabled={!canExport}
+          >
+            Export
+          </button>
+        </div>
+        <div className="form-bottom">
+          <div className="form-group">
+            <label>Sort By:</label>
+            <select
+              className="field"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              {SORT_METHODS.map((m) => (
+                <option value={m.value} key={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Direction:</label>
+            <select
+              className="field"
+              value={direction}
+              onChange={(e) => setDirection(e.target.value)}
+            >
+              {DIRECTIONS.map((d) => (
+                <option value={d.value} key={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Mode:</label>
+            <select
+              className="field"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            >
+              <option value="Fully Sorted">Fully Sorted</option>
+              <option value="Threshold">Threshold</option>
+            </select>
+          </div>
+
+          {mode === "Threshold" && (
+            <div className="form-group range-row">
+              <div className="range-col">
+                <label>Low Threshold:</label>
+                <div className="range-inline">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={low}
+                    onChange={(e) => setLow(+e.target.value)}
+                  />
+                  <span className="value-box">{low}</span>
                 </div>
+              </div>
+              <div className="range-col">
+                <label>High Threshold:</label>
+                <div className="range-inline">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={high}
+                    onChange={(e) => setHigh(+e.target.value)}
+                  />
+                  <span className="value-box">{high}</span>
+                </div>
+              </div>
             </div>
-        </>
-    );
-};
-
-export default Pixort;
+          )}
+        </div>
+      </div>
+      <div className="main-container">
+        <div className="images-container">
+          {fileURL && (
+            <div className="image-box">
+              <img src={fileURL} alt="uploaded" />
+            </div>
+          )}
+          <div className="image-box">
+            <canvas ref={canvasRef} />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
