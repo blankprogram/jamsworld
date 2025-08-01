@@ -104,7 +104,39 @@ const FilterControl = ({
   </label>
 );
 
-const FilterOptions = ({
+// --- DropZone: gets a unique key, is registered ONCE only, and inserts filter at correct index ---
+const DropZone = React.memo(function DropZone({
+  onDrop,
+  onDragEnter,
+  onDragLeave,
+  isActive,
+  idx,
+}) {
+  const ref = useRef();
+
+  useEffect(() => {
+    if (!ref.current) return;
+    let cleanup;
+    cleanup = dropTargetForElements({
+      element: ref.current,
+      getData: () => ({ dropZoneIdx: idx }),
+      canDrop: () => true,
+      onDrop: ({ source }) => onDrop(idx),
+      onDragEnter: () => onDragEnter && onDragEnter(idx),
+      onDragLeave: () => onDragLeave && onDragLeave(idx),
+    });
+    return () => cleanup && cleanup();
+  }, [onDrop, onDragEnter, onDragLeave, idx]);
+
+  return (
+    <div
+      ref={ref}
+      className={`${styles.dropZone} ${isActive ? styles.isActive : ""}`}
+    />
+  );
+});
+
+const FilterOptions = React.memo(function FilterOptions({
   filter,
   index,
   fonts,
@@ -115,12 +147,17 @@ const FilterOptions = ({
   toggleEnabled,
   addCustomColor,
   removeCustomColor,
-}) => {
+  swapActive,
+  onSwapDrop,
+  onSwapEnter,
+  onSwapLeave,
+}) {
   const ref = useRef();
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
-  const cfg = defs[filter.type];
+  const cfg = filter ? defs[filter.type] : null;
 
   useEffect(() => {
+    if (!ref.current) return;
     if (!ref.current.dataset.dragInit) {
       draggable({
         element: ref.current,
@@ -129,20 +166,28 @@ const FilterOptions = ({
         onDragStart: () => setDraggedIndex(index),
         onDragEnd: () => setDraggedIndex(null),
       });
-      dropTargetForElements({
-        element: ref.current,
-        getData: () => ({ index }),
-      });
       ref.current.dataset.dragInit = "1";
     }
-  }, [index, setDraggedIndex]);
+  }, [filter, index, setDraggedIndex]);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    let cleanup;
+    cleanup = dropTargetForElements({
+      element: ref.current,
+      getData: () => ({ swapIdx: index }),
+      canDrop: () => true,
+      onDrop: ({ source }) => onSwapDrop(index),
+      onDragEnter: () => onSwapEnter(index),
+      onDragLeave: () => onSwapLeave(index),
+    });
+    return () => cleanup && cleanup();
+  }, [index, onSwapDrop, onSwapEnter, onSwapLeave]);
 
   return (
     <div
       ref={ref}
-      className={`${styles.filterOptions} ${
-        filter.enabled ? styles.enabled : ""
-      }`}
+      className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""} ${swapActive ? styles.swapActive : ""}`}
       data-filter-index={index}
     >
       <div className={styles.filterHeader}>
@@ -164,7 +209,6 @@ const FilterOptions = ({
           />
         </div>
       </div>
-
       {filter.open && (
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => {
@@ -175,7 +219,6 @@ const FilterOptions = ({
             ) {
               return null;
             }
-
             if (filter.type === "PALETTE" && opt.name === "customColors") {
               if (filter.opts.preset !== "Custom") return null;
               return (
@@ -209,7 +252,6 @@ const FilterOptions = ({
                 </div>
               );
             }
-
             return (
               <FilterControl
                 key={opt.name}
@@ -225,7 +267,7 @@ const FilterOptions = ({
       )}
     </div>
   );
-};
+});
 
 export default function PixelPass() {
   const fileInputRef = useRef();
@@ -234,6 +276,8 @@ export default function PixelPass() {
   const [filters, setFilters] = useState([]);
   const [canExport, setCanExport] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
+  const [dropZoneActive, setDropZoneActive] = useState(-1);
+  const [swapIdx, setSwapIdx] = useState(-1);
   const [showAdd, setShowAdd] = useState(false);
   const [fileURL, setFileURL] = useState(null);
 
@@ -241,11 +285,15 @@ export default function PixelPass() {
     loadFonts().then(setFonts);
   }, []);
 
+  useEffect(() => {
+    setDragIdx(null);
+  }, [filters.length]);
+
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
   const makePasses = useCallback(
     (gl, { filters: fArr }) =>
       fArr
-        .filter((f) => f.enabled)
+        .filter((f) => f && f.enabled)
         .map((f) => new defs[f.type].Pass(gl, f.opts)),
     [defs],
   );
@@ -254,21 +302,59 @@ export default function PixelPass() {
     filters,
   });
 
-  useEffect(() => {
-    monitorForElements({
-      onDrop({ location }) {
-        const to = location.current.dropTargets[0]?.data.index;
-        if (dragIdx != null && to != null && dragIdx !== to) {
-          setFilters((fs) => {
-            const a = [...fs];
-            [a[dragIdx], a[to]] = [a[to], a[dragIdx]];
-            return a;
-          });
-        }
-        setDragIdx(null);
-      },
-    });
-  }, [dragIdx]);
+  // Handler for "drop between" (DropZone)
+  const handleDropBetween = useCallback(
+    (idx) => {
+      setFilters((fs) => {
+        if (
+          dragIdx == null ||
+          dragIdx === idx ||
+          dragIdx < 0 ||
+          idx < 0 ||
+          dragIdx >= fs.length ||
+          idx > fs.length
+        )
+          return fs;
+        const arr = [...fs];
+        const [dragged] = arr.splice(dragIdx, 1);
+        arr.splice(idx > dragIdx ? idx - 1 : idx, 0, dragged);
+        return arr;
+      });
+      setDragIdx(null);
+      setDropZoneActive(-1);
+      setSwapIdx(-1);
+    },
+    [dragIdx],
+  );
+
+  const handleSwapDrop = useCallback(
+    (idx) => {
+      setFilters((fs) => {
+        if (
+          dragIdx == null ||
+          dragIdx === idx ||
+          dragIdx < 0 ||
+          idx < 0 ||
+          dragIdx >= fs.length ||
+          idx >= fs.length
+        )
+          return fs;
+        const arr = [...fs];
+        [arr[dragIdx], arr[idx]] = [arr[idx], arr[dragIdx]];
+        return arr;
+      });
+      setDragIdx(null);
+      setDropZoneActive(-1);
+      setSwapIdx(-1);
+    },
+    [dragIdx],
+  );
+
+  const handleDropZoneEnter = useCallback((idx) => setDropZoneActive(idx), []);
+  const handleDropZoneLeave = useCallback(() => setDropZoneActive(-1), []);
+
+  const handleSwapEnter = useCallback((idx) => setSwapIdx(idx), []);
+  const handleSwapLeave = useCallback(() => setSwapIdx(-1), []);
 
   const handleFile = useCallback(
     async (e) => {
@@ -391,24 +477,43 @@ export default function PixelPass() {
             Export
           </button>
         </div>
-
         <div className={styles.filterStackScrollable}>
-          {filters.map((f, i) => (
-            <FilterOptions
-              key={i}
-              filter={f}
-              index={i}
-              fonts={fonts}
-              toggleFilter={toggleFilter}
-              handleOptionChange={handleOptionChange}
-              removeFilter={removeFilter}
-              setDraggedIndex={setDragIdx}
-              toggleEnabled={toggleEnabled}
-              addCustomColor={addCustomColor}
-              removeCustomColor={removeCustomColor}
-            />
-          ))}
-
+          <DropZone
+            idx={0}
+            onDrop={handleDropBetween}
+            onDragEnter={handleDropZoneEnter}
+            onDragLeave={handleDropZoneLeave}
+            isActive={dropZoneActive === 0}
+          />
+          {filters.map((f, i) =>
+            f ? (
+              <React.Fragment key={i}>
+                <FilterOptions
+                  filter={f}
+                  index={i}
+                  fonts={fonts}
+                  toggleFilter={toggleFilter}
+                  handleOptionChange={handleOptionChange}
+                  removeFilter={removeFilter}
+                  setDraggedIndex={setDragIdx}
+                  toggleEnabled={toggleEnabled}
+                  addCustomColor={addCustomColor}
+                  removeCustomColor={removeCustomColor}
+                  swapActive={swapIdx === i}
+                  onSwapDrop={handleSwapDrop}
+                  onSwapEnter={handleSwapEnter}
+                  onSwapLeave={handleSwapLeave}
+                />
+                <DropZone
+                  idx={i + 1}
+                  onDrop={handleDropBetween}
+                  onDragEnter={handleDropZoneEnter}
+                  onDragLeave={handleDropZoneLeave}
+                  isActive={dropZoneActive === i + 1}
+                />
+              </React.Fragment>
+            ) : null,
+          )}
           <button
             type="button"
             className="xpButton"
@@ -432,7 +537,6 @@ export default function PixelPass() {
           )}
         </div>
       </div>
-
       <div className={styles.imagesContainer}>
         <div className={styles.imageBox}>
           <canvas ref={canvasRef} className={styles.image} />
