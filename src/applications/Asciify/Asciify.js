@@ -11,6 +11,7 @@ export default function Asciify() {
   const pickerRef = useRef(null);
 
   const [chars, setChars] = useState(".:-=+*#%@");
+  const [fonts, setFonts] = useState(["Arial"]);
   const [font, setFont] = useState("Arial");
   const [density, setDensity] = useState(1);
   const [blockSize, setBlockSize] = useState(16);
@@ -21,7 +22,15 @@ export default function Asciify() {
   const [canExport, setCanExport] = useState(false);
 
   useEffect(() => {
-    loadFonts().then((f) => f.length && setFont(f[0]));
+    loadFonts().then((f) => {
+      if (f && f.length) {
+        setFonts(f);
+        setFont(f[0]);
+      } else {
+        setFonts(["Arial"]);
+        setFont("Arial");
+      }
+    });
   }, []);
 
   const makeAsciiPasses = useCallback(
@@ -117,7 +126,11 @@ export default function Asciify() {
               value={font}
               onChange={(e) => setFont(e.target.value)}
             >
-              <option value={font}>{font}</option>
+              {fonts.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
             </select>
           </div>
 
