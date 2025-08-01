@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { SketchPicker } from "react-color";
-import GLPipeline, { AsciiPass } from "../../utils/GLPipeline";
+import { AsciiPass } from "../../utils/GLPipeline";
 import { loadFonts } from "../../utils/fontUtils";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
 import "./Asciify.css";

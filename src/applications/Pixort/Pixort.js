@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from "react";
-import GLPipeline, { PixelSortPass } from "../../utils/GLPipeline";
+import { PixelSortPass } from "../../utils/GLPipeline";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
 import "./Pixort.css";
 const SORT_METHODS = [

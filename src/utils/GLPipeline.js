@@ -53,6 +53,7 @@ class ShaderProgram {
       if (!loc) continue;
       let val =
         typeof u.value === "function" ? u.value(stateIn, stateOut) : u.value;
+
       switch (u.type) {
         case "1f":
           gl.uniform1f(loc, val);
@@ -71,6 +72,9 @@ class ShaderProgram {
           break;
         case "4f":
           gl.uniform4f(loc, val[0], val[1], val[2], val[3]);
+          break;
+        default:
+          console.warn(`Unknown uniform type: ${u.type}`);
           break;
       }
     }
