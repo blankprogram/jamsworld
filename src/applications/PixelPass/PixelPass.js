@@ -26,6 +26,7 @@ import {
   PalettePass,
   EmbossPass,
   ChromaticAberrationPass,
+  PixelSortPass,
 } from "../../utils/GLPipeline";
 
 const ALL_PASSES = [
@@ -41,6 +42,7 @@ const ALL_PASSES = [
   PalettePass,
   EmbossPass,
   ChromaticAberrationPass,
+  PixelSortPass,
 ];
 
 function getFilterDefs(fonts) {
@@ -166,6 +168,14 @@ const FilterOptions = ({
       {filter.open && (
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => {
+            if (
+              filter.type === "PIXELSORT" &&
+              (opt.name === "low" || opt.name === "high") &&
+              filter.opts.mode !== "Threshold"
+            ) {
+              return null;
+            }
+
             if (filter.type === "PALETTE" && opt.name === "customColors") {
               if (filter.opts.preset !== "Custom") return null;
               return (

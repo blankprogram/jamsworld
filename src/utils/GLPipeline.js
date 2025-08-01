@@ -1229,3 +1229,191 @@ void main() {
   float a = texture(u_texture, v_uv).a;
   outColor = vec4(r, g, b, a);
 }`;
+
+export class PixelSortPass extends GLPass {
+  static def = {
+    type: "PIXELSORT",
+    title: "Pixel Sort",
+    options: [
+      {
+        label: "Mode",
+        type: "select",
+        name: "mode",
+        options: ["Fully Sorted", "Threshold"],
+        defaultValue: "Fully Sorted",
+      },
+      {
+        label: "Low Threshold",
+        type: "range",
+        name: "low",
+        props: { min: 0, max: 1, step: 0.01 },
+        defaultValue: 0.2,
+      },
+      {
+        label: "High Threshold",
+        type: "range",
+        name: "high",
+        props: { min: 0, max: 1, step: 0.01 },
+        defaultValue: 0.8,
+      },
+      {
+        label: "Sort By",
+        type: "select",
+        name: "sortBy",
+        options: [
+          "Luminance",
+          "Hue",
+          "Saturation",
+          "RGB Average",
+          "Red",
+          "Green",
+          "Blue",
+        ],
+        defaultValue: "Luminance",
+      },
+      {
+        label: "Direction",
+        type: "select",
+        name: "direction",
+        options: ["Up", "Down", "Left", "Right"],
+        defaultValue: "Down",
+      },
+    ],
+    structuralKeys: ["mode", "sortBy", "direction"],
+    uniformKeys: [
+      "u_sortBy",
+      "u_sortVec",
+      "u_width",
+      "u_height",
+      "u_mode",
+      "u_low",
+      "u_high",
+    ],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, PixelSortPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      { name: "u_sortBy", type: "1i", value: () => this.sortByIndex },
+      { name: "u_sortVec", type: "2f", value: () => this.sortVec },
+      { name: "u_width", type: "1i", value: ({ width }) => width },
+      { name: "u_height", type: "1i", value: ({ height }) => height },
+      {
+        name: "u_mode",
+        type: "1i",
+        value: () => (this.mode === "Threshold" ? 1 : 0),
+      },
+      { name: "u_low", type: "1f", value: () => this.low },
+      { name: "u_high", type: "1f", value: () => this.high },
+    ]);
+
+    this.mode = opts.mode || "Fully Sorted";
+    this.low = opts.low ?? 0.2;
+    this.high = opts.high ?? 0.8;
+    this.sortBy = opts.sortBy || "Luminance";
+    this.direction = opts.direction || "Down";
+
+    this.sortByIndex = PixelSortPass.indexMap[this.sortBy];
+    this.sortVec = PixelSortPass.vecMap[this.direction];
+  }
+
+  setOption(name, value) {
+    if (name === "mode") this.mode = value;
+    else if (name === "low") this.low = +value;
+    else if (name === "high") this.high = +value;
+    else if (name === "sortBy") {
+      this.sortBy = value;
+      this.sortByIndex = PixelSortPass.indexMap[value];
+    } else if (name === "direction") {
+      this.direction = value;
+      this.sortVec = PixelSortPass.vecMap[value];
+    }
+  }
+
+  static indexMap = {
+    Luminance: 0,
+    Hue: 1,
+    Saturation: 2,
+    "RGB Average": 3,
+    Red: 4,
+    Green: 5,
+    Blue: 6,
+  };
+
+  static vecMap = {
+    Up: [0, -1],
+    Down: [0, 1],
+    Left: [-1, 0],
+    Right: [1, 0],
+  };
+}
+
+PixelSortPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform vec2 u_sortVec;
+uniform int u_sortBy;
+uniform int u_width;
+uniform int u_height;
+uniform int u_mode;
+uniform float u_low;
+uniform float u_high;
+out vec4 outColor;
+
+vec3 rgb2hsl(vec3 c) {
+  float maxC = max(c.r, max(c.g, c.b));
+  float minC = min(c.r, min(c.g, c.b));
+  float delta = maxC - minC;
+  float h = 0.0;
+  if (delta > 0.0) {
+    if (maxC == c.r) h = mod((c.g - c.b) / delta, 6.0);
+    else if (maxC == c.g) h = (c.b - c.r) / delta + 2.0;
+    else h = (c.r - c.g) / delta + 4.0;
+    h /= 6.0;
+  }
+  float l = 0.5 * (maxC + minC);
+  float s = delta == 0.0 ? 0.0 : delta / (1.0 - abs(2.0 * l - 1.0));
+  return vec3(h, s, l);
+}
+
+float getKey(vec3 c) {
+  vec3 hsl = rgb2hsl(c);
+  if (u_sortBy == 0) return hsl.z;
+  if (u_sortBy == 1) return hsl.x;
+  if (u_sortBy == 2) return hsl.y;
+  if (u_sortBy == 3) return (c.r + c.g + c.b) / 3.0;
+  if (u_sortBy == 4) return c.r;
+  if (u_sortBy == 5) return c.g;
+  if (u_sortBy == 6) return c.b;
+  return hsl.z;
+}
+
+#define MAX_SPAN 1024
+
+void main() {
+  ivec2 coord = ivec2(gl_FragCoord.xy);
+  bool vertical = abs(u_sortVec.y) > abs(u_sortVec.x);
+  int spanLength = vertical ? u_height : u_width;
+  int spanIndex = vertical ? coord.x : coord.y;
+  int localIndex = vertical ? coord.y : coord.x;
+
+  vec4 pixels[MAX_SPAN];
+  float keys[MAX_SPAN];
+  for (int i = 0; i < spanLength; i++) {
+    vec2 uv = vertical
+      ? vec2(float(spanIndex) + 0.5, float(i) + 0.5) / vec2(u_width, u_height)
+      : vec2(float(i) + 0.5, float(spanIndex) + 0.5) / vec2(u_width, u_height);
+    vec4 px = texture(u_texture, uv);
+    float key = getKey(px.rgb);
+    keys[i] = (u_mode == 1 && (key < u_low || key > u_high)) ? -1.0 : key;
+    pixels[i] = px;
+  }
+  for (int i = 0; i < spanLength; i++)
+    for (int j = 0; j < spanLength - 1 - i; j++)
+      if (keys[j] >= 0.0 && keys[j+1] >= 0.0 && keys[j] > keys[j+1]) {
+        float k = keys[j]; keys[j] = keys[j+1]; keys[j+1] = k;
+        vec4 p = pixels[j]; pixels[j] = pixels[j+1]; pixels[j+1] = p;
+      }
+  outColor = pixels[localIndex];
+}`;
