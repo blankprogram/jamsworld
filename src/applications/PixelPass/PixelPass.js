@@ -10,7 +10,6 @@ import styles from "./PixelPass.module.css";
 import {
   draggable,
   dropTargetForElements,
-  monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
 import {
