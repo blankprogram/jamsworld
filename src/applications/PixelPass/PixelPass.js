@@ -1,20 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import {
-  processMediaWithFilters,
-  processGIFWithFilters,
-} from "../../utils/processMediaWithFilters";
-import {
-  invertColors,
-  grayscale,
-  blur,
-  sharpen,
-  dithering,
-  applyPaletteFilter,
-  edgeDetection,
-  posterize,
-  asciiFilter,
-  pixelSortFilter,
-} from "../../utils/filters";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { loadFonts } from "../../utils/fontUtils";
 import styles from "./PixelPass.module.css";
 import {
@@ -22,132 +12,96 @@ import {
   dropTargetForElements,
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { useProcessMedia } from "../../hooks/useProcessMedia";
+import {
+  InvertPass,
+  GrayscalePass,
+  GaussianBlurPass,
+  SharpenPass,
+  EdgePass,
+  PosterizePass,
+  AsciiPass,
+  DownsamplePass,
+  DitherPass,
+  PalettePass,
+  EmbossPass,
+  ChromaticAberrationPass,
+  PixelSortPass,
+} from "../../utils/GLPipeline";
 
-const FILTER_FUNCTIONS = {
-  ASCII: asciiFilter,
-  PIXEL: pixelSortFilter,
-  INVERT: invertColors,
-  GRAYSCALE: grayscale,
-  BLUR: blur,
-  SHARPEN: sharpen,
-  DITHERING: dithering,
-  PALETTE: applyPaletteFilter,
-  EDGE: edgeDetection,
-  POSTERIZE: posterize,
-};
+const ALL_PASSES = [
+  InvertPass,
+  GrayscalePass,
+  GaussianBlurPass,
+  SharpenPass,
+  EdgePass,
+  PosterizePass,
+  AsciiPass,
+  DitherPass,
+  DownsamplePass,
+  PalettePass,
+  EmbossPass,
+  ChromaticAberrationPass,
+  PixelSortPass,
+];
 
-const getFilterOptions = (fonts, intervalType) => ({
-  ASCII: {
-    title: "ASCII Filter",
-    options: [
-      { label: "Width", type: "number", name: "newWidth", defaultValue: 50 },
-      { label: "Characters", type: "text", name: "chars", defaultValue: ".:-=+*#%@" },
-      { label: "Font", type: "select", name: "font", options: fonts, defaultValue: fonts[0] || "Arial" },
-      { label: "Fill", type: "color", name: "fill", defaultValue: "#000000" },
-    ],
-  },
-  PIXEL: {
-    title: "Pixel Sort Filter",
-    options: [
-      { label: "Direction", type: "select", name: "direction", options: ["Right", "Left", "Down", "Up"], defaultValue: "Right" },
-      { label: "Sort Method", type: "select", name: "sortMethod", options: ["rgb", "hue", "sat", "laplace", "luminance"], defaultValue: "hue" },
-      { label: "Interval Type", type: "select", name: "intervalType", options: ["none", "threshold"], defaultValue: "none" },
-      {
-        label: "Lower Threshold",
-        type: "range",
-        name: "lowerThreshold",
-        showIf: () => intervalType === "threshold",
-        props: { min: 0, max: 100 },
-        defaultValue: 27,
-      },
-      {
-        label: "Upper Threshold",
-        type: "range",
-        name: "upperThreshold",
-        showIf: () => intervalType === "threshold",
-        props: { min: 0, max: 100 },
-        defaultValue: 81,
-      },
-    ],
-  },
-  INVERT: { title: "Invert Colors", options: [] },
-  GRAYSCALE: { title: "Grayscale", options: [] },
-  BLUR: {
-    title: "Blur",
-    options: [{ label: "Strength", type: "range", name: "strength", props: { min: 0, max: 20 }, defaultValue: 1 }],
-  },
-  SHARPEN: {
-    title: "Sharpen",
-    options: [{ label: "Strength", type: "range", name: "strength", props: { min: 0, max: 20 }, defaultValue: 1 }],
-  },
-  DITHERING: { title: "Dithering", options: [] },
-  PALETTE: {
-    title: "Palette Filter",
-    options: [],
-    defaultPalette: ["#000000", "#FFFFFF"],
-  },
-  EDGE: { title: "Edge Detection", options: [] },
-  POSTERIZE: {
-    title: "Posterize",
-    options: [{ label: "Levels", type: "range", name: "levels", props: { min: 0, max: 20 }, defaultValue: 5 }],
-  },
-});
+function getFilterDefs(fonts) {
+  const defs = {};
+  ALL_PASSES.forEach((PassClass) => {
+    const def = { ...PassClass.def };
+    if (def.type === "ASCII") {
+      def.options = def.options.map((opt) =>
+        opt.name === "font"
+          ? { ...opt, type: "select", options: fonts, defaultValue: fonts[0] }
+          : opt,
+      );
+    }
+    defs[def.type] = { Pass: PassClass, ...def };
+  });
+  return defs;
+}
 
-const FilterControl = ({ label, type, name, value, options, onChange, props }) => (
+const FilterControl = ({
+  label,
+  type,
+  name,
+  value,
+  options,
+  onChange,
+  props,
+}) => (
   <label className={styles.filterLabel}>
     {label}:
     {type === "select" ? (
       <select name={name} value={value} onChange={onChange}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
           </option>
         ))}
       </select>
+    ) : type === "range" ? (
+      <div className={styles.rangeWrapper}>
+        <input
+          type="range"
+          name={name}
+          value={value}
+          onChange={onChange}
+          {...props}
+          className={styles.rangeInput}
+        />
+        <span className={styles.rangeValue}>{value}</span>
+      </div>
     ) : (
-      <input type={type} name={name} value={value} onChange={onChange} {...props} />
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        {...props}
+      />
     )}
   </label>
-);
-
-const PaletteOptions = ({ filter, index, handleOptionChange }) => (
-  <div className={styles.paletteOptionsContainer}>
-    {filter.options.palette.map((color, colorIndex) => (
-      <div key={colorIndex} className={styles.paletteColorRow}>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) =>
-            handleOptionChange(index, "palette", [
-              ...filter.options.palette.slice(0, colorIndex),
-              e.target.value,
-              ...filter.options.palette.slice(colorIndex + 1),
-            ])
-          }
-          className={styles.paletteColorInput}
-        />
-        <button
-          onClick={() =>
-            handleOptionChange(index, "palette", [
-              ...filter.options.palette.slice(0, colorIndex),
-              ...filter.options.palette.slice(colorIndex + 1),
-            ])
-          }
-          className={`${styles.removeButton} xpButton`}
-        >
-          Remove
-        </button>
-      </div>
-    ))}
-    <button
-      onClick={() =>
-        handleOptionChange(index, "palette", [...filter.options.palette, "#000000"])
-      }
-      className={`${styles.addButton} xpButton`}
-    >
-      Add Color
-    </button>
-  </div>
 );
 
 const FilterOptions = ({
@@ -156,234 +110,257 @@ const FilterOptions = ({
   fonts,
   toggleFilter,
   handleOptionChange,
-  removeFilterFromStack,
-  getFilterFunction,
+  removeFilter,
   setDraggedIndex,
+  toggleEnabled,
+  addCustomColor,
+  removeCustomColor,
 }) => {
-  const filterRef = useRef(null);
-
-  const filterOptions = useMemo(
-    () => getFilterOptions(fonts, filter.options.intervalType),
-    [fonts, filter.options.intervalType]
-  );
-
-  const filterType = useMemo(
-    () =>
-      Object.keys(filterOptions).find(
-        (key) => filter.filterFunc === getFilterFunction(key)
-      ),
-    [filter, getFilterFunction, filterOptions]
-  );
-
-  const { title, options } = filterOptions[filterType] || {};
+  const ref = useRef();
+  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const cfg = defs[filter.type];
 
   useEffect(() => {
-    const element = filterRef.current;
-
-    if (element && !element.dataset.draggableInitialized) {
+    if (!ref.current.dataset.dragInit) {
       draggable({
-        element,
-        dragHandle: element.querySelector(`.${styles.filterTitle}`),
+        element: ref.current,
+        dragHandle: ref.current.querySelector(`.${styles.filterTitle}`),
         data: { index },
         onDragStart: () => setDraggedIndex(index),
         onDragEnd: () => setDraggedIndex(null),
       });
-
-      element.dataset.draggableInitialized = true;
-    }
-
-    if (element && !element.dataset.dropTargetInitialized) {
       dropTargetForElements({
-        element,
-        getData: ({ element }) => {
-          const filterIndex = parseInt(element.getAttribute("data-filter-index"), 10);
-          return { index: filterIndex };
-        },
+        element: ref.current,
+        getData: () => ({ index }),
       });
-
-      element.dataset.dropTargetInitialized = true;
+      ref.current.dataset.dragInit = "1";
     }
   }, [index, setDraggedIndex]);
 
   return (
     <div
-      ref={filterRef}
-      className={styles.filterOptions}
+      ref={ref}
+      className={`${styles.filterOptions} ${
+        filter.enabled ? styles.enabled : ""
+      }`}
       data-filter-index={index}
     >
-      <h4 className={styles.filterTitle} onClick={() => toggleFilter(index)}>
-        {title}
-      </h4>
-      {filter.isOpen && (
-        <div className={styles.filterContent}>
-          {filterType === "PALETTE" && (
-            <PaletteOptions
-              filter={filter}
-              index={index}
-              handleOptionChange={handleOptionChange}
-            />
-          )}
-          {options.map(
-            ({ label, type, name, options: opt, showIf, props, defaultValue }) =>
-              (!showIf || showIf(filter.options)) && (
-                <FilterControl
-                  key={name}
-                  label={label}
-                  type={type}
-                  name={name}
-                  value={filter.options[name] ?? defaultValue}
-                  options={opt}
-                  onChange={(e) => handleOptionChange(index, name, e.target.value)}
-                  props={props}
-                />
-              )
-          )}
+      <div className={styles.filterHeader}>
+        <h4 className={styles.filterTitle} onClick={() => toggleFilter(index)}>
+          {cfg.title}
+        </h4>
+        <div className={styles.filterIcons}>
           <button
-            onClick={() => removeFilterFromStack(index)}
-            className={styles.removeFilterButton}
+            type="button"
+            className={styles.iconBtn}
+            onClick={() => toggleEnabled(index)}
           >
-            X
+            {filter.enabled ? "👁️" : "🚫"}
           </button>
+          <button
+            type="button"
+            className={`${styles.iconBtn} ${styles.delete}`}
+            onClick={() => removeFilter(index)}
+          />
+        </div>
+      </div>
+
+      {filter.open && (
+        <div className={styles.filterContent}>
+          {cfg.options.map((opt) => {
+            if (
+              filter.type === "PIXELSORT" &&
+              (opt.name === "low" || opt.name === "high") &&
+              filter.opts.mode !== "Threshold"
+            ) {
+              return null;
+            }
+
+            if (filter.type === "PALETTE" && opt.name === "customColors") {
+              if (filter.opts.preset !== "Custom") return null;
+              return (
+                <div key="cc" className={styles.customColors}>
+                  {filter.opts.customColors.map((col, ci) => (
+                    <div key={ci}>
+                      <input
+                        type="color"
+                        value={col}
+                        onChange={(e) =>
+                          handleOptionChange(
+                            index,
+                            "customColors",
+                            filter.opts.customColors.map((c, j) =>
+                              j === ci ? e.target.value : c,
+                            ),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCustomColor(index, ci)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => addCustomColor(index)}>
+                    + Add
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <FilterControl
+                key={opt.name}
+                {...opt}
+                value={filter.opts[opt.name]}
+                onChange={(e) =>
+                  handleOptionChange(index, opt.name, e.target.value)
+                }
+              />
+            );
+          })}
         </div>
       )}
     </div>
   );
 };
 
-const PixelPass = () => {
-  const [fileType, setFileType] = useState(null);
-  const [fileURL, setFileURL] = useState(null);
-  const [outputURL, setOutputURL] = useState(null);
-  const [filterStack, setFilterStack] = useState([]);
-  const [showFilterOptions, setShowFilterOptions] = useState(false);
+export default function PixelPass() {
+  const fileInputRef = useRef();
+  const canvasRef = useRef();
   const [fonts, setFonts] = useState([]);
-  const [draggedIndex, setDraggedIndex] = useState(null);
-
-  const fileInputRef = useRef(null);
+  const [filters, setFilters] = useState([]);
+  const [canExport, setCanExport] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [fileURL, setFileURL] = useState(null);
 
   useEffect(() => {
-    const fetchFonts = async () => {
-      const loadedFonts = await loadFonts();
-      setFonts(loadedFonts);
-    };
-    fetchFonts();
+    loadFonts().then(setFonts);
   }, []);
 
-  const moveFilter = useCallback(
-    (fromIndex, toIndex) => {
-      if (fromIndex === toIndex || fromIndex === null || toIndex === null) return;
-  
-      const updatedStack = [...filterStack];
-  
-      [updatedStack[fromIndex], updatedStack[toIndex]] = [updatedStack[toIndex], updatedStack[fromIndex]];
-  
-      setFilterStack(updatedStack);
-  
-    },
-    [filterStack]
+  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const makePasses = useCallback(
+    (gl, { filters: fArr }) =>
+      fArr
+        .filter((f) => f.enabled)
+        .map((f) => new defs[f.type].Pass(gl, f.opts)),
+    [defs],
   );
 
-  useEffect(() => {
-    return monitorForElements({
-      onDrop({ location }) {
-        const fromIndex = draggedIndex;
-        const toIndex = location.current.dropTargets[0]?.data.index;
+  const { loadFile, exportResult } = useProcessMedia(canvasRef, makePasses, {
+    filters,
+  });
 
-        if (fromIndex !== undefined && toIndex !== undefined && fromIndex !== toIndex) {
-          moveFilter(fromIndex, toIndex);
+  useEffect(() => {
+    monitorForElements({
+      onDrop({ location }) {
+        const to = location.current.dropTargets[0]?.data.index;
+        if (dragIdx != null && to != null && dragIdx !== to) {
+          setFilters((fs) => {
+            const a = [...fs];
+            [a[dragIdx], a[to]] = [a[to], a[dragIdx]];
+            return a;
+          });
         }
-        setDraggedIndex(null);
+        setDragIdx(null);
       },
     });
-  }, [draggedIndex, moveFilter]);
+  }, [dragIdx]);
 
-  const handleFileChange = useCallback((e) => {
-    const uploadedFile = e.target.files[0];
-    if (uploadedFile) {
-      const objectURL = URL.createObjectURL(uploadedFile);
-      setFileURL(objectURL);
-      setFileType(uploadedFile.type);
-    }
-  }, []);
-
-  const addFilterToStack = useCallback(
-    (filterType) => {
-      const filterFunc = FILTER_FUNCTIONS[filterType];
-      const filterConfig = getFilterOptions(fonts)[filterType];
-      const filterOptions = filterConfig.options.reduce((acc, opt) => {
-        acc[opt.name] = opt.defaultValue;
-        return acc;
-      }, {});
-
-      if (filterConfig.defaultPalette) {
-        filterOptions.palette = filterConfig.defaultPalette;
-      }
-
-      setFilterStack((prevStack) => [
-        ...prevStack,
-        { filterFunc, options: filterOptions, isOpen: false },
-      ]);
-      setShowFilterOptions(false);
+  const handleFile = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (fileURL) URL.revokeObjectURL(fileURL);
+      const url = await loadFile(file);
+      setFileURL(url);
+      setCanExport(true);
+      setShowAdd(false);
     },
-    [fonts]
+    [loadFile, fileURL],
   );
 
-  const toggleFilter = useCallback((index) => {
-    setFilterStack((prevStack) =>
-      prevStack.map((filter, i) =>
-        i === index ? { ...filter, isOpen: !filter.isOpen } : filter
-      )
+  const handleExport = useCallback(
+    () => exportResult("pixelpass"),
+    [exportResult],
+  );
+
+  const addFilter = useCallback(
+    (type) => {
+      const def = defs[type];
+      const opts = {};
+      def.options.forEach((o) => {
+        opts[o.name === "customColors" ? "customColors" : o.name] =
+          o.name === "customColors"
+            ? ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF", "#000000"]
+            : o.defaultValue;
+      });
+      setFilters((fs) => [...fs, { type, opts, open: false, enabled: true }]);
+      setShowAdd(false);
+    },
+    [defs],
+  );
+
+  const handleOptionChange = useCallback((i, name, val) => {
+    setFilters((fs) =>
+      fs.map((f, j) =>
+        j === i ? { ...f, opts: { ...f.opts, [name]: val } } : f,
+      ),
     );
   }, []);
 
-  const removeFilterFromStack = useCallback((index) => {
-    setFilterStack((prevStack) => prevStack.filter((_, i) => i !== index));
-  }, []);
-
-  const handleOptionChange = useCallback((index, optionName, value) => {
-    setFilterStack((prevStack) => {
-      const updatedStack = [...prevStack];
-      updatedStack[index].options[optionName] =
-        optionName === "strength" ? Number(value) : value;
-      return updatedStack;
-    });
-  }, []);
-
-  const processImage = useCallback(async (fileURL, filters) => {
-    const img = new Image();
-    img.src = fileURL;
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-    });
-
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    canvas.width = img.width;
-    canvas.height = img.height;
-    context.drawImage(img, 0, 0);
-
-    return processMediaWithFilters(context.canvas, filters);
-  }, []);
-
-  const applyFilters = useCallback(async () => {
-    if (!fileURL) return;
-
-    const filters = filterStack.map(
-      ({ filterFunc, options }) => (context) => filterFunc(context, options)
+  const addCustomColor = useCallback((i) => {
+    setFilters((fs) =>
+      fs.map((f, j) =>
+        j === i
+          ? {
+              ...f,
+              opts: {
+                ...f.opts,
+                customColors: [...f.opts.customColors, "#000000"],
+              },
+            }
+          : f,
+      ),
     );
+  }, []);
 
-    try {
-      const result =
-        fileType === "image/gif"
-          ? await processGIFWithFilters(fileURL, filters)
-          : await processImage(fileURL, filters);
+  const removeCustomColor = useCallback((i, ci) => {
+    setFilters((fs) =>
+      fs.map((f, j) =>
+        j === i
+          ? {
+              ...f,
+              opts: {
+                ...f.opts,
+                customColors: f.opts.customColors.filter(
+                  (_, idx) => idx !== ci,
+                ),
+              },
+            }
+          : f,
+      ),
+    );
+  }, []);
 
-      setOutputURL(result);
-    } catch (error) {
-      console.error("Error applying filters:", error);
-    }
-  }, [fileURL, fileType, filterStack, processImage]);
+  const removeFilter = useCallback((i) => {
+    setFilters((fs) => fs.filter((_, j) => j !== i));
+  }, []);
+
+  const toggleFilter = useCallback((i) => {
+    setFilters((fs) =>
+      fs.map((f, j) => (j === i ? { ...f, open: !f.open } : f)),
+    );
+  }, []);
+
+  const toggleEnabled = useCallback((i) => {
+    setFilters((fs) =>
+      fs.map((f, j) => (j === i ? { ...f, enabled: !f.enabled } : f)),
+    );
+  }, []);
 
   return (
     <div className={styles.mainContainer}>
@@ -391,72 +368,76 @@ const PixelPass = () => {
         <div className={styles.filterStackFixed}>
           <h3>PixelPass</h3>
           <div className={styles.formContainer}>
-            <form className={styles.form}>
-              <div className={styles.formGroup}>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className={styles.field}
-                />
-                <button
-                  type="button"
-                  className="xpButton"
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  Choose File
-                </button>
-              </div>
-            </form>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFile}
+              className={styles.field}
+            />
+            <button
+              type="button"
+              className="xpButton"
+              onClick={() => fileInputRef.current.click()}
+            >
+              Choose File
+            </button>
           </div>
-          <button onClick={applyFilters} className="xpButton">
-            Apply Filters
+          <button
+            type="button"
+            className="xpButton"
+            disabled={!canExport}
+            onClick={handleExport}
+          >
+            Export
           </button>
         </div>
+
         <div className={styles.filterStackScrollable}>
-          {filterStack.map((filter, index) => (
+          {filters.map((f, i) => (
             <FilterOptions
-              key={index}
-              filter={filter}
-              index={index}
+              key={i}
+              filter={f}
+              index={i}
               fonts={fonts}
               toggleFilter={toggleFilter}
               handleOptionChange={handleOptionChange}
-              removeFilterFromStack={removeFilterFromStack}
-              getFilterFunction={(key) => FILTER_FUNCTIONS[key]}
-              setDraggedIndex={setDraggedIndex}
+              removeFilter={removeFilter}
+              setDraggedIndex={setDragIdx}
+              toggleEnabled={toggleEnabled}
+              addCustomColor={addCustomColor}
+              removeCustomColor={removeCustomColor}
             />
           ))}
+
           <button
-            onClick={() => setShowFilterOptions((prev) => !prev)}
+            type="button"
             className="xpButton"
+            onClick={() => setShowAdd((v) => !v)}
           >
             + Add Filter
           </button>
-          {showFilterOptions && (
+          {showAdd && (
             <div className={styles.filterSelection}>
-              {Object.keys(FILTER_FUNCTIONS).map((filterType) => (
+              {Object.keys(defs).map((type) => (
                 <button
-                  key={filterType}
-                  onClick={() => addFilterToStack(filterType)}
+                  type="button"
+                  key={type}
                   className="xpButton"
+                  onClick={() => addFilter(type)}
                 >
-                  {filterType.replace(/_/g, " ")}
+                  {defs[type].title}
                 </button>
               ))}
             </div>
           )}
         </div>
       </div>
+
       <div className={styles.imagesContainer}>
         <div className={styles.imageBox}>
-          {(outputURL || fileURL) && (
-            <img src={outputURL || fileURL} alt="Preview" className={styles.image} />
-          )}
+          <canvas ref={canvasRef} className={styles.image} />
         </div>
       </div>
     </div>
   );
-};
-
-export default PixelPass;
+}

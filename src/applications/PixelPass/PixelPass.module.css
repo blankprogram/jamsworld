@@ -1,130 +1,226 @@
 .mainContainer {
-    display: flex;
-    height: 100%;
-    width: 100%;
-    font-family: "Tahoma", sans-serif;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  font-family: Tahoma, sans-serif;
 }
 
 .filterStack {
-    width: 30%;
-    max-width: 400px;
-    min-width: 300px;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background-color: #ece9d8;
-    border-right: 2px solid #999999;
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 30%;
+  max-width: 400px;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: #ece9d8;
+  border-right: 2px solid #999;
 }
 
 .filterStackFixed {
-    background-color: #b9b6a9;
-    padding: 20px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    border-bottom: 2px solid #999999;
+  background: #b9b6a9;
+  padding: 1.25rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-bottom: 2px solid #999;
 }
 
 .filterStack button {
-    margin: 10px 0;
+  margin: 0.625rem 0;
 }
 
 .filterStackScrollable {
-    display: flex;
-    flex-direction: column;
-    align-items: center; /* Centers horizontally */
-
-    overflow-y: scroll;
-    height: 100%;
-    scrollbar-width: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
 }
 
-
-
 .imagesContainer {
-    flex: 1;
-    background-color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
 }
 
 .imageBox {
-    width: 95%;
-    height: 95%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #f0f0f0;
-    border: 2px solid #999;
+  width: 95%;
+  height: 95%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f0f0f0;
+  border: 2px solid #999;
 }
 
-
 .image {
-    width: 95%;
-    height: 95%;
-    object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .filterOptions {
-    width: 80%;
-    display: flex;
-    flex-direction: column;
-    padding: 5px;
-    margin: 10px auto;
-    background-color: #f0f0f0;
-    border: 1px solid #808080;
-    cursor: pointer;
+  width: 80%;
+  margin: 0.625rem auto;
+  padding: 0.625rem;
+  background: #b9b6a9;
+  border: 1px solid #808080;
 }
 
-.filterTitle {
-    text-align: center;
-    font-weight: bold;
-    cursor: pointer;
+.filterHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.filterHeader .filterTitle {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.filterIcons {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: flex;
+  gap: 0.25rem;
+  transform: translateY(-50%);
+}
+
+.filterIcons .iconBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 1px;
+  border: 1px solid #fff;
+  border-radius: 3px;
+  box-shadow: inset 0 -1px 2px 1px #4646ff;
+  background-image: radial-gradient(
+    circle at 90% 90%,
+    #0054e9 0%,
+    #2263d5 55%,
+    #4479e4 70%,
+    #a3bbec 90%,
+    white 100%
+  );
+  padding: 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 0;
+  min-height: 0;
+}
+
+.filterIcons .iconBtn:hover {
+  filter: brightness(120%);
+}
+
+.filterIcons .iconBtn:active {
+  filter: brightness(90%);
+}
+
+.filterIcons .iconBtn.disable {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+.filterIcons .iconBtn.delete {
+  box-shadow: inset 0 -1px 2px 1px #da4600;
+  background-image: radial-gradient(
+    circle at 90% 90%,
+    #cc4600 0%,
+    #dc6527 55%,
+    #cd7546 70%,
+    #ffccb2 90%,
+    white 100%
+  );
+}
+
+.filterIcons .iconBtn.delete::before,
+.filterIcons .iconBtn.delete::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  background-color: white;
+}
+
+.filterIcons .iconBtn.delete::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.filterIcons .iconBtn.delete::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .filterContent {
-    margin-top: 10px;
-    display: flex;
-    flex-direction: column;
-
+  margin-top: 0.625rem;
 }
 
 .filterOptions label {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-
-.filterSelection {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 3px;
-
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.625rem;
 }
 
 .filterOptions select,
-.filterOptions input[type="range"],
 .filterOptions input[type="text"],
 .filterOptions input[type="number"],
 .filterOptions input[type="color"] {
-    max-width: 60%;
-    flex-grow: 1;
+  grid-column: 2;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.paletteOptionsContainer {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    
+.rangeWrapper {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.paletteColorRow {
-    display: flex;
-    align-items: center;
-    
-    gap: 10px;
+.rangeValue {
+  width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.filterSelection {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.customColors > div {
+  display: flex;
+  align-items: center;
+}
+.customColors > div input[type="color"] {
+  height: 1.5rem;
+  margin-right: 0.5rem;
+}
+.customColors {
+  display: flex;
+  flex-direction: column;
+}
+
+.customColors > button {
+  align-self: center;
 }
