@@ -26,6 +26,8 @@ import {
   EmbossPass,
   ChromaticAberrationPass,
   PixelSortPass,
+  BloomPass,
+  FilmGrainPass,
 } from "../../utils/GLPipeline";
 
 const ALL_PASSES = [
@@ -42,6 +44,8 @@ const ALL_PASSES = [
   EmbossPass,
   ChromaticAberrationPass,
   PixelSortPass,
+  BloomPass,
+  FilmGrainPass,
 ];
 
 function getFilterDefs(fonts) {
@@ -103,7 +107,6 @@ const FilterControl = ({
   </label>
 );
 
-// --- DropZone: gets a unique key, is registered ONCE only, and inserts filter at correct index ---
 const DropZone = React.memo(function DropZone({
   onDrop,
   onDragEnter,

@@ -527,12 +527,20 @@ export class EdgePass extends GLPass {
   static def = {
     type: "EDGE",
     title: "Edge Detection",
-    options: [],
-    uniformKeys: [],
-    structuralKeys: [],
+    options: [
+      {
+        label: "Method",
+        type: "select",
+        name: "method",
+        options: ["Sobel", "Dag", "XDag"],
+        defaultValue: "Sobel",
+      },
+    ],
+    structuralKeys: ["method"],
+    uniformKeys: ["u_texelSize", "u_method"],
   };
 
-  constructor(gl) {
+  constructor(gl, opts = {}) {
     super(gl, EdgePass.FS, [
       { name: "u_texture", type: "1i", value: 0 },
       {
@@ -540,32 +548,70 @@ export class EdgePass extends GLPass {
         type: "2f",
         value: ({ width, height }) => [1 / width, 1 / height],
       },
+      { name: "u_method", type: "1i", value: () => this.methodIndex },
     ]);
+
+    // default
+    this.method = opts.method || "Sobel";
+    this.methodIndex = EdgePass.methodMap[this.method];
+  }
+
+  setOption(name, value) {
+    if (name === "method") {
+      this.method = value;
+      this.methodIndex = EdgePass.methodMap[value];
+    }
   }
 }
+
+EdgePass.methodMap = {
+  Sobel: 0,
+  Dag: 1,
+  XDag: 2,
+};
 
 EdgePass.FS = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_texture;
 uniform vec2 u_texelSize;
+uniform int u_method;
 out vec4 outColor;
+
 void main() {
-  float gx = 0.0;
-  float gy = 0.0;
-  gx += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x, -u_texelSize.y)).r;
-  gx += -2.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  0.0)).r;
-  gx += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  u_texelSize.y)).r;
-  gx +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x, -u_texelSize.y)).r;
-  gx +=  2.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  0.0)).r;
-  gx +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  u_texelSize.y)).r;
-  gy += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x, -u_texelSize.y)).r;
-  gy += -2.0 * texture(u_texture, v_uv + vec2( 0.0,           -u_texelSize.y)).r;
-  gy += -1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x, -u_texelSize.y)).r;
-  gy +=  1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  u_texelSize.y)).r;
-  gy +=  2.0 * texture(u_texture, v_uv + vec2( 0.0,            u_texelSize.y)).r;
-  gy +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  u_texelSize.y)).r;
-  float g = length(vec2(gx, gy));
+  vec2 uv = v_uv;
+  float g = 0.0;
+
+  if (u_method == 0) {
+    float gx = 0.0;
+    float gy = 0.0;
+    gx += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x, -u_texelSize.y)).r;
+    gx += -2.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  0.0)).r;
+    gx += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  u_texelSize.y)).r;
+    gx +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x, -u_texelSize.y)).r;
+    gx +=  2.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  0.0)).r;
+    gx +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  u_texelSize.y)).r;
+    gy += -1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x, -u_texelSize.y)).r;
+    gy += -2.0 * texture(u_texture, v_uv + vec2( 0.0,           -u_texelSize.y)).r;
+    gy += -1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x, -u_texelSize.y)).r;
+    gy +=  1.0 * texture(u_texture, v_uv + vec2(-u_texelSize.x,  u_texelSize.y)).r;
+    gy +=  2.0 * texture(u_texture, v_uv + vec2( 0.0,            u_texelSize.y)).r;
+    gy +=  1.0 * texture(u_texture, v_uv + vec2( u_texelSize.x,  u_texelSize.y)).r;
+
+    g = length(vec2(gx, gy));
+  }
+  else if (u_method == 1) {
+    vec2 off = vec2(u_texelSize.x, u_texelSize.y);
+    float d1 = texture(u_texture, uv).r
+             - texture(u_texture, uv + off).r;
+    g = abs(d1);
+  }
+  else {
+    float d2 = texture(u_texture, uv + vec2(u_texelSize.x, 0.0)).r
+             - texture(u_texture, uv + vec2(0.0, u_texelSize.y)).r;
+    g = abs(d2);
+  }
+
   outColor = vec4(vec3(g), 1.0);
 }
 `;
@@ -623,15 +669,15 @@ export class DitherPass extends GLPass {
         label: "Algorithm",
         type: "select",
         name: "algo",
-        options: ["Ordered", "Stochastic", "Halftone"],
+        options: ["Ordered", "Stochastic", "Halftone", "Error Diffusion"],
         defaultValue: "Ordered",
       },
       {
         label: "Levels",
         type: "range",
         name: "levels",
-        props: { min: 1, max: 32, step: 1 },
-        defaultValue: 1,
+        props: { min: 2, max: 10, step: 1 },
+        defaultValue: 2,
       },
     ],
     uniformKeys: ["u_algo", "u_levels"],
@@ -644,18 +690,132 @@ export class DitherPass extends GLPass {
       { name: "u_algo", type: "1i", value: () => this.algoIndex },
       { name: "u_levels", type: "1f", value: () => this.levels },
     ]);
+    this.algo = opts.algo || "Ordered";
     this.algoIndex =
-      opts.algo === "Stochastic" ? 1 : opts.algo === "Halftone" ? 2 : 0;
+      this.algo === "Stochastic"
+        ? 1
+        : this.algo === "Halftone"
+          ? 2
+          : this.algo === "Error Diffusion"
+            ? 3
+            : 0;
     this.levels = opts.levels ?? 2;
+    this.cpuTexture = null;
   }
 
   setOption(name, value) {
     if (name === "algo") {
+      this.algo = value;
       this.algoIndex =
-        value === "Stochastic" ? 1 : value === "Halftone" ? 2 : 0;
+        value === "Stochastic"
+          ? 1
+          : value === "Halftone"
+            ? 2
+            : value === "Error Diffusion"
+              ? 3
+              : 0;
     }
-    if (name === "levels") {
-      this.levels = Math.max(1, parseInt(value, 10) || 1);
+    if (name === "levels") this.levels = Math.max(2, parseInt(value, 10) || 2);
+  }
+
+  render(gl, state, pool, vao) {
+    if (this.algo !== "Error Diffusion")
+      return super.render(gl, state, pool, vao);
+
+    const { texture, width, height } = state;
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      texture,
+      0,
+    );
+
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(fbo);
+
+    this.applyFloydSteinberg(pixels, width, height, this.levels);
+
+    if (!this.cpuTexture) {
+      this.cpuTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.cpuTexture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        width,
+        height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixels,
+      );
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, this.cpuTexture);
+      gl.texSubImage2D(
+        gl.TEXTURE_2D,
+        0,
+        0,
+        0,
+        width,
+        height,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixels,
+      );
+    }
+
+    return { texture: this.cpuTexture, width, height };
+  }
+
+  applyFloydSteinberg(pixels, width, height, levels) {
+    const quantLevel = levels - 1;
+    const idx = (x, y) => 4 * (y * width + x);
+    const quantize = (v) => Math.round(v * quantLevel) / quantLevel;
+
+    const floatPixels = new Float32Array(pixels.length);
+    for (let i = 0; i < pixels.length; i++) floatPixels[i] = pixels[i] / 255;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = idx(x, y);
+        for (let c = 0; c < 3; c++) {
+          const oldVal = floatPixels[i + c];
+          const newVal = quantize(oldVal);
+          const error = oldVal - newVal;
+          floatPixels[i + c] = newVal;
+          if (x + 1 < width) floatPixels[idx(x + 1, y) + c] += (error * 7) / 16;
+          if (x - 1 >= 0 && y + 1 < height)
+            floatPixels[idx(x - 1, y + 1) + c] += (error * 3) / 16;
+          if (y + 1 < height)
+            floatPixels[idx(x, y + 1) + c] += (error * 5) / 16;
+          if (x + 1 < width && y + 1 < height)
+            floatPixels[idx(x + 1, y + 1) + c] += (error * 1) / 16;
+        }
+      }
+    }
+
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = Math.min(255, Math.max(0, floatPixels[i] * 255));
+      pixels[i + 1] = Math.min(255, Math.max(0, floatPixels[i + 1] * 255));
+      pixels[i + 2] = Math.min(255, Math.max(0, floatPixels[i + 2] * 255));
+    }
+  }
+
+  destroy() {
+    super.destroy();
+    if (this.cpuTexture) {
+      this.gl.deleteTexture(this.cpuTexture);
+      this.cpuTexture = null;
     }
   }
 }
@@ -664,30 +824,30 @@ DitherPass.FS = `#version 300 es
 precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_texture;
-uniform int   u_algo;
+uniform int u_algo;
 uniform float u_levels;
 out vec4 outColor;
 
 const int bayer4[16] = int[16](
-     0,  8,  2, 10,
-    12,  4, 14,  6,
-     3, 11,  1,  9,
-    15,  7, 13,  5
+  0, 8, 2, 10,
+  12, 4, 14, 6,
+  3, 11, 1, 9,
+  15, 7, 13, 5
 );
 
-float rand(vec2 co){
-  return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453);
+float rand(vec2 co) {
+  return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-mat2 rot(float a){
+mat2 rot(float a) {
   float c = cos(a), s = sin(a);
   return mat2(c, -s, s, c);
 }
 
-void main(){
+void main() {
   vec4 src = texture(u_texture, v_uv);
 
-  if(u_algo == 2){
+  if(u_algo == 2) {
     bool isGray = abs(src.r - src.g) < 0.001 && abs(src.r - src.b) < 0.001;
     float a0 = isGray ? radians(45.0) : radians(15.0);
     float a1 = isGray ? radians(45.0) : radians(45.0);
@@ -1484,5 +1644,183 @@ void main() {
     );
 
     outColor = shouldSwap ? neighbor : self;
+}
+`;
+
+export class BloomPass extends GLPass {
+  static def = {
+    type: "BLOOM",
+    title: "Bloom",
+    options: [
+      {
+        label: "Strength",
+        type: "range",
+        name: "strength",
+        props: { min: 0, max: 3, step: 0.01 },
+        defaultValue: 1,
+      },
+      {
+        label: "Threshold",
+        type: "range",
+        name: "threshold",
+        props: { min: 0, max: 1, step: 0.01 },
+        defaultValue: 0.8,
+      },
+      {
+        label: "Blur Radius",
+        type: "range",
+        name: "radius",
+        props: { min: 1, max: 10, step: 1 },
+        defaultValue: 5,
+      },
+    ],
+    uniformKeys: ["u_strength", "u_threshold", "u_texelSize", "u_radius"],
+    structuralKeys: ["strength", "threshold", "radius"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, BloomPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      {
+        name: "u_strength",
+        type: "1f",
+        value: () => this.strength,
+      },
+      {
+        name: "u_threshold",
+        type: "1f",
+        value: () => this.threshold,
+      },
+      {
+        name: "u_texelSize",
+        type: "2f",
+        value: ({ width, height }) => [1 / width, 1 / height],
+      },
+      {
+        name: "u_radius",
+        type: "1i",
+        value: () => this.radius,
+      },
+    ]);
+    this.strength = opts.strength ?? 1;
+    this.threshold = opts.threshold ?? 0.8;
+    this.radius = opts.radius ?? 5;
+  }
+
+  setOption(name, value) {
+    if (name === "strength")
+      this.strength = Math.max(0, parseFloat(value) || 0);
+    if (name === "threshold")
+      this.threshold = Math.min(1, Math.max(0, parseFloat(value) || 0));
+    if (name === "radius")
+      this.radius = Math.min(10, Math.max(1, parseInt(value) || 1));
+  }
+}
+
+BloomPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_strength;
+uniform float u_threshold;
+uniform vec2 u_texelSize;
+uniform int u_radius;
+out vec4 outColor;
+
+float lum(vec3 c) {
+  return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+  vec4 color = texture(u_texture, v_uv);
+  float brightness = lum(color.rgb);
+  if (brightness < u_threshold) {
+    outColor = color;
+    return;
+  }
+
+  vec3 bloom = vec3(0.0);
+  int radius = u_radius;
+  float count = 0.0;
+  for (int y = -radius; y <= radius; y++) {
+    for (int x = -radius; x <= radius; x++) {
+      vec2 offset = vec2(float(x), float(y)) * u_texelSize;
+      vec3 colSample = texture(u_texture, v_uv + offset).rgb;
+      bloom += colSample;
+      count += 1.0;
+    }
+  }
+  bloom /= count;
+  bloom *= u_strength;
+  vec3 result = color.rgb + bloom;
+  outColor = vec4(result, color.a);
+}
+`;
+
+export class FilmGrainPass extends GLPass {
+  static def = {
+    type: "FILMGRAIN",
+    title: "Film Grain",
+    options: [
+      {
+        label: "Intensity",
+        type: "range",
+        name: "intensity",
+        props: { min: 0, max: 0.2, step: 0.001 },
+        defaultValue: 0.05,
+      },
+      {
+        label: "Speed",
+        type: "range",
+        name: "speed",
+        props: { min: 0, max: 10, step: 0.1 },
+        defaultValue: 1,
+      },
+    ],
+    uniformKeys: ["u_texture", "u_intensity", "u_time"],
+    structuralKeys: ["intensity", "speed"],
+  };
+
+  constructor(gl, opts = {}) {
+    super(gl, FilmGrainPass.FS, [
+      { name: "u_texture", type: "1i", value: 0 },
+      {
+        name: "u_intensity",
+        type: "1f",
+        value: () => this.intensity,
+      },
+      {
+        name: "u_time",
+        type: "1f",
+        value: () => performance.now() * 0.001 * this.speed,
+      },
+    ]);
+    this.intensity = opts.intensity ?? 0.05;
+    this.speed = opts.speed ?? 1;
+  }
+
+  setOption(name, value) {
+    if (name === "intensity")
+      this.intensity = Math.max(0, Math.min(1, parseFloat(value) || 0));
+    if (name === "speed") this.speed = Math.max(0, parseFloat(value) || 1);
+  }
+}
+
+FilmGrainPass.FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_texture;
+uniform float u_intensity;
+uniform float u_time;
+out vec4 outColor;
+
+float rand(vec2 co) {
+  return fract(sin(dot(co.xy + u_time, vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main() {
+  vec4 color = texture(u_texture, v_uv);
+  float grain = (rand(gl_FragCoord.xy) - 0.5) * u_intensity;
+  outColor = vec4(clamp(color.rgb + grain, 0.0, 1.0), color.a);
 }
 `;
