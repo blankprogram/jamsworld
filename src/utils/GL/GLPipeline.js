@@ -84,7 +84,8 @@ export default class GLPipeline {
       if (result.temp) frameLiveTemps.add(result.temp.tex);
       state = result;
     }
-
+    this.canvas.width = state.width;
+    this.canvas.height = state.height;
     this._blitToScreen(state);
 
     this.pool.releaseAllExcept(frameLiveTemps);
