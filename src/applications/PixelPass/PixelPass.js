@@ -294,19 +294,23 @@ export default function PixelPass() {
   }, [filters.length]);
 
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+
   const makePasses = useCallback(
-    (gl, { filters: fArr }) =>
-      fArr
+    (gl, { filters: fArr }) => {
+      return fArr
         .filter((f) => f && f.enabled)
-        .map((f) => new defs[f.type].Pass(gl, f.opts)),
+        .map((f) => new defs[f.type].Pass(gl, f.opts));
+    },
     [defs],
   );
 
-  const { loadFile, exportResult } = useProcessMedia(canvasRef, makePasses, {
-    filters,
-  });
+  const memoOpts = useMemo(() => ({ filters }), [filters]);
+  const { loadFile, exportResult } = useProcessMedia(
+    canvasRef,
+    makePasses,
+    memoOpts,
+  );
 
-  // Handler for "drop between" (DropZone)
   const handleDropBetween = useCallback(
     (idx) => {
       setFilters((fs) => {

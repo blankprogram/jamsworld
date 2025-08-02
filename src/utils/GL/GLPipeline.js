@@ -1,6 +1,7 @@
 import FBOPool from "./FBOPool";
 import ShaderProgram from "./ShaderProgram";
 import { bindTexture } from "./helpers";
+
 export const SIMPLE_QUAD_VS = `#version 300 es
 precision highp float;
 out vec2 v_uv;
@@ -43,6 +44,7 @@ export default class GLPipeline {
 
     this._inputTexture = null;
     this._imgSize = { width: 0, height: 0 };
+    this._lastTemp = null;
   }
 
   use(pass) {
@@ -62,33 +64,46 @@ export default class GLPipeline {
   }
 
   renderFrame() {
+    const gl = this.gl;
     let state = {
       texture: this._inputTexture,
       width: this._imgSize.width,
       height: this._imgSize.height,
     };
 
-    const frameLiveTemps = new Set([state.texture]);
     const pool = this.pool;
+    const allTemps = [];
+    const liveTemps = new Set();
+
     const trackedPool = {
       getTemp: (w, h) => {
         const temp = pool.getTemp(w, h);
-        frameLiveTemps.add(temp.tex);
+        allTemps.push(temp);
         return temp;
       },
       getPair: (w, h) => pool.getPair(w, h),
     };
 
     for (const pass of this.passes) {
-      const result = pass.render(this.gl, state, trackedPool, this.quadVAO);
-      if (result.temp) frameLiveTemps.add(result.temp.tex);
+      const result = pass.render(gl, state, trackedPool, this.quadVAO);
+      if (result.temp) liveTemps.add(result.temp);
       state = result;
     }
+
     this.canvas.width = state.width;
     this.canvas.height = state.height;
     this._blitToScreen(state);
 
-    this.pool.releaseAllExcept(frameLiveTemps);
+    if (this._lastTemp && this._lastTemp !== state.temp) {
+      pool.returnTemp(this._lastTemp);
+    }
+    this._lastTemp = state.temp;
+
+    for (const temp of allTemps) {
+      if (temp !== state.temp) {
+        pool.returnTemp(temp);
+      }
+    }
   }
 
   _blitToScreen({ texture }) {
@@ -101,9 +116,18 @@ export default class GLPipeline {
     gl.clear(gl.COLOR_BUFFER_BIT);
     this.copyProg.use();
     bindTexture(gl, 0, texture, this.copyProg.locs.u_texture);
-
     gl.bindVertexArray(this.quadVAO);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  clearPasses() {
+    this.passes.forEach((p) => p.destroy?.());
+    this.passes = [];
+
+    if (this._lastTemp) {
+      this.pool.returnTemp(this._lastTemp);
+      this._lastTemp = null;
+    }
   }
 
   destroy() {
@@ -113,13 +137,8 @@ export default class GLPipeline {
     }
     this.copyProg.destroy();
     this.gl.deleteVertexArray(this.quadVAO);
-    this.passes.forEach((p) => p.destroy && p.destroy());
+    this.passes.forEach((p) => p.destroy?.());
     this.pool.destroy();
-  }
-
-  clearPasses() {
-    this.passes.forEach((p) => p.destroy && p.destroy());
-    this.passes = [];
   }
 
   _createTexture(img) {
