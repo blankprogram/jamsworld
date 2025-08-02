@@ -17,7 +17,7 @@ import {
   GrayscalePass,
   GaussianBlurPass,
   SharpenPass,
-  EdgePass,
+  SobelPass,
   PosterizePass,
   AsciiPass,
   DownsamplePass,
@@ -28,6 +28,7 @@ import {
   PixelSortPass,
   BloomPass,
   FilmGrainPass,
+  XDoGPass,
 } from "../../utils/GLPipeline";
 
 const ALL_PASSES = [
@@ -35,7 +36,7 @@ const ALL_PASSES = [
   GrayscalePass,
   GaussianBlurPass,
   SharpenPass,
-  EdgePass,
+  SobelPass,
   PosterizePass,
   AsciiPass,
   DitherPass,
@@ -46,6 +47,7 @@ const ALL_PASSES = [
   PixelSortPass,
   BloomPass,
   FilmGrainPass,
+  XDoGPass,
 ];
 
 function getFilterDefs(fonts) {
