@@ -1,6 +1,5 @@
 import FBOPool from "./FBOPool";
 import ShaderProgram from "./ShaderProgram";
-import GLPass from "./GLPass";
 import { bindTexture } from "./helpers";
 export const SIMPLE_QUAD_VS = `#version 300 es
 precision highp float;
