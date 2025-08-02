@@ -20,8 +20,8 @@ import {
   SobelPass,
   PosterizePass,
   AsciiPass,
-  DownsamplePass,
   DitherPass,
+  DownsamplePass,
   PalettePass,
   EmbossPass,
   ChromaticAberrationPass,
@@ -29,7 +29,7 @@ import {
   BloomPass,
   FilmGrainPass,
   XDoGPass,
-} from "../../utils/GLPipeline";
+} from "../../utils/GL/passes";
 
 const ALL_PASSES = [
   InvertPass,

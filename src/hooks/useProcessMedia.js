@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import GLPipeline from "../utils/GLPipeline";
+import GLPipeline from "../utils/GL/GLPipeline";
 import { decodeGIF, encodeGIF } from "../utils/gifUtils";
 
 function readImageDataFromWebGL(gl, width, height) {
