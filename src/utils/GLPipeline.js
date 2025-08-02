@@ -247,7 +247,7 @@ class FBOPool {
   }
 
   releaseAllExcept(liveTextures) {
-    for (const [_, poolArr] of this.pool) {
+    for (const poolArr of this.pool.values()) {
       for (let i = poolArr.length - 1; i >= 0; --i) {
         if (!liveTextures.has(poolArr[i].tex)) {
           const { fbo, tex } = poolArr.splice(i, 1)[0];
@@ -1219,6 +1219,8 @@ export class XDoGPass extends GLPass {
       case "phi":
       case "epsilon":
         this._thresh.setOption(name, v);
+        break;
+      default:
         break;
     }
   }
