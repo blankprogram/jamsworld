@@ -104,6 +104,7 @@ export default class GLPipeline {
         pool.returnTemp(temp);
       }
     }
+    return state;
   }
 
   _blitToScreen({ texture }) {
