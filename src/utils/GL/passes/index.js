@@ -14,3 +14,6 @@ export { default as PixelSortPass } from "./PixelSortPass.js";
 export { default as BloomPass } from "./BloomPass.js";
 export { default as FilmGrainPass } from "./FilmGrainPass.js";
 export { default as XDoGPass } from "./XDoGPass.js";
+export { default as VHSPass } from "./VHSPass.js";
+export { default as CRTPass } from "./CRTPass.js";
+export { default as MinesweeperPass} from "./MinesweeperPass.js";

@@ -29,6 +29,12 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
   const lastTime = useRef(0);
   const acc = useRef(0);
 
+  const invalidate = useCallback(() => {
+  const p = pipelineRef.current;
+  if (!p) return;
+  p.renderFrame();
+  }, []);
+
   const prepare = useCallback((src) => {
     const p = pipelineRef.current;
     if (!p) return;
@@ -56,15 +62,15 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
   }, [canvasRef]);
 
   useEffect(() => {
-    const p = pipelineRef.current;
-    if (!p) return;
-    p.clearPasses();
-    makePasses(p.gl, opts).forEach((pass) => p.use(pass));
+  const p = pipelineRef.current;
+  if (!p) return;
+  p.clearPasses();
+  makePasses(p.gl, { ...opts, invalidate }).forEach((pass) => p.use(pass));
 
-    if (!frames && lastSource.current) {
+  if (!frames && lastSource.current) {
       prepare(lastSource.current);
-    }
-  }, [makePasses, opts, frames, prepare]);
+  }
+  }, [makePasses, opts, frames, prepare, invalidate]);
 
   useEffect(() => {
     const onVis = () => {
@@ -156,7 +162,7 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
       off.height = h;
       const exp = GLPipeline.for(off);
       exp.clearPasses();
-      makePasses(exp.gl, opts).forEach((pass) => exp.use(pass));
+      makePasses(exp.gl, { ...opts, invalidate: () => {} }).forEach((pass) => exp.use(pass));
 
       const out = frames.map(({ imgData, frameInfo }) => {
         gifCanvas.current.width = imgData.width;

@@ -29,6 +29,9 @@ import {
   BloomPass,
   FilmGrainPass,
   XDoGPass,
+  VHSPass,
+  CRTPass,
+  MinesweeperPass,
 } from "../../utils/GL/passes";
 
 const ALL_PASSES = [
@@ -48,6 +51,9 @@ const ALL_PASSES = [
   BloomPass,
   FilmGrainPass,
   XDoGPass,
+  VHSPass,
+  CRTPass,
+  MinesweeperPass,
 ];
 
 function getFilterDefs(fonts) {
@@ -296,12 +302,12 @@ export default function PixelPass() {
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
 
   const makePasses = useCallback(
-    (gl, { filters: fArr }) => {
+  (gl, { filters: fArr, invalidate }) => {
       return fArr
-        .filter((f) => f && f.enabled)
-        .map((f) => new defs[f.type].Pass(gl, f.opts));
-    },
-    [defs],
+      .filter((f) => f && f.enabled)
+      .map((f) => new defs[f.type].Pass(gl, { ...f.opts, invalidate }));
+  },
+  [defs],
   );
 
   const memoOpts = useMemo(() => ({ filters }), [filters]);
