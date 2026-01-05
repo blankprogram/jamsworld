@@ -11,7 +11,7 @@ export default class GLPass {
   setOption(name, value) {}
 
   render(gl, { texture, width, height }, pool, vao) {
-    const temp = pool.getTemp(width, height);
+    const temp = pool.getTemp(width, height, new Set([texture]));
     const { fbo, tex } = temp;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -27,12 +27,7 @@ export default class GLPass {
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    return {
-      texture: tex,
-      width,
-      height,
-      temp,
-    };
+    return { texture: tex, width, height, temp };
   }
 
   destroy() {

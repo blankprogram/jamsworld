@@ -56,9 +56,14 @@ const ALL_PASSES = [
   MinesweeperPass,
 ];
 
+const makeId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 function getFilterDefs(fonts) {
   const defs = {};
-  ALL_PASSES.forEach((PassClass) => {
+  for (const PassClass of ALL_PASSES) {
     const def = { ...PassClass.def };
     if (def.type === "ASCII") {
       def.options = def.options.map((opt) =>
@@ -68,7 +73,7 @@ function getFilterDefs(fonts) {
       );
     }
     defs[def.type] = { Pass: PassClass, ...def };
-  });
+  }
   return defs;
 }
 
@@ -122,21 +127,23 @@ const DropZone = React.memo(function DropZone({
   isActive,
   idx,
 }) {
-  const ref = useRef();
+  const ref = useRef(null);
 
   useEffect(() => {
-    if (!ref.current) return;
-    let cleanup;
-    cleanup = dropTargetForElements({
-      element: ref.current,
+    const el = ref.current;
+    if (!el) return;
+
+    const cleanup = dropTargetForElements({
+      element: el,
       getData: () => ({ dropZoneIdx: idx }),
       canDrop: () => true,
-      onDrop: ({ source }) => onDrop(idx),
-      onDragEnter: () => onDragEnter && onDragEnter(idx),
-      onDragLeave: () => onDragLeave && onDragLeave(idx),
+      onDrop: ({ source }) => onDrop(idx, source?.data?.index),
+      onDragEnter: () => onDragEnter?.(idx),
+      onDragLeave: () => onDragLeave?.(idx),
     });
-    return () => cleanup && cleanup();
-  }, [onDrop, onDragEnter, onDragLeave, idx]);
+
+    return () => cleanup?.();
+  }, [idx, onDrop, onDragEnter, onDragLeave]);
 
   return (
     <div
@@ -149,11 +156,10 @@ const DropZone = React.memo(function DropZone({
 const FilterOptions = React.memo(function FilterOptions({
   filter,
   index,
-  fonts,
+  defs,
   toggleFilter,
   handleOptionChange,
   removeFilter,
-  setDraggedIndex,
   toggleEnabled,
   addCustomColor,
   removeCustomColor,
@@ -162,43 +168,44 @@ const FilterOptions = React.memo(function FilterOptions({
   onSwapEnter,
   onSwapLeave,
 }) {
-  const ref = useRef();
-  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const ref = useRef(null);
   const cfg = filter ? defs[filter.type] : null;
 
   useEffect(() => {
-    if (!ref.current) return;
-    if (!ref.current.dataset.dragInit) {
-      draggable({
-        element: ref.current,
-        dragHandle: ref.current.querySelector(`.${styles.filterTitle}`),
-        data: { index },
-        onDragStart: () => setDraggedIndex(index),
-        onDragEnd: () => setDraggedIndex(null),
-      });
-      ref.current.dataset.dragInit = "1";
-    }
-  }, [filter, index, setDraggedIndex]);
+    const el = ref.current;
+    if (!el) return;
+
+    const cleanup = draggable({
+      element: el,
+      dragHandle: el.querySelector(`.${styles.filterTitle}`),
+      getInitialData: () => ({ index }),
+    });
+
+    return () => cleanup?.();
+  }, [index]);
 
   useEffect(() => {
-    if (!ref.current) return;
-    let cleanup;
-    cleanup = dropTargetForElements({
-      element: ref.current,
+    const el = ref.current;
+    if (!el) return;
+
+    const cleanup = dropTargetForElements({
+      element: el,
       getData: () => ({ swapIdx: index }),
       canDrop: () => true,
-      onDrop: ({ source }) => onSwapDrop(index),
+      onDrop: ({ source }) => onSwapDrop(index, source?.data?.index),
       onDragEnter: () => onSwapEnter(index),
       onDragLeave: () => onSwapLeave(index),
     });
-    return () => cleanup && cleanup();
+
+    return () => cleanup?.();
   }, [index, onSwapDrop, onSwapEnter, onSwapLeave]);
+
+  if (!cfg) return null;
 
   return (
     <div
       ref={ref}
       className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""} ${swapActive ? styles.swapActive : ""}`}
-      data-filter-index={index}
     >
       <div className={styles.filterHeader}>
         <h4 className={styles.filterTitle} onClick={() => toggleFilter(index)}>
@@ -209,6 +216,7 @@ const FilterOptions = React.memo(function FilterOptions({
             type="button"
             className={styles.iconBtn}
             onClick={() => toggleEnabled(index)}
+            aria-label={filter.enabled ? "Disable filter" : "Enable filter"}
           >
             {filter.enabled ? "👁️" : "🚫"}
           </button>
@@ -216,9 +224,11 @@ const FilterOptions = React.memo(function FilterOptions({
             type="button"
             className={`${styles.iconBtn} ${styles.delete}`}
             onClick={() => removeFilter(index)}
+            aria-label="Remove filter"
           />
         </div>
       </div>
+
       {filter.open && (
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => {
@@ -229,10 +239,12 @@ const FilterOptions = React.memo(function FilterOptions({
             ) {
               return null;
             }
+
             if (filter.type === "PALETTE" && opt.name === "customColors") {
               if (filter.opts.preset !== "Custom") return null;
+
               return (
-                <div key="cc" className={styles.customColors}>
+                <div key="customColors" className={styles.customColors}>
                   {filter.opts.customColors.map((col, ci) => (
                     <div key={ci}>
                       <input
@@ -251,17 +263,23 @@ const FilterOptions = React.memo(function FilterOptions({
                       <button
                         type="button"
                         onClick={() => removeCustomColor(index, ci)}
+                        aria-label="Remove custom color"
                       >
                         ✕
                       </button>
                     </div>
                   ))}
-                  <button type="button" onClick={() => addCustomColor(index)}>
+                  <button
+                    type="button"
+                    onClick={() => addCustomColor(index)}
+                    aria-label="Add custom color"
+                  >
                     + Add
                   </button>
                 </div>
               );
             }
+
             return (
               <FilterControl
                 key={opt.name}
@@ -280,91 +298,91 @@ const FilterOptions = React.memo(function FilterOptions({
 });
 
 export default function PixelPass() {
-  const fileInputRef = useRef();
-  const canvasRef = useRef();
+  const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
+
   const [fonts, setFonts] = useState([]);
   const [filters, setFilters] = useState([]);
   const [canExport, setCanExport] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
+
   const [dropZoneActive, setDropZoneActive] = useState(-1);
   const [swapIdx, setSwapIdx] = useState(-1);
+
   const [showAdd, setShowAdd] = useState(false);
   const [fileURL, setFileURL] = useState(null);
-  const videoRef = useRef(null);
   const [cameraOn, setCameraOn] = useState(false);
 
   useEffect(() => {
     loadFonts().then(setFonts);
   }, []);
 
-  useEffect(() => {
-    setDragIdx(null);
-  }, [filters.length]);
-
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
 
-  const makePasses = useCallback(
-    (gl, { filters: fArr, invalidate }) => {
-      return fArr
-        .filter((f) => f && f.enabled)
-        .map((f) => new defs[f.type].Pass(gl, { ...f.opts, invalidate }));
-    },
-    [defs],
-  );
+  const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
+    cameraOn,
+    videoRef,
+  });
 
-  const memoOpts = useMemo(() => ({ filters }), [filters]);
-  const { loadFile, exportResult } = useProcessMedia(
-    canvasRef,
-    makePasses,
-    memoOpts,
-    { cameraOn, videoRef },
-  );
+  const clearDnDUI = useCallback(() => {
+    setDropZoneActive(-1);
+    setSwapIdx(-1);
+  }, []);
 
   const handleDropBetween = useCallback(
-    (idx) => {
+    (dropIdx, sourceIdx) => {
       setFilters((fs) => {
+        const from = sourceIdx;
+        const to = dropIdx;
+
         if (
-          dragIdx == null ||
-          dragIdx === idx ||
-          dragIdx < 0 ||
-          idx < 0 ||
-          dragIdx >= fs.length ||
-          idx > fs.length
+          from == null ||
+          to == null ||
+          from === to ||
+          from < 0 ||
+          to < 0 ||
+          from >= fs.length ||
+          to > fs.length
         )
           return fs;
+
         const arr = [...fs];
-        const [dragged] = arr.splice(dragIdx, 1);
-        arr.splice(idx > dragIdx ? idx - 1 : idx, 0, dragged);
+        const [dragged] = arr.splice(from, 1);
+        arr.splice(to > from ? to - 1 : to, 0, dragged);
         return arr;
       });
-      setDragIdx(null);
-      setDropZoneActive(-1);
-      setSwapIdx(-1);
+
+      clearDnDUI();
     },
-    [dragIdx],
+    [clearDnDUI],
   );
 
   const handleSwapDrop = useCallback(
-    (idx) => {
+    (targetIdx, sourceIdx) => {
       setFilters((fs) => {
+        const from = sourceIdx;
+        const to = targetIdx;
+
         if (
-          dragIdx == null ||
-          dragIdx === idx ||
-          dragIdx < 0 ||
-          idx < 0 ||
-          dragIdx >= fs.length ||
-          idx >= fs.length
+          from == null ||
+          to == null ||
+          from === to ||
+          from < 0 ||
+          to < 0 ||
+          from >= fs.length ||
+          to >= fs.length
         )
           return fs;
+
         const arr = [...fs];
-        [arr[dragIdx], arr[idx]] = [arr[idx], arr[dragIdx]];
+        [arr[from], arr[to]] = [arr[to], arr[from]];
         return arr;
       });
-      setDragIdx(null);
-      setDropZoneActive(-1);
-      setSwapIdx(-1);
+
+      clearDnDUI();
     },
-    [dragIdx],
+    [clearDnDUI],
   );
 
   const handleDropZoneEnter = useCallback((idx) => setDropZoneActive(idx), []);
@@ -377,7 +395,9 @@ export default function PixelPass() {
     async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
+
       if (fileURL) URL.revokeObjectURL(fileURL);
+
       const url = await loadFile(file);
       setFileURL(url);
       setCanExport(true);
@@ -394,14 +414,21 @@ export default function PixelPass() {
   const addFilter = useCallback(
     (type) => {
       const def = defs[type];
+      if (!def) return;
+
       const opts = {};
-      def.options.forEach((o) => {
+      for (const o of def.options) {
         opts[o.name === "customColors" ? "customColors" : o.name] =
           o.name === "customColors"
             ? ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF", "#000000"]
             : o.defaultValue;
-      });
-      setFilters((fs) => [...fs, { type, opts, open: false, enabled: true }]);
+      }
+
+      setFilters((fs) => [
+        ...fs,
+        { id: makeId(), type, opts, open: false, enabled: true },
+      ]);
+
       setShowAdd(false);
     },
     [defs],
@@ -439,9 +466,7 @@ export default function PixelPass() {
               ...f,
               opts: {
                 ...f.opts,
-                customColors: f.opts.customColors.filter(
-                  (_, idx) => idx !== ci,
-                ),
+                customColors: f.opts.customColors.filter((_, k) => k !== ci),
               },
             }
           : f,
@@ -470,6 +495,7 @@ export default function PixelPass() {
       <div className={styles.filterStack}>
         <div className={styles.filterStackFixed}>
           <h3>PixelPass</h3>
+
           <div className={styles.formContainer}>
             <input
               type="file"
@@ -481,11 +507,12 @@ export default function PixelPass() {
               type="button"
               className="xpButton"
               disabled={cameraOn}
-              onClick={() => fileInputRef.current.click()}
+              onClick={() => fileInputRef.current?.click()}
             >
               Choose File
             </button>
           </div>
+
           <button
             type="button"
             className="xpButton"
@@ -494,6 +521,7 @@ export default function PixelPass() {
           >
             Export
           </button>
+
           <button
             type="button"
             className="xpButton"
@@ -502,6 +530,7 @@ export default function PixelPass() {
             {cameraOn ? "Stop Camera" : "Use Camera"}
           </button>
         </div>
+
         <div className={styles.filterStackScrollable}>
           <DropZone
             idx={0}
@@ -510,17 +539,17 @@ export default function PixelPass() {
             onDragLeave={handleDropZoneLeave}
             isActive={dropZoneActive === 0}
           />
+
           {filters.map((f, i) =>
             f ? (
-              <React.Fragment key={i}>
+              <React.Fragment key={f.id}>
                 <FilterOptions
                   filter={f}
                   index={i}
-                  fonts={fonts}
+                  defs={defs}
                   toggleFilter={toggleFilter}
                   handleOptionChange={handleOptionChange}
                   removeFilter={removeFilter}
-                  setDraggedIndex={setDragIdx}
                   toggleEnabled={toggleEnabled}
                   addCustomColor={addCustomColor}
                   removeCustomColor={removeCustomColor}
@@ -529,6 +558,7 @@ export default function PixelPass() {
                   onSwapEnter={handleSwapEnter}
                   onSwapLeave={handleSwapLeave}
                 />
+
                 <DropZone
                   idx={i + 1}
                   onDrop={handleDropBetween}
@@ -539,6 +569,7 @@ export default function PixelPass() {
               </React.Fragment>
             ) : null,
           )}
+
           <button
             type="button"
             className="xpButton"
@@ -546,6 +577,7 @@ export default function PixelPass() {
           >
             + Add Filter
           </button>
+
           {showAdd && (
             <div className={styles.filterSelection}>
               {Object.keys(defs).map((type) => (
@@ -562,6 +594,7 @@ export default function PixelPass() {
           )}
         </div>
       </div>
+
       <div className={styles.imagesContainer}>
         <div className={styles.imageBox}>
           <canvas ref={canvasRef} className={styles.image} />
