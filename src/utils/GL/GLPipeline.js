@@ -90,8 +90,9 @@ export default class GLPipeline {
       state = result;
     }
 
-    this.canvas.width = state.width;
-    this.canvas.height = state.height;
+    if (this.canvas.width !== state.width) this.canvas.width = state.width;
+    if (this.canvas.height !== state.height) this.canvas.height = state.height;
+
     this._blitToScreen(state);
 
     if (this._lastTemp && this._lastTemp !== state.temp) {
@@ -107,14 +108,86 @@ export default class GLPipeline {
     return state;
   }
 
+  prepareVideo(videoEl, preserve = true) {
+    const gl = this.gl;
+
+    if (!preserve && this._inputTexture) {
+      gl.deleteTexture(this._inputTexture);
+      this._inputTexture = null;
+    }
+    if (!this._inputTexture) {
+      this._inputTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this._inputTexture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, this._inputTexture);
+    }
+
+    const w = videoEl.videoWidth | 0;
+    const h = videoEl.videoHeight | 0;
+    if (w <= 0 || h <= 0) {
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return false;
+    }
+
+    if (this._imgSize.width !== w || this._imgSize.height !== h) {
+      this._imgSize = { width: w, height: h };
+      this.canvas.width = w;
+      this.canvas.height = h;
+
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        w,
+        h,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null,
+      );
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return true;
+  }
+
+  updateVideoFrame(videoEl) {
+    const gl = this.gl;
+    if (!this._inputTexture) return false;
+
+    const w = videoEl.videoWidth | 0;
+    const h = videoEl.videoHeight | 0;
+    if (w <= 0 || h <= 0) return false;
+
+    if (this._imgSize.width !== w || this._imgSize.height !== h) {
+      return this.prepareVideo(videoEl, true);
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, this._inputTexture);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0,
+      0,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      videoEl,
+    );
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    return true;
+  }
+
   _blitToScreen({ texture }) {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.clearColor(0.0, 0.0, 0.0, 0.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     this.copyProg.use();
     bindTexture(gl, 0, texture, this.copyProg.locs.u_texture);
     gl.bindVertexArray(this.quadVAO);
@@ -151,6 +224,8 @@ export default class GLPipeline {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
     return tex;
   }
 }

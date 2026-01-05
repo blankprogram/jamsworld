@@ -290,6 +290,8 @@ export default function PixelPass() {
   const [swapIdx, setSwapIdx] = useState(-1);
   const [showAdd, setShowAdd] = useState(false);
   const [fileURL, setFileURL] = useState(null);
+  const videoRef = useRef(null);
+  const [cameraOn, setCameraOn] = useState(false);
 
   useEffect(() => {
     loadFonts().then(setFonts);
@@ -302,12 +304,12 @@ export default function PixelPass() {
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
 
   const makePasses = useCallback(
-  (gl, { filters: fArr, invalidate }) => {
+    (gl, { filters: fArr, invalidate }) => {
       return fArr
-      .filter((f) => f && f.enabled)
-      .map((f) => new defs[f.type].Pass(gl, { ...f.opts, invalidate }));
-  },
-  [defs],
+        .filter((f) => f && f.enabled)
+        .map((f) => new defs[f.type].Pass(gl, { ...f.opts, invalidate }));
+    },
+    [defs],
   );
 
   const memoOpts = useMemo(() => ({ filters }), [filters]);
@@ -315,6 +317,7 @@ export default function PixelPass() {
     canvasRef,
     makePasses,
     memoOpts,
+    { cameraOn, videoRef },
   );
 
   const handleDropBetween = useCallback(
@@ -477,6 +480,7 @@ export default function PixelPass() {
             <button
               type="button"
               className="xpButton"
+              disabled={cameraOn}
               onClick={() => fileInputRef.current.click()}
             >
               Choose File
@@ -485,10 +489,17 @@ export default function PixelPass() {
           <button
             type="button"
             className="xpButton"
-            disabled={!canExport}
+            disabled={!canExport || cameraOn}
             onClick={handleExport}
           >
             Export
+          </button>
+          <button
+            type="button"
+            className="xpButton"
+            onClick={() => setCameraOn((v) => !v)}
+          >
+            {cameraOn ? "Stop Camera" : "Use Camera"}
           </button>
         </div>
         <div className={styles.filterStackScrollable}>
@@ -554,6 +565,7 @@ export default function PixelPass() {
       <div className={styles.imagesContainer}>
         <div className={styles.imageBox}>
           <canvas ref={canvasRef} className={styles.image} />
+          <video ref={videoRef} playsInline muted style={{ display: "none" }} />
         </div>
       </div>
     </div>

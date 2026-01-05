@@ -18,7 +18,7 @@ function readImageDataFromWebGL(gl, width, height) {
   return new ImageData(flipped, width, height);
 }
 
-export function useProcessMedia(canvasRef, makePasses, opts) {
+export function useProcessMedia(canvasRef, makePasses, opts, camera) {
   const pipelineRef = useRef(null);
   const gifCanvas = useRef(document.createElement("canvas"));
   const gifCtx = useRef(gifCanvas.current.getContext("2d"));
@@ -30,9 +30,9 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
   const acc = useRef(0);
 
   const invalidate = useCallback(() => {
-  const p = pipelineRef.current;
-  if (!p) return;
-  p.renderFrame();
+    const p = pipelineRef.current;
+    if (!p) return;
+    p.renderFrame();
   }, []);
 
   const prepare = useCallback((src) => {
@@ -62,14 +62,14 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
   }, [canvasRef]);
 
   useEffect(() => {
-  const p = pipelineRef.current;
-  if (!p) return;
-  p.clearPasses();
-  makePasses(p.gl, { ...opts, invalidate }).forEach((pass) => p.use(pass));
+    const p = pipelineRef.current;
+    if (!p) return;
+    p.clearPasses();
+    makePasses(p.gl, { ...opts, invalidate }).forEach((pass) => p.use(pass));
 
-  if (!frames && lastSource.current) {
+    if (!frames && lastSource.current) {
       prepare(lastSource.current);
-  }
+    }
   }, [makePasses, opts, frames, prepare, invalidate]);
 
   useEffect(() => {
@@ -162,7 +162,9 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
       off.height = h;
       const exp = GLPipeline.for(off);
       exp.clearPasses();
-      makePasses(exp.gl, { ...opts, invalidate: () => {} }).forEach((pass) => exp.use(pass));
+      makePasses(exp.gl, { ...opts, invalidate: () => {} }).forEach((pass) =>
+        exp.use(pass),
+      );
 
       const out = frames.map(({ imgData, frameInfo }) => {
         gifCanvas.current.width = imgData.width;
@@ -185,6 +187,62 @@ export function useProcessMedia(canvasRef, makePasses, opts) {
     },
     [frames, makePasses, opts, canvasRef],
   );
+
+  useEffect(() => {
+    const p = pipelineRef.current;
+    const video = camera?.videoRef?.current;
+    if (!p || !video) return;
+
+    if (!camera?.cameraOn) {
+      cancelAnimationFrame(animRef.current);
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach((t) => t.stop());
+        video.srcObject = null;
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      video.srcObject = stream;
+      await video.play();
+
+      if (!p.prepareVideo(video, true)) {
+        const wait = () => new Promise((r) => requestAnimationFrame(() => r()));
+        while (!cancelled && !p.prepareVideo(video, true)) {
+          await wait();
+        }
+      }
+
+      const loop = () => {
+        if (cancelled) return;
+        p.updateVideoFrame(video);
+        p.renderFrame();
+        animRef.current = requestAnimationFrame(loop);
+      };
+
+      animRef.current = requestAnimationFrame(loop);
+    })();
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(animRef.current);
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach((t) => t.stop());
+        video.srcObject = null;
+      }
+    };
+  }, [camera?.cameraOn, camera?.videoRef]);
 
   return { loadFile, exportResult, frames };
 }
