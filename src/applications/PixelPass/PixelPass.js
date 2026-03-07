@@ -501,6 +501,7 @@ export default function PixelPass() {
               type="file"
               ref={fileInputRef}
               onChange={handleFile}
+              accept="image/*,video/*,.gif"
               className={styles.field}
             />
             <button

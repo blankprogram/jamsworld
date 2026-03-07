@@ -50,6 +50,34 @@ function diffKeys(prev = {}, next = {}) {
   return changed;
 }
 
+function waitForEvent(target, eventName) {
+  return new Promise((resolve, reject) => {
+    const onOk = () => {
+      cleanup();
+      resolve();
+    };
+    const onErr = (e) => {
+      cleanup();
+      reject(e);
+    };
+    const cleanup = () => {
+      target.removeEventListener(eventName, onOk);
+      target.removeEventListener("error", onErr);
+    };
+    target.addEventListener(eventName, onOk, { once: true });
+    target.addEventListener("error", onErr, { once: true });
+  });
+}
+
+function getSupportedVideoMimeType() {
+  const candidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || null;
+}
+
 export function useProcessMedia(canvasRef, config, camera) {
   const pipelineRef = useRef(null);
 
@@ -60,9 +88,11 @@ export function useProcessMedia(canvasRef, config, camera) {
   const frameIdx = useRef(0);
 
   const gifRafRef = useRef(0);
-  const camRafRef = useRef(0);
+  const liveVideoRafRef = useRef(0);
 
   const lastSource = useRef(null);
+  const sourceKindRef = useRef(null); // "image" | "gif" | "video" | "camera" | null
+  const uploadedVideoUrlRef = useRef(null);
 
   const lastTime = useRef(0);
   const acc = useRef(0);
@@ -70,6 +100,44 @@ export function useProcessMedia(canvasRef, config, camera) {
   const passCacheRef = useRef(new Map());
 
   const cameraReadyRef = useRef(false);
+
+  const stopGifLoop = useCallback(() => {
+    cancelAnimationFrame(gifRafRef.current);
+    gifRafRef.current = 0;
+  }, []);
+
+  const stopLiveVideoLoop = useCallback(() => {
+    cancelAnimationFrame(liveVideoRafRef.current);
+    liveVideoRafRef.current = 0;
+  }, []);
+
+  const cleanupVideoElement = useCallback(() => {
+    const video = camera?.videoRef?.current;
+    if (!video) return;
+
+    stopLiveVideoLoop();
+
+    try {
+      video.pause();
+    } catch {}
+
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+    }
+
+    if (video.src) {
+      video.removeAttribute("src");
+      video.load();
+    }
+  }, [camera?.videoRef, stopLiveVideoLoop]);
+
+  const revokeUploadedVideoUrl = useCallback(() => {
+    if (uploadedVideoUrlRef.current) {
+      URL.revokeObjectURL(uploadedVideoUrlRef.current);
+      uploadedVideoUrlRef.current = null;
+    }
+  }, []);
 
   const clearOutputAndInput = useCallback(() => {
     const p = pipelineRef.current;
@@ -104,6 +172,23 @@ export function useProcessMedia(canvasRef, config, camera) {
     p.renderFrame();
   }, []);
 
+  const startLiveVideoLoop = useCallback(() => {
+    const p = pipelineRef.current;
+    const video = camera?.videoRef?.current;
+    if (!p || !video) return;
+
+    stopLiveVideoLoop();
+
+    const loop = () => {
+      if (!pipelineRef.current || !camera?.videoRef?.current) return;
+      pipelineRef.current.updateVideoFrame(camera.videoRef.current);
+      pipelineRef.current.renderFrame();
+      liveVideoRafRef.current = requestAnimationFrame(loop);
+    };
+
+    liveVideoRafRef.current = requestAnimationFrame(loop);
+  }, [camera?.videoRef, stopLiveVideoLoop]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -114,8 +199,11 @@ export function useProcessMedia(canvasRef, config, camera) {
     const passCache = passCacheRef.current;
 
     return () => {
-      cancelAnimationFrame(gifRafRef.current);
-      cancelAnimationFrame(camRafRef.current);
+      stopGifLoop();
+      stopLiveVideoLoop();
+
+      cleanupVideoElement();
+      revokeUploadedVideoUrl();
 
       for (const rec of passCache.values()) rec.pass?.destroy?.();
       passCache.clear();
@@ -123,7 +211,13 @@ export function useProcessMedia(canvasRef, config, camera) {
       p.destroy();
       pipelineRef.current = null;
     };
-  }, [canvasRef]);
+  }, [
+    canvasRef,
+    cleanupVideoElement,
+    revokeUploadedVideoUrl,
+    stopGifLoop,
+    stopLiveVideoLoop,
+  ]);
 
   useEffect(() => {
     const onVis = () => {
@@ -205,14 +299,22 @@ export function useProcessMedia(canvasRef, config, camera) {
     p.passes = nextPassChain;
 
     const hasSource =
-      !!lastSource.current || !!frames || cameraReadyRef.current;
+      !!lastSource.current ||
+      !!frames ||
+      cameraReadyRef.current ||
+      sourceKindRef.current === "video";
 
     if (hasSource) p.renderFrame();
   }, [config, invalidate, frames, camera?.cameraOn]);
 
   const loadFile = useCallback(
     async (file) => {
-      cancelAnimationFrame(gifRafRef.current);
+      const p = pipelineRef.current;
+      const video = camera?.videoRef?.current;
+      if (!p) return null;
+
+      stopGifLoop();
+      stopLiveVideoLoop();
 
       cameraReadyRef.current = false;
 
@@ -221,28 +323,89 @@ export function useProcessMedia(canvasRef, config, camera) {
       lastTime.current = performance.now();
       acc.current = 0;
 
+      clearOutputAndInput();
+      cleanupVideoElement();
+      revokeUploadedVideoUrl();
+
       const url = URL.createObjectURL(file);
 
       if (file.type === "image/gif") {
+        sourceKindRef.current = "gif";
+
         const { frames: decoded } = decodeGIF(await file.arrayBuffer());
         setFrames(decoded);
         prepare(decoded[0]);
-      } else {
-        const img = new Image();
-        img.src = url;
-        await new Promise((r) => (img.onload = r));
-        lastSource.current = img;
-        prepare(img);
+        return url;
       }
 
-      return url;
+      if (file.type.startsWith("video/")) {
+        if (!video) {
+          URL.revokeObjectURL(url);
+          throw new Error("Video element not available");
+        }
+
+        sourceKindRef.current = "video";
+        uploadedVideoUrlRef.current = url;
+
+        video.srcObject = null;
+        video.src = url;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.currentTime = 0;
+
+        await waitForEvent(video, "loadedmetadata");
+        await video.play();
+
+        if (!p.prepareVideo(video)) {
+          const wait = () =>
+            new Promise((r) => requestAnimationFrame(() => r()));
+          while (!p.prepareVideo(video)) {
+            await wait();
+          }
+        }
+
+        p.updateVideoFrame(video);
+        p.renderFrame();
+
+        startLiveVideoLoop();
+        return url;
+      }
+
+      if (file.type.startsWith("image/")) {
+        sourceKindRef.current = "image";
+
+        const img = new Image();
+        img.src = url;
+        await new Promise((r, reject) => {
+          img.onload = r;
+          img.onerror = reject;
+        });
+
+        lastSource.current = img;
+        prepare(img);
+        return url;
+      }
+
+      URL.revokeObjectURL(url);
+      throw new Error(`Unsupported file type: ${file.type}`);
     },
-    [prepare],
+    [
+      camera?.videoRef,
+      cleanupVideoElement,
+      clearOutputAndInput,
+      prepare,
+      revokeUploadedVideoUrl,
+      startLiveVideoLoop,
+      stopGifLoop,
+      stopLiveVideoLoop,
+    ],
   );
 
   useEffect(() => {
     if (!frames) return;
     if (camera?.cameraOn) return;
+    if (sourceKindRef.current !== "gif") return;
 
     lastTime.current = performance.now();
     acc.current = 0;
@@ -271,9 +434,105 @@ export function useProcessMedia(canvasRef, config, camera) {
     gifRafRef.current = requestAnimationFrame(loop);
     return () => {
       cancelled = true;
-      cancelAnimationFrame(gifRafRef.current);
+      stopGifLoop();
     };
-  }, [frames, prepare, camera?.cameraOn]);
+  }, [frames, prepare, camera?.cameraOn, stopGifLoop]);
+
+  const exportVideo = useCallback(
+    async (name) => {
+      const p = pipelineRef.current;
+      const canvas = canvasRef.current;
+      const video = camera?.videoRef?.current;
+
+      if (!p || !canvas || !video) return;
+
+      const mimeType = getSupportedVideoMimeType();
+      if (!mimeType) {
+        throw new Error("No supported video export mime type found");
+      }
+
+      const wasLooping = video.loop;
+      const wasPaused = video.paused;
+      const prevTime = video.currentTime;
+
+      stopLiveVideoLoop();
+
+      video.pause();
+      video.loop = false;
+      video.currentTime = 0;
+
+      await waitForEvent(video, "seeked").catch(() => {});
+
+      p.updateVideoFrame(video);
+      p.renderFrame();
+
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+
+      const stopped = new Promise((resolve, reject) => {
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+        recorder.onerror = (e) => reject(e.error || e);
+        recorder.onstop = () =>
+          resolve(new Blob(chunks, { type: recorder.mimeType }));
+      });
+
+      let done = false;
+      const renderLoop = () => {
+        if (done) return;
+        p.updateVideoFrame(video);
+        p.renderFrame();
+        liveVideoRafRef.current = requestAnimationFrame(renderLoop);
+      };
+
+      recorder.start();
+      liveVideoRafRef.current = requestAnimationFrame(renderLoop);
+
+      await video.play();
+
+      await new Promise((resolve) => {
+        const onEnded = () => {
+          video.removeEventListener("ended", onEnded);
+          resolve();
+        };
+        video.addEventListener("ended", onEnded);
+      });
+
+      done = true;
+      stopLiveVideoLoop();
+
+      recorder.stop();
+
+      const blob = await stopped;
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}.webm`;
+      a.click();
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      video.loop = wasLooping;
+      video.currentTime = prevTime;
+
+      await waitForEvent(video, "seeked").catch(() => {});
+
+      if (!wasPaused) {
+        await video.play().catch(() => {});
+      }
+
+      if (
+        sourceKindRef.current === "video" ||
+        sourceKindRef.current === "camera"
+      ) {
+        startLiveVideoLoop();
+      }
+    },
+    [camera?.videoRef, canvasRef, startLiveVideoLoop, stopLiveVideoLoop],
+  );
 
   const exportResult = useCallback(
     async (name) => {
@@ -283,6 +542,14 @@ export function useProcessMedia(canvasRef, config, camera) {
       const defs = config?.defs || {};
       const filters = Array.isArray(config?.filters) ? config.filters : [];
       const enabled = filters.filter((f) => f && f.enabled);
+
+      if (
+        sourceKindRef.current === "video" ||
+        sourceKindRef.current === "camera"
+      ) {
+        await exportVideo(name);
+        return;
+      }
 
       if (!frames) {
         const can = canvasRef.current;
@@ -295,6 +562,7 @@ export function useProcessMedia(canvasRef, config, camera) {
           a.href = url;
           a.download = `${name}.png`;
           a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
         return;
       }
@@ -336,7 +604,7 @@ export function useProcessMedia(canvasRef, config, camera) {
       a.download = `${name}.gif`;
       a.click();
     },
-    [frames, canvasRef, config],
+    [frames, canvasRef, config, exportVideo],
   );
 
   useEffect(() => {
@@ -345,25 +613,21 @@ export function useProcessMedia(canvasRef, config, camera) {
     if (!p || !video) return;
 
     if (!camera?.cameraOn) {
-      cancelAnimationFrame(camRafRef.current);
-
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach((t) => t.stop());
-        video.srcObject = null;
+      if (sourceKindRef.current === "camera") {
+        cleanupVideoElement();
+        cameraReadyRef.current = false;
+        clearOutputAndInput();
+        sourceKindRef.current = null;
       }
-
-      cameraReadyRef.current = false;
-
-      setFrames(null);
-      lastSource.current = null;
-      frameIdx.current = 0;
-      acc.current = 0;
-
-      clearOutputAndInput();
       return;
     }
 
-    cancelAnimationFrame(gifRafRef.current);
+    stopGifLoop();
+    stopLiveVideoLoop();
+    setFrames(null);
+    frameIdx.current = 0;
+    acc.current = 0;
+    lastSource.current = null;
 
     let cancelled = false;
 
@@ -378,7 +642,15 @@ export function useProcessMedia(canvasRef, config, camera) {
         return;
       }
 
+      cleanupVideoElement();
+      revokeUploadedVideoUrl();
+
+      sourceKindRef.current = "camera";
+
       video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+
       await video.play();
 
       if (!p.prepareVideo(video)) {
@@ -392,29 +664,28 @@ export function useProcessMedia(canvasRef, config, camera) {
       p.renderFrame();
       cameraReadyRef.current = true;
 
-      const loop = () => {
-        if (cancelled) return;
-        p.updateVideoFrame(video);
-        p.renderFrame();
-        camRafRef.current = requestAnimationFrame(loop);
-      };
-
-      camRafRef.current = requestAnimationFrame(loop);
+      startLiveVideoLoop();
     })().catch(() => {
       cameraReadyRef.current = false;
     });
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(camRafRef.current);
-      cameraReadyRef.current = false;
-
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach((t) => t.stop());
-        video.srcObject = null;
+      if (sourceKindRef.current === "camera") {
+        cleanupVideoElement();
+        cameraReadyRef.current = false;
       }
     };
-  }, [camera?.cameraOn, camera?.videoRef, clearOutputAndInput]);
+  }, [
+    camera?.cameraOn,
+    camera?.videoRef,
+    cleanupVideoElement,
+    clearOutputAndInput,
+    revokeUploadedVideoUrl,
+    startLiveVideoLoop,
+    stopGifLoop,
+    stopLiveVideoLoop,
+  ]);
 
   return { loadFile, exportResult, frames };
 }
