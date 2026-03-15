@@ -1,6 +1,6 @@
 # Hi there, I'm Jamal Elmir
 
-### Just a dude that does stuff and who enjoys messing around with technology : ).
+### Just a dude that does stuff and who enjoys messing around with technology : )
 
 <span style="color:pink">Kirby Enthusiast!</span>
 
