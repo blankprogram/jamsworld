@@ -1,7 +1,7 @@
 # Hi there, I'm Jamal Elmir
 
-### Computer Science Student @UNSW  
-Passionate about mostly everything, especially when there's something new to learn.  
+### Just a dude that does stuff and who enjoys messing around with technology : ).
+
 <span style="color:pink">Kirby Enthusiast!</span>
 
 ---
@@ -11,6 +11,6 @@ Passionate about mostly everything, especially when there's something new to lea
 ---
 
 ## Contact Me
+
 - [**Email**](mailto:jelmirapp@gmail.com)
 - [**LinkedIn**](https://www.linkedin.com/in/jamalelmir/)
-
