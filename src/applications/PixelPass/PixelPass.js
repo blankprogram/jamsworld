@@ -21,7 +21,6 @@ import {
   PosterizePass,
   AsciiPass,
   DitherPass,
-  DownsamplePass,
   PalettePass,
   EmbossPass,
   ChromaticAberrationPass,
@@ -32,6 +31,7 @@ import {
   VHSPass,
   CRTPass,
   MinesweeperPass,
+  ScalePass,
 } from "../../utils/GL/passes";
 
 const ALL_PASSES = [
@@ -39,11 +39,11 @@ const ALL_PASSES = [
   GrayscalePass,
   GaussianBlurPass,
   SharpenPass,
+  ScalePass,
   SobelPass,
   PosterizePass,
   AsciiPass,
   DitherPass,
-  DownsamplePass,
   PalettePass,
   EmbossPass,
   ChromaticAberrationPass,
@@ -233,9 +233,41 @@ const FilterOptions = React.memo(function FilterOptions({
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => {
             if (
-              filter.type === "PIXELSORT" &&
+              (filter.type === "PIXELSORT" ||
+                filter.type === "ASCII" ||
+                filter.type === "MINESWEEPER") &&
               (opt.name === "low" || opt.name === "high") &&
               filter.opts.mode !== "Threshold"
+            ) {
+              return null;
+            }
+
+            if (
+              filter.type === "ASCII" &&
+              opt.name === "textColor" &&
+              filter.opts.textColorMode !== "Custom"
+            ) {
+              return null;
+            }
+            if (
+              filter.type === "ASCII" &&
+              opt.name === "fill" &&
+              filter.opts.fillMode === "Transparent"
+            ) {
+              return null;
+            }
+            if (
+              filter.type === "SCALE" &&
+              (opt.name === "scaleX" || opt.name === "scaleY") &&
+              filter.opts.uniform !== "No"
+            ) {
+              return null;
+            }
+
+            if (
+              filter.type === "SCALE" &&
+              opt.name === "scale" &&
+              filter.opts.uniform !== "Yes"
             ) {
               return null;
             }
@@ -318,7 +350,22 @@ export default function PixelPass() {
   }, []);
 
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
-  const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
+
+  const processingFilters = useMemo(
+    () =>
+      filters.map(({ id, type, opts, enabled }) => ({
+        id,
+        type,
+        opts,
+        enabled,
+      })),
+    [filters],
+  );
+
+  const mediaConfig = useMemo(
+    () => ({ defs, filters: processingFilters }),
+    [defs, processingFilters],
+  );
 
   const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
     cameraOn,
