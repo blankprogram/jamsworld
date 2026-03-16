@@ -5,7 +5,7 @@ import fileContent from './info.md';
 import { createAppManifest } from "../createAppManifest";
 import notepadIcon from "../../assets/Icons/notepad.png";
 
-import './Notepad.css';
+import styles from "./Notepad.module.css";
 
 export const appManifest = createAppManifest({
   id: "notepad",
@@ -24,8 +24,8 @@ const Notepad = () => {
   }, []);
 
   return (
-    <div className="notepad-xp">
-      <div className="notepad-menu-bar">
+    <div className={styles.notepadXp}>
+      <div className={styles.notepadMenuBar}>
         <span>File</span>
         <span>Edit</span>
         <span>Format</span>
@@ -33,7 +33,7 @@ const Notepad = () => {
         <span>Help</span>
       </div>
       
-      <div className="notepad-textarea">
+      <div className={styles.notepadTextarea}>
         <ReactMarkdown rehypePlugins={[rehypeRaw]}>
           {markdown}
         </ReactMarkdown>

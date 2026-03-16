@@ -597,41 +597,11 @@ const TopMenuAction = React.memo(function TopMenuAction({
   );
 });
 
-export default function PixelPass() {
-  const fileInputRef = useRef(null);
-  const canvasRef = useRef(null);
-  const videoRef = useRef(null);
-  const imageSurfaceRef = useRef(null);
-  const maskMenuRef = useRef(null);
-  const maskCanvasRef = useRef(createOffscreenMaskCanvas());
-
-  const [fonts, setFonts] = useState([]);
+function useFilterStackState(defs) {
   const [filters, setFilters] = useState([]);
-  const [canExport, setCanExport] = useState(false);
-
+  const [showAdd, setShowAdd] = useState(false);
   const [dropZoneActive, setDropZoneActive] = useState(INACTIVE_INDEX);
   const [swapIdx, setSwapIdx] = useState(INACTIVE_INDEX);
-
-  const [showAdd, setShowAdd] = useState(false);
-  const [showMaskSettings, setShowMaskSettings] = useState(false);
-  const [fileURL, setFileURL] = useState(null);
-  const [cameraOn, setCameraOn] = useState(false);
-  const [maskEnabled, setMaskEnabled] = useState(false);
-  const [maskInvert, setMaskInvert] = useState(false);
-  const [maskShowOutlines, setMaskShowOutlines] = useState(true);
-  const [maskTool, setMaskTool] = useState("draw");
-  const [maskBrushSize, setMaskBrushSize] = useState(24);
-  const [maskSegments, setMaskSegments] = useState([]);
-  const [selectedMaskSegmentId, setSelectedMaskSegmentId] = useState(null);
-  const [maskVersion, setMaskVersion] = useState(0);
-  const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
-  const [contentSize, setContentSize] = useState({ width: 1, height: 1 });
-
-  useEffect(() => {
-    loadFonts().then(setFonts);
-  }, []);
-
-  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
 
   const processingFilters = useMemo(
     () =>
@@ -643,68 +613,7 @@ export default function PixelPass() {
       })),
     [filters],
   );
-
-  const maskConfig = useMemo(
-    () => ({
-      enabled: maskEnabled,
-      invert: maskInvert,
-      canvas: maskCanvasRef.current,
-      version: maskVersion,
-    }),
-    [maskEnabled, maskInvert, maskVersion],
-  );
-
-  const mediaConfig = useMemo(
-    () => ({ defs, filters: processingFilters, mask: maskConfig }),
-    [defs, processingFilters, maskConfig],
-  );
   const availableFilterEntries = useMemo(() => Object.entries(defs), [defs]);
-
-  const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
-    cameraOn,
-    videoRef,
-  });
-
-  useEffect(() => {
-    const surface = imageSurfaceRef.current;
-    if (!surface || typeof ResizeObserver === "undefined") return undefined;
-
-    const updateSurfaceSize = () => {
-      setSurfaceSize({
-        width: surface.clientWidth || 0,
-        height: surface.clientHeight || 0,
-      });
-    };
-
-    updateSurfaceSize();
-    const observer = new ResizeObserver(updateSurfaceSize);
-    observer.observe(surface);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-
-    const updateContentSize = () => {
-      setContentSize({
-        width: Math.max(1, canvas.width || 1),
-        height: Math.max(1, canvas.height || 1),
-      });
-    };
-
-    updateContentSize();
-
-    if (typeof MutationObserver === "undefined") return undefined;
-    const observer = new MutationObserver(updateContentSize);
-    observer.observe(canvas, {
-      attributes: true,
-      attributeFilter: ["width", "height"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
 
   const clearDnDUI = useCallback(() => {
     setDropZoneActive(INACTIVE_INDEX);
@@ -714,7 +623,6 @@ export default function PixelPass() {
   const handleDropBetween = useCallback(
     (dropIdx, sourceIdx) => {
       setFilters((fs) => reorderBetween(fs, sourceIdx, dropIdx));
-
       clearDnDUI();
     },
     [clearDnDUI],
@@ -723,7 +631,6 @@ export default function PixelPass() {
   const handleSwapDrop = useCallback(
     (targetIdx, sourceIdx) => {
       setFilters((fs) => swapFilters(fs, sourceIdx, targetIdx));
-
       clearDnDUI();
     },
     [clearDnDUI],
@@ -734,135 +641,11 @@ export default function PixelPass() {
     () => setDropZoneActive(INACTIVE_INDEX),
     [],
   );
-
   const handleSwapEnter = useCallback((idx) => setSwapIdx(idx), []);
   const handleSwapLeave = useCallback(() => setSwapIdx(INACTIVE_INDEX), []);
 
-  const handleFile = useCallback(
-    async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      if (fileURL) URL.revokeObjectURL(fileURL);
-
-      const url = await loadFile(file);
-      setFileURL(url);
-      setCanExport(true);
-      setShowAdd(false);
-    },
-    [loadFile, fileURL],
-  );
-
-  useEffect(
-    () => () => {
-      if (fileURL) URL.revokeObjectURL(fileURL);
-    },
-    [fileURL],
-  );
-
-  useEffect(() => {
-    if (!showMaskSettings) return undefined;
-
-    const handlePointerDown = (event) => {
-      const root = maskMenuRef.current;
-      if (!root) return;
-      if (!root.contains(event.target)) {
-        setShowMaskSettings(false);
-      }
-    };
-
-    const handleEscape = (event) => {
-      if (event.key === "Escape") setShowMaskSettings(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [showMaskSettings]);
-
-  useEffect(() => {
-    if (!maskEnabled) setSelectedMaskSegmentId(null);
-  }, [maskEnabled]);
-
-  useEffect(() => {
-    if (!selectedMaskSegmentId) return;
-    const exists = maskSegments.some((segment) => segment.id === selectedMaskSegmentId);
-    if (!exists) setSelectedMaskSegmentId(null);
-  }, [maskSegments, selectedMaskSegmentId]);
-
-  useEffect(() => {
-    const maskCanvas = maskCanvasRef.current;
-    if (!maskCanvas) return;
-
-    const targetWidth = Math.max(1, contentSize.width || 1);
-    const targetHeight = Math.max(1, contentSize.height || 1);
-
-    if (maskCanvas.width !== targetWidth) maskCanvas.width = targetWidth;
-    if (maskCanvas.height !== targetHeight) maskCanvas.height = targetHeight;
-
-    if (!maskEnabled || !maskSegments.length) {
-      const ctx = maskCanvas.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-      setMaskVersion((v) => v + 1);
-      return;
-    }
-
-    rasterizeMask(maskCanvas, maskSegments);
-    setMaskVersion((v) => v + 1);
-  }, [maskEnabled, maskSegments, contentSize.width, contentSize.height]);
-
-  const imageViewportStyle = useMemo(() => {
-    const sw = surfaceSize.width;
-    const sh = surfaceSize.height;
-    const cw = contentSize.width;
-    const ch = contentSize.height;
-    if (sw <= 0 || sh <= 0 || cw <= 0 || ch <= 0) return undefined;
-
-    const surfaceAspect = sw / sh;
-    const contentAspect = cw / ch;
-
-    if (contentAspect > surfaceAspect) {
-      const width = sw;
-      const height = sw / contentAspect;
-      return {
-        left: 0,
-        top: (sh - height) / 2,
-        width,
-        height,
-      };
-    }
-
-    const height = sh;
-    const width = sh * contentAspect;
-    return {
-      left: (sw - width) / 2,
-      top: 0,
-      width,
-      height,
-    };
-  }, [surfaceSize, contentSize]);
-
-  const handleExport = useCallback(
-    () => exportResult("pixelpass"),
-    [exportResult],
-  );
-
-  const removeSelectedMaskSegment = useCallback(() => {
-    if (!selectedMaskSegmentId) return;
-    setMaskSegments((prev) =>
-      prev.filter((segment) => segment.id !== selectedMaskSegmentId),
-    );
-    setSelectedMaskSegmentId(null);
-  }, [selectedMaskSegmentId]);
-
-  const clearMask = useCallback(() => {
-    setMaskSegments([]);
-    setSelectedMaskSegmentId(null);
-  }, []);
+  const closeAddMenu = useCallback(() => setShowAdd(false), []);
+  const toggleShowAdd = useCallback(() => setShowAdd((v) => !v), []);
 
   const addFilter = useCallback(
     (type) => {
@@ -879,7 +662,6 @@ export default function PixelPass() {
           enabled: true,
         },
       ]);
-
       setShowAdd(false);
     },
     [defs],
@@ -940,6 +722,349 @@ export default function PixelPass() {
       fs.map((f, j) => (j === i ? { ...f, enabled: !f.enabled } : f)),
     );
   }, []);
+
+  return {
+    filters,
+    showAdd,
+    dropZoneActive,
+    swapIdx,
+    processingFilters,
+    availableFilterEntries,
+    handleDropBetween,
+    handleSwapDrop,
+    handleDropZoneEnter,
+    handleDropZoneLeave,
+    handleSwapEnter,
+    handleSwapLeave,
+    closeAddMenu,
+    toggleShowAdd,
+    addFilter,
+    handleOptionChange,
+    addCustomColor,
+    removeCustomColor,
+    removeFilter,
+    toggleFilter,
+    toggleEnabled,
+  };
+}
+
+function useMaskState() {
+  const [showMaskSettings, setShowMaskSettings] = useState(false);
+  const [maskEnabled, setMaskEnabled] = useState(false);
+  const [maskInvert, setMaskInvert] = useState(false);
+  const [maskShowOutlines, setMaskShowOutlines] = useState(true);
+  const [maskTool, setMaskTool] = useState("draw");
+  const [maskBrushSize, setMaskBrushSize] = useState(24);
+  const [maskSegments, setMaskSegments] = useState([]);
+  const [selectedMaskSegmentId, setSelectedMaskSegmentId] = useState(null);
+  const [maskVersion, setMaskVersion] = useState(0);
+
+  useEffect(() => {
+    if (!maskEnabled) setSelectedMaskSegmentId(null);
+  }, [maskEnabled]);
+
+  useEffect(() => {
+    if (!selectedMaskSegmentId) return;
+    const exists = maskSegments.some((segment) => segment.id === selectedMaskSegmentId);
+    if (!exists) setSelectedMaskSegmentId(null);
+  }, [maskSegments, selectedMaskSegmentId]);
+
+  const removeSelectedMaskSegment = useCallback(() => {
+    if (!selectedMaskSegmentId) return;
+    setMaskSegments((prev) =>
+      prev.filter((segment) => segment.id !== selectedMaskSegmentId),
+    );
+    setSelectedMaskSegmentId(null);
+  }, [selectedMaskSegmentId]);
+
+  const clearMask = useCallback(() => {
+    setMaskSegments([]);
+    setSelectedMaskSegmentId(null);
+  }, []);
+
+  return {
+    showMaskSettings,
+    setShowMaskSettings,
+    maskEnabled,
+    setMaskEnabled,
+    maskInvert,
+    setMaskInvert,
+    maskShowOutlines,
+    setMaskShowOutlines,
+    maskTool,
+    setMaskTool,
+    maskBrushSize,
+    setMaskBrushSize,
+    maskSegments,
+    setMaskSegments,
+    selectedMaskSegmentId,
+    setSelectedMaskSegmentId,
+    maskVersion,
+    setMaskVersion,
+    removeSelectedMaskSegment,
+    clearMask,
+  };
+}
+
+function useViewportSizing(imageSurfaceRef, canvasRef) {
+  const [surfaceSize, setSurfaceSize] = useState({ width: 0, height: 0 });
+  const [contentSize, setContentSize] = useState({ width: 1, height: 1 });
+
+  useEffect(() => {
+    const surface = imageSurfaceRef.current;
+    if (!surface || typeof ResizeObserver === "undefined") return undefined;
+
+    const updateSurfaceSize = () => {
+      setSurfaceSize({
+        width: surface.clientWidth || 0,
+        height: surface.clientHeight || 0,
+      });
+    };
+
+    updateSurfaceSize();
+    const observer = new ResizeObserver(updateSurfaceSize);
+    observer.observe(surface);
+
+    return () => observer.disconnect();
+  }, [imageSurfaceRef]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+
+    const updateContentSize = () => {
+      setContentSize({
+        width: Math.max(1, canvas.width || 1),
+        height: Math.max(1, canvas.height || 1),
+      });
+    };
+
+    updateContentSize();
+
+    if (typeof MutationObserver === "undefined") return undefined;
+    const observer = new MutationObserver(updateContentSize);
+    observer.observe(canvas, {
+      attributes: true,
+      attributeFilter: ["width", "height"],
+    });
+
+    return () => observer.disconnect();
+  }, [canvasRef]);
+
+  return { surfaceSize, contentSize };
+}
+
+function useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef) {
+  useEffect(() => {
+    if (!showMaskSettings) return undefined;
+
+    const handlePointerDown = (event) => {
+      const root = maskMenuRef.current;
+      if (!root) return;
+      if (!root.contains(event.target)) setShowMaskSettings(false);
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setShowMaskSettings(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showMaskSettings, setShowMaskSettings, maskMenuRef]);
+}
+
+function useMaskRasterization(
+  maskCanvasRef,
+  maskEnabled,
+  maskSegments,
+  contentSize,
+  setMaskVersion,
+) {
+  useEffect(() => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+
+    const targetWidth = Math.max(1, contentSize.width || 1);
+    const targetHeight = Math.max(1, contentSize.height || 1);
+
+    if (maskCanvas.width !== targetWidth) maskCanvas.width = targetWidth;
+    if (maskCanvas.height !== targetHeight) maskCanvas.height = targetHeight;
+
+    if (!maskEnabled || !maskSegments.length) {
+      const ctx = maskCanvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+      setMaskVersion((v) => v + 1);
+      return;
+    }
+
+    rasterizeMask(maskCanvas, maskSegments);
+    setMaskVersion((v) => v + 1);
+  }, [
+    maskCanvasRef,
+    maskEnabled,
+    maskSegments,
+    contentSize.width,
+    contentSize.height,
+    setMaskVersion,
+  ]);
+}
+
+export default function PixelPass() {
+  const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
+  const imageSurfaceRef = useRef(null);
+  const maskMenuRef = useRef(null);
+  const maskCanvasRef = useRef(createOffscreenMaskCanvas());
+
+  const [fonts, setFonts] = useState([]);
+  const [canExport, setCanExport] = useState(false);
+  const [fileURL, setFileURL] = useState(null);
+  const [cameraOn, setCameraOn] = useState(false);
+
+  useEffect(() => {
+    loadFonts().then(setFonts);
+  }, []);
+
+  const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const {
+    filters,
+    showAdd,
+    dropZoneActive,
+    swapIdx,
+    processingFilters,
+    availableFilterEntries,
+    handleDropBetween,
+    handleSwapDrop,
+    handleDropZoneEnter,
+    handleDropZoneLeave,
+    handleSwapEnter,
+    handleSwapLeave,
+    closeAddMenu,
+    toggleShowAdd,
+    addFilter,
+    handleOptionChange,
+    addCustomColor,
+    removeCustomColor,
+    removeFilter,
+    toggleFilter,
+    toggleEnabled,
+  } = useFilterStackState(defs);
+  const {
+    showMaskSettings,
+    setShowMaskSettings,
+    maskEnabled,
+    setMaskEnabled,
+    maskInvert,
+    setMaskInvert,
+    maskShowOutlines,
+    setMaskShowOutlines,
+    maskTool,
+    setMaskTool,
+    maskBrushSize,
+    setMaskBrushSize,
+    maskSegments,
+    setMaskSegments,
+    selectedMaskSegmentId,
+    setSelectedMaskSegmentId,
+    maskVersion,
+    setMaskVersion,
+    removeSelectedMaskSegment,
+    clearMask,
+  } = useMaskState();
+  const { surfaceSize, contentSize } = useViewportSizing(
+    imageSurfaceRef,
+    canvasRef,
+  );
+
+  const maskConfig = useMemo(
+    () => ({
+      enabled: maskEnabled,
+      invert: maskInvert,
+      canvas: maskCanvasRef.current,
+      version: maskVersion,
+    }),
+    [maskEnabled, maskInvert, maskVersion],
+  );
+  const mediaConfig = useMemo(() => {
+    return { defs, filters: processingFilters, mask: maskConfig };
+  }, [defs, processingFilters, maskConfig]);
+
+  const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
+    cameraOn,
+    videoRef,
+  });
+
+  const handleFile = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (fileURL) URL.revokeObjectURL(fileURL);
+
+      const url = await loadFile(file);
+      setFileURL(url);
+      setCanExport(true);
+      closeAddMenu();
+    },
+    [loadFile, fileURL, closeAddMenu],
+  );
+
+  useEffect(
+    () => () => {
+      if (fileURL) URL.revokeObjectURL(fileURL);
+    },
+    [fileURL],
+  );
+  useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef);
+  useMaskRasterization(
+    maskCanvasRef,
+    maskEnabled,
+    maskSegments,
+    contentSize,
+    setMaskVersion,
+  );
+
+  const imageViewportStyle = useMemo(() => {
+    const sw = surfaceSize.width;
+    const sh = surfaceSize.height;
+    const cw = contentSize.width;
+    const ch = contentSize.height;
+    if (sw <= 0 || sh <= 0 || cw <= 0 || ch <= 0) return undefined;
+
+    const surfaceAspect = sw / sh;
+    const contentAspect = cw / ch;
+
+    if (contentAspect > surfaceAspect) {
+      const width = sw;
+      const height = sw / contentAspect;
+      return {
+        left: 0,
+        top: (sh - height) / 2,
+        width,
+        height,
+      };
+    }
+
+    const height = sh;
+    const width = sh * contentAspect;
+    return {
+      left: (sw - width) / 2,
+      top: 0,
+      width,
+      height,
+    };
+  }, [surfaceSize, contentSize]);
+
+  const handleExport = useCallback(
+    () => exportResult("pixelpass"),
+    [exportResult],
+  );
 
   return (
     <div className={styles.mainContainer}>
@@ -1102,7 +1227,7 @@ export default function PixelPass() {
             <button
               type="button"
               className="xpButton"
-              onClick={() => setShowAdd((v) => !v)}
+              onClick={toggleShowAdd}
             >
               + Add Filter
             </button>

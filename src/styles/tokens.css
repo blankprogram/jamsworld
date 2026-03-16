@@ -1,0 +1,78 @@
+:root {
+  /* Shared XP-like primitives used by app modules and window chrome. */
+  --xp-color-white: #fff;
+  --xp-color-shell: #ece9d8;
+  --xp-color-panel: #b9b6a9;
+  --xp-color-inner: #d4d0c8;
+  --xp-color-stage: #f0f0f0;
+  --xp-color-workspace: #f6f4eb;
+  --xp-color-border-strong: #999;
+  --xp-color-border-mid: #808080;
+  --xp-color-border-soft: #9d9d9d;
+  --xp-color-accent-primary: #1f4b9a;
+  --xp-color-accent-danger: #a63b1c;
+  --xp-color-menu-bg: #edead8;
+  --xp-color-menu-border: #96abff;
+  --xp-color-menu-hover: #1660e8;
+  --xp-color-ie-shell: #c0c0c0;
+  --xp-color-ie-toolbar: #edebda;
+  --xp-color-ie-toolbar-border: #bab8aa;
+  --xp-color-ie-muted: #767696;
+  --xp-spacing-md: 0.625rem;
+
+  --xp-window-frame-focused: #0831d9;
+  --xp-window-frame-unfocused: #6582f5;
+  --xp-window-header-focused-gradient: linear-gradient(
+    to bottom,
+    #0058ee 0%,
+    #3593ff 4%,
+    #288eff 6%,
+    #127dff 8%,
+    #036ffc 10%,
+    #0262ee 14%,
+    #0057e5 20%,
+    #0054e3 24%,
+    #0055eb 56%,
+    #005bf5 66%,
+    #026afe 76%,
+    #0062ef 86%,
+    #0052d6 92%,
+    #0040ab 94%,
+    #003092 100%
+  );
+  --xp-window-header-unfocused-gradient: linear-gradient(
+    to bottom,
+    #7697e7 0%,
+    #7e9ee3 3%,
+    #94afe8 6%,
+    #97b4e9 8%,
+    #82a5e4 14%,
+    #7c9fe2 17%,
+    #7996de 25%,
+    #7b99e1 56%,
+    #82a9e9 81%,
+    #80a5e7 89%,
+    #7b96e1 94%,
+    #7a93df 97%,
+    #abbae3 100%
+  );
+  --xp-window-button-primary-shadow: #4646ff;
+  --xp-window-button-primary-gradient: radial-gradient(
+    circle at 90% 90%,
+    #0054e9 0%,
+    #2263d5 55%,
+    #4479e4 70%,
+    #a3bbec 90%,
+    white 100%
+  );
+  --xp-window-button-close-shadow: #da4600;
+  --xp-window-button-close-gradient: radial-gradient(
+    circle at 90% 90%,
+    #cc4600 0%,
+    #dc6527 55%,
+    #cd7546 70%,
+    #ffccb2 90%,
+    white 100%
+  );
+  --xp-window-button-maximized-bg: #136dff;
+}

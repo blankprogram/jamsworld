@@ -1,0 +1,33 @@
+.notepadXp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--xp-color-white, #fff);
+  font-family: Tahoma, sans-serif;
+}
+
+.notepadMenuBar {
+  display: flex;
+  border-bottom: 1px solid var(--xp-color-menu-border, #96abff);
+  background: var(--xp-color-menu-bg, #edead8);
+  color: #000;
+  font-size: 12px;
+}
+
+.notepadMenuBar span {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.notepadMenuBar span:hover {
+  background-color: var(--xp-color-menu-hover, #1660e8);
+  color: var(--xp-color-white, #fff);
+}
+
+.notepadTextarea {
+  margin-left: 5px;
+  overflow: auto;
+  font-size: 14px;
+}

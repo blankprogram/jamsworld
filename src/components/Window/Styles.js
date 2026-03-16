@@ -6,7 +6,10 @@ export const StyledWindow = styled.div`
   position: absolute;
   padding: ${({ isMaximized, header }) =>
     isMaximized ? 0 : header?.invisible ? 0 : 3}px;
-  background-color: ${({ isFocused }) => (isFocused ? "#0831d9" : "#6582f5")};
+  background-color: ${({ isFocused }) =>
+    isFocused
+      ? "var(--xp-window-frame-focused, #0831d9)"
+      : "var(--xp-window-frame-unfocused, #6582f5)"};
   flex-direction: column;
   border-top-left-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
   border-top-right-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
@@ -32,8 +35,8 @@ export const StyledHeader = styled.header`
   align-items: center;
   background: ${({ isFocused }) =>
     isFocused
-      ? "linear-gradient(to bottom,#0058ee 0%,#3593ff 4%,#288eff 6%,#127dff 8%,#036ffc 10%,#0262ee 14%,#0057e5 20%,#0054e3 24%,#0055eb 56%,#005bf5 66%,#026afe 76%,#0062ef 86%,#0052d6 92%,#0040ab 94%,#003092 100%)"
-      : "linear-gradient(to bottom, #7697e7 0%,#7e9ee3 3%,#94afe8 6%,#97b4e9 8%,#82a5e4 14%,#7c9fe2 17%,#7996de 25%,#7b99e1 56%,#82a9e9 81%,#80a5e7 89%,#7b96e1 94%,#7a93df 97%,#abbae3 100%)"};
+      ? "var(--xp-window-header-focused-gradient, linear-gradient(to bottom,#0058ee 0%,#3593ff 4%,#288eff 6%,#127dff 8%,#036ffc 10%,#0262ee 14%,#0057e5 20%,#0054e3 24%,#0055eb 56%,#005bf5 66%,#026afe 76%,#0062ef 86%,#0052d6 92%,#0040ab 94%,#003092 100%))"
+      : "var(--xp-window-header-unfocused-gradient, linear-gradient(to bottom, #7697e7 0%,#7e9ee3 3%,#94afe8 6%,#97b4e9 8%,#82a5e4 14%,#7c9fe2 17%,#7996de 25%,#7b99e1 56%,#82a9e9 81%,#80a5e7 89%,#7b96e1 94%,#7a93df 97%,#abbae3 100%))"};
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
   overflow: hidden;
@@ -151,7 +154,7 @@ export const StyledHeaderButtons = styled.div`
     position: relative;
     width: 22px;
     height: 22px;
-    border: 1px solid #fff;
+    border: 1px solid var(--xp-color-white, #fff);
     border-radius: 3px;
     min-width: 0 !important;
     min-height: 0 !important;
@@ -165,14 +168,18 @@ export const StyledHeaderButtons = styled.div`
   }
 
   .header__button--minimize {
-    box-shadow: inset 0 -1px 2px 1px #4646ff;
-    background-image: radial-gradient(
-      circle at 90% 90%,
-      #0054e9 0%,
-      #2263d5 55%,
-      #4479e4 70%,
-      #a3bbec 90%,
-      white 100%
+    box-shadow: inset 0 -1px 2px 1px
+      var(--xp-window-button-primary-shadow, #4646ff);
+    background-image: var(
+      --xp-window-button-primary-gradient,
+      radial-gradient(
+        circle at 90% 90%,
+        #0054e9 0%,
+        #2263d5 55%,
+        #4479e4 70%,
+        #a3bbec 90%,
+        white 100%
+      )
     );
     &:before {
       content: "";
@@ -186,14 +193,18 @@ export const StyledHeaderButtons = styled.div`
   }
 
   .header__button--maximize {
-    box-shadow: inset 0 -1px 2px 1px #4646ff;
-    background-image: radial-gradient(
-      circle at 90% 90%,
-      #0054e9 0%,
-      #2263d5 55%,
-      #4479e4 70%,
-      #a3bbec 90%,
-      white 100%
+    box-shadow: inset 0 -1px 2px 1px
+      var(--xp-window-button-primary-shadow, #4646ff);
+    background-image: var(
+      --xp-window-button-primary-gradient,
+      radial-gradient(
+        circle at 90% 90%,
+        #0054e9 0%,
+        #2263d5 55%,
+        #4479e4 70%,
+        #a3bbec 90%,
+        white 100%
+      )
     );
     &:before {
       content: "";
@@ -210,14 +221,18 @@ export const StyledHeaderButtons = styled.div`
   }
 
   .header__button--maximized {
-    box-shadow: inset 0 -1px 2px 1px #4646ff;
-    background-image: radial-gradient(
-      circle at 90% 90%,
-      #0054e9 0%,
-      #2263d5 55%,
-      #4479e4 70%,
-      #a3bbec 90%,
-      white 100%
+    box-shadow: inset 0 -1px 2px 1px
+      var(--xp-window-button-primary-shadow, #4646ff);
+    background-image: var(
+      --xp-window-button-primary-gradient,
+      radial-gradient(
+        circle at 90% 90%,
+        #0054e9 0%,
+        #2263d5 55%,
+        #4479e4 70%,
+        #a3bbec 90%,
+        white 100%
+      )
     );
     &:before {
       content: "";
@@ -240,22 +255,26 @@ export const StyledHeaderButtons = styled.div`
       box-shadow:
         inset 0 2px white,
         inset 0 0 0 1px white,
-        1px -1px #136dff;
+        1px -1px var(--xp-window-button-maximized-bg, #136dff);
       height: 8px;
       width: 8px;
-      background-color: #136dff;
+      background-color: var(--xp-window-button-maximized-bg, #136dff);
     }
   }
 
   .header__button--close {
-    box-shadow: inset 0 -1px 2px 1px #da4600;
-    background-image: radial-gradient(
-      circle at 90% 90%,
-      #cc4600 0%,
-      #dc6527 55%,
-      #cd7546 70%,
-      #ffccb2 90%,
-      white 100%
+    box-shadow: inset 0 -1px 2px 1px
+      var(--xp-window-button-close-shadow, #da4600);
+    background-image: var(
+      --xp-window-button-close-gradient,
+      radial-gradient(
+        circle at 90% 90%,
+        #cc4600 0%,
+        #dc6527 55%,
+        #cd7546 70%,
+        #ffccb2 90%,
+        white 100%
+      )
     );
     &:before {
       content: "";

@@ -4,7 +4,7 @@ import { useProcessMedia } from "../../hooks/useProcessMedia";
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createPixortIcon } from "../../utils/appIconFactory";
-import "./Pixort.css";
+import styles from "./Pixort.module.css";
 
 export const appManifest = createAppManifest({
   id: "pixort",
@@ -85,10 +85,10 @@ export default function Pixort() {
 
   return (
     <>
-      <div className="form-container">
-        <div className="form-top">
+      <div className={styles.formContainer}>
+        <div className={styles.formTop}>
           <button
-            className="button"
+            className={styles.button}
             onClick={() => fileInputRef.current.click()}
           >
             Choose File
@@ -97,23 +97,23 @@ export default function Pixort() {
             type="file"
             accept="image/*,image/gif"
             ref={fileInputRef}
-            style={{ display: "none" }}
+            className={styles.hiddenFileInput}
             onChange={handleFileChange}
           />
 
           <button
-            className="button export-button"
+            className={`${styles.button} ${styles.exportButton}`}
             onClick={handleExport}
             disabled={!canExport}
           >
             Export
           </button>
         </div>
-        <div className="form-bottom">
-          <div className="form-group">
+        <div className={styles.formBottom}>
+          <div className={styles.formGroup}>
             <label>Sort By:</label>
             <select
-              className="field"
+              className={styles.field}
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
@@ -124,10 +124,10 @@ export default function Pixort() {
               ))}
             </select>
           </div>
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Direction:</label>
             <select
-              className="field"
+              className={styles.field}
               value={direction}
               onChange={(e) => setDirection(e.target.value)}
             >
@@ -138,10 +138,10 @@ export default function Pixort() {
               ))}
             </select>
           </div>
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Mode:</label>
             <select
-              className="field"
+              className={styles.field}
               value={mode}
               onChange={(e) => setMode(e.target.value)}
             >
@@ -151,10 +151,10 @@ export default function Pixort() {
           </div>
 
           {mode === "Threshold" && (
-            <div className="form-group range-row">
-              <div className="range-col">
+            <div className={`${styles.formGroup} ${styles.rangeRow}`}>
+              <div className={styles.rangeCol}>
                 <label>Low Threshold:</label>
-                <div className="range-inline">
+                <div className={styles.rangeInline}>
                   <input
                     type="range"
                     min="0"
@@ -163,12 +163,12 @@ export default function Pixort() {
                     value={low}
                     onChange={(e) => setLow(+e.target.value)}
                   />
-                  <span className="value-box">{low}</span>
+                  <span className={styles.valueBox}>{low}</span>
                 </div>
               </div>
-              <div className="range-col">
+              <div className={styles.rangeCol}>
                 <label>High Threshold:</label>
-                <div className="range-inline">
+                <div className={styles.rangeInline}>
                   <input
                     type="range"
                     min="0"
@@ -177,21 +177,21 @@ export default function Pixort() {
                     value={high}
                     onChange={(e) => setHigh(+e.target.value)}
                   />
-                  <span className="value-box">{high}</span>
+                  <span className={styles.valueBox}>{high}</span>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-      <div className="main-container">
-        <div className="images-container">
+      <div className={styles.mainContainer}>
+        <div className={styles.imagesContainer}>
           {fileURL && (
-            <div className="image-box">
+            <div className={styles.imageBox}>
               <img src={fileURL} alt="uploaded" />
             </div>
           )}
-          <div className="image-box">
+          <div className={styles.imageBox}>
             <canvas ref={canvasRef} />
           </div>
         </div>

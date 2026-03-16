@@ -8,19 +8,19 @@
     blue 24px,
     blue 36px
   );
-  --pp-shell-bg: #ece9d8;
-  --pp-panel-bg: #b9b6a9;
-  --pp-inner-bg: #d4d0c8;
-  --pp-stage-bg: #f0f0f0;
-  --pp-workspace-bg: #f6f4eb;
-  --pp-border-strong: #999;
-  --pp-border-mid: #808080;
-  --pp-border-soft: #9d9d9d;
-  --pp-accent-primary: #1f4b9a;
-  --pp-accent-danger: #a63b1c;
-  --pp-highlight: #fff;
+  --pp-shell-bg: var(--xp-color-shell, #ece9d8);
+  --pp-panel-bg: var(--xp-color-panel, #b9b6a9);
+  --pp-inner-bg: var(--xp-color-inner, #d4d0c8);
+  --pp-stage-bg: var(--xp-color-stage, #f0f0f0);
+  --pp-workspace-bg: var(--xp-color-workspace, #f6f4eb);
+  --pp-border-strong: var(--xp-color-border-strong, #999);
+  --pp-border-mid: var(--xp-color-border-mid, #808080);
+  --pp-border-soft: var(--xp-color-border-soft, #9d9d9d);
+  --pp-accent-primary: var(--xp-color-accent-primary, #1f4b9a);
+  --pp-accent-danger: var(--xp-color-accent-danger, #a63b1c);
+  --pp-highlight: var(--xp-color-white, #fff);
   --filter-item-width: 100%;
-  --pixelpass-spacing: 0.625rem;
+  --pixelpass-spacing: var(--xp-spacing-md, 0.625rem);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -47,8 +47,8 @@
   align-items: center;
   gap: 0;
   padding: 0;
-  background: #edead8;
-  border-bottom: 1px solid #96abff;
+  background: var(--xp-color-menu-bg, #edead8);
+  border-bottom: 1px solid var(--xp-color-menu-border, #96abff);
 }
 
 .topMenuButton {
@@ -74,7 +74,7 @@
 }
 
 .topMenuButton:not(.topMenuButtonDisabled):not(:disabled):hover {
-  background: #1660e8;
+  background: var(--xp-color-menu-hover, #1660e8);
   color: #fff;
   border: 0;
   box-shadow: none;
@@ -103,7 +103,7 @@
 }
 
 .topMenuButtonActive {
-  background: #1660e8;
+  background: var(--xp-color-menu-hover, #1660e8);
   color: #fff;
   border: 0;
   box-shadow: none;

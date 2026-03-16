@@ -6,7 +6,7 @@ import { useProcessMedia } from "../../hooks/useProcessMedia";
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createAsciifyIcon } from "../../utils/appIconFactory";
-import "./Asciify.css";
+import styles from "./Asciify.module.css";
 
 export const appManifest = createAppManifest({
   id: "asciify",
@@ -118,10 +118,10 @@ export default function Asciify() {
 
   return (
     <>
-      <div className="form-container">
-        <div className="form-top">
-          <div className="form-left">
-            <div className="rainbow-text-container">
+      <div className={styles.formContainer}>
+        <div className={styles.formTop}>
+          <div className={styles.formLeft}>
+            <div className={styles.rainbowTextContainer}>
               {"ASCIIFY :)".split("").map((c, i) => (
                 <span
                   key={i}
@@ -132,7 +132,7 @@ export default function Asciify() {
               ))}
             </div>
             <button
-              className="button"
+              className={styles.button}
               onClick={() => fileInputRef.current.click()}
             >
               Choose File
@@ -142,12 +142,13 @@ export default function Asciify() {
               accept="image/*"
               ref={fileInputRef}
               onChange={handleFileChange}
+              className={styles.hiddenFileInput}
             />
           </div>
 
-          <div className="form-right">
+          <div className={styles.formRight}>
             <button
-              className="button export-button"
+              className={`${styles.button} ${styles.exportButton}`}
               onClick={handleExport}
               disabled={!canExport}
             >
@@ -156,21 +157,21 @@ export default function Asciify() {
           </div>
         </div>
 
-        <div className="form-bottom">
-          <div className="form-group">
+        <div className={styles.formBottom}>
+          <div className={styles.formGroup}>
             <label>Characters:</label>
             <input
               type="text"
-              className="field"
+              className={styles.field}
               value={chars}
               onChange={(e) => setChars(e.target.value)}
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Font:</label>
             <select
-              className="field"
+              className={styles.field}
               value={font}
               onChange={(e) => setFont(e.target.value)}
             >
@@ -182,15 +183,15 @@ export default function Asciify() {
             </select>
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Fill Color:</label>
             <div
-              className="color-select-icon"
+              className={styles.colorSelectIcon}
               style={{ backgroundColor: fill }}
               onClick={() => setShowPicker((v) => !v)}
             />
             {showPicker && (
-              <div className="color-picker-popover" ref={pickerRef}>
+              <div className={styles.colorPickerPopover} ref={pickerRef}>
                 <SketchPicker
                   color={fill}
                   onChangeComplete={(c) => {
@@ -202,44 +203,44 @@ export default function Asciify() {
             )}
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Density:</label>
             <input
               type="range"
-              className="field"
+              className={styles.field}
               min={0.25}
               max={5}
               step={0.25}
               value={density}
               onChange={(e) => setDensity(+e.target.value)}
             />
-            <span className="value-box">{density}</span>
+            <span className={styles.valueBox}>{density}</span>
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label>Block Size:</label>
             <input
               type="range"
-              className="field"
+              className={styles.field}
               min={4}
               max={64}
               step={1}
               value={blockSize}
               onChange={(e) => setBlockSize(+e.target.value)}
             />
-            <span className="value-box">{blockSize}</span>
+            <span className={styles.valueBox}>{blockSize}</span>
           </div>
         </div>
       </div>
 
-      <div className="main-container">
-        <div className="images-container">
+      <div className={styles.mainContainer}>
+        <div className={styles.imagesContainer}>
           {fileURL && (
-            <div className="image-box">
+            <div className={styles.imageBox}>
               <img src={fileURL} alt="uploaded" />
             </div>
           )}
-          <div className="image-box">
+          <div className={styles.imageBox}>
             <canvas ref={canvasRef} />
           </div>
         </div>
