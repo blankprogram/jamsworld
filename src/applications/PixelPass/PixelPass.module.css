@@ -5,6 +5,20 @@
   font-family: Tahoma, sans-serif;
 }
 
+:root {
+  --primitive-rgb-gradient-blocky: repeating-linear-gradient(
+    to right,
+    red 0px,
+    red 12px,
+    green 12px,
+    green 24px,
+    blue 24px,
+    blue 36px
+  );
+  --filter-item-width: 80%;
+  --pixelpass-spacing: 0.625rem;
+}
+
 .filterStack {
   position: relative;
   overflow: hidden;
@@ -27,7 +41,7 @@
 }
 
 .filterStack button {
-  margin: 0.625rem 0;
+  margin: var(--pixelpass-spacing) 0;
 }
 
 .filterStackScrollable {
@@ -64,6 +78,11 @@
 }
 
 .filterOptions {
+  width: var(--filter-item-width);
+  padding: var(--pixelpass-spacing);
+  box-sizing: border-box;
+  margin: 0;
+  position: relative;
   background: #b9b6a9;
   border: 1px solid #808080;
 }
@@ -160,7 +179,7 @@
 }
 
 .filterContent {
-  margin-top: 0.625rem;
+  margin-top: var(--pixelpass-spacing);
 }
 
 .filterOptions label {
@@ -168,7 +187,7 @@
   grid-template-columns: 5rem 1fr;
   gap: 0.5rem;
   align-items: center;
-  margin-bottom: 0.625rem;
+  margin-bottom: var(--pixelpass-spacing);
 }
 
 .filterOptions select,
@@ -217,20 +236,8 @@
   align-self: center;
 }
 
-:root {
-  --primitive-rgb-gradient-blocky: repeating-linear-gradient(
-    to right,
-    red 0px,
-    red 12px,
-    green 12px,
-    green 24px,
-    blue 24px,
-    blue 36px
-  );
-}
-
 .dropZone {
-  width: 80%;
+  width: var(--filter-item-width);
   min-height: 12px;
   box-sizing: border-box;
   margin: 0;
@@ -244,14 +251,6 @@
   transition: background 0.15s;
   pointer-events: auto;
   z-index: 2;
-}
-
-.filterOptions {
-  width: 80%;
-  padding: 0.625rem;
-  box-sizing: border-box;
-  margin: 0;
-  position: relative;
 }
 
 .filterOptions.swapActive::before {

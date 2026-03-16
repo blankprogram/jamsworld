@@ -1,6 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import Webamp from 'webamp';
 import { initialTracks } from './Music';
+import { createAppManifest } from "../createAppManifest";
+import winampIcon from "../../assets/Icons/winamp.png";
+
+export const appManifest = createAppManifest({
+  id: "winamp",
+  title: "Winamp",
+  icon: winampIcon,
+  useStyledWindow: false,
+  windowDefaults: {
+    width: 350,
+    height: 240,
+    resizable: false,
+  },
+});
 
 function Winamp({ onClose, onMinimize, isMinimized }) {
   const ref = useRef(null);

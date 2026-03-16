@@ -33,6 +33,15 @@ import {
   MinesweeperPass,
   ScalePass,
 } from "../../utils/GL/passes";
+import startIcon from "../../assets/Icons/start.png";
+import { createAppManifest } from "../createAppManifest";
+import { createPixelPassIcon } from "../../utils/appIconFactory";
+
+export const appManifest = createAppManifest({
+  id: "pixelpass",
+  title: "PixelPass",
+  icon: createPixelPassIcon() || startIcon,
+});
 
 const ALL_PASSES = [
   InvertPass,
@@ -56,10 +65,115 @@ const ALL_PASSES = [
   MinesweeperPass,
 ];
 
+const DEFAULT_CUSTOM_COLORS = [
+  "#FF0000",
+  "#00FF00",
+  "#0000FF",
+  "#FFFFFF",
+  "#000000",
+];
+const INACTIVE_INDEX = -1;
+
 const makeId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+function shouldHideOption(filter, optionName) {
+  if (
+    (filter.type === "PIXELSORT" ||
+      filter.type === "ASCII" ||
+      filter.type === "MINESWEEPER") &&
+    (optionName === "low" || optionName === "high") &&
+    filter.opts.mode !== "Threshold"
+  ) {
+    return true;
+  }
+
+  if (
+    filter.type === "ASCII" &&
+    optionName === "textColor" &&
+    filter.opts.textColorMode !== "Custom"
+  ) {
+    return true;
+  }
+
+  if (
+    filter.type === "ASCII" &&
+    optionName === "fill" &&
+    filter.opts.fillMode === "Transparent"
+  ) {
+    return true;
+  }
+
+  if (
+    filter.type === "SCALE" &&
+    (optionName === "scaleX" || optionName === "scaleY") &&
+    filter.opts.uniform !== "No"
+  ) {
+    return true;
+  }
+
+  if (
+    filter.type === "SCALE" &&
+    optionName === "scale" &&
+    filter.opts.uniform !== "Yes"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function createFilterDefaults(def) {
+  const opts = {};
+  for (const option of def.options) {
+    opts[option.name] =
+      option.name === "customColors"
+        ? [...DEFAULT_CUSTOM_COLORS]
+        : option.defaultValue;
+  }
+  return opts;
+}
+
+function isValidDropBetween(filters, from, to) {
+  return !(
+    from == null ||
+    to == null ||
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= filters.length ||
+    to > filters.length
+  );
+}
+
+function isValidSwap(filters, from, to) {
+  return !(
+    from == null ||
+    to == null ||
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= filters.length ||
+    to >= filters.length
+  );
+}
+
+function reorderBetween(filters, from, to) {
+  if (!isValidDropBetween(filters, from, to)) return filters;
+  const next = [...filters];
+  const [dragged] = next.splice(from, 1);
+  next.splice(to > from ? to - 1 : to, 0, dragged);
+  return next;
+}
+
+function swapFilters(filters, from, to) {
+  if (!isValidSwap(filters, from, to)) return filters;
+  const next = [...filters];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
 
 function getFilterDefs(fonts) {
   const defs = {};
@@ -232,45 +346,7 @@ const FilterOptions = React.memo(function FilterOptions({
       {filter.open && (
         <div className={styles.filterContent}>
           {cfg.options.map((opt) => {
-            if (
-              (filter.type === "PIXELSORT" ||
-                filter.type === "ASCII" ||
-                filter.type === "MINESWEEPER") &&
-              (opt.name === "low" || opt.name === "high") &&
-              filter.opts.mode !== "Threshold"
-            ) {
-              return null;
-            }
-
-            if (
-              filter.type === "ASCII" &&
-              opt.name === "textColor" &&
-              filter.opts.textColorMode !== "Custom"
-            ) {
-              return null;
-            }
-            if (
-              filter.type === "ASCII" &&
-              opt.name === "fill" &&
-              filter.opts.fillMode === "Transparent"
-            ) {
-              return null;
-            }
-            if (
-              filter.type === "SCALE" &&
-              (opt.name === "scaleX" || opt.name === "scaleY") &&
-              filter.opts.uniform !== "No"
-            ) {
-              return null;
-            }
-
-            if (
-              filter.type === "SCALE" &&
-              opt.name === "scale" &&
-              filter.opts.uniform !== "Yes"
-            ) {
-              return null;
-            }
+            if (shouldHideOption(filter, opt.name)) return null;
 
             if (filter.type === "PALETTE" && opt.name === "customColors") {
               if (filter.opts.preset !== "Custom") return null;
@@ -338,8 +414,8 @@ export default function PixelPass() {
   const [filters, setFilters] = useState([]);
   const [canExport, setCanExport] = useState(false);
 
-  const [dropZoneActive, setDropZoneActive] = useState(-1);
-  const [swapIdx, setSwapIdx] = useState(-1);
+  const [dropZoneActive, setDropZoneActive] = useState(INACTIVE_INDEX);
+  const [swapIdx, setSwapIdx] = useState(INACTIVE_INDEX);
 
   const [showAdd, setShowAdd] = useState(false);
   const [fileURL, setFileURL] = useState(null);
@@ -366,6 +442,7 @@ export default function PixelPass() {
     () => ({ defs, filters: processingFilters }),
     [defs, processingFilters],
   );
+  const availableFilterEntries = useMemo(() => Object.entries(defs), [defs]);
 
   const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
     cameraOn,
@@ -373,32 +450,13 @@ export default function PixelPass() {
   });
 
   const clearDnDUI = useCallback(() => {
-    setDropZoneActive(-1);
-    setSwapIdx(-1);
+    setDropZoneActive(INACTIVE_INDEX);
+    setSwapIdx(INACTIVE_INDEX);
   }, []);
 
   const handleDropBetween = useCallback(
     (dropIdx, sourceIdx) => {
-      setFilters((fs) => {
-        const from = sourceIdx;
-        const to = dropIdx;
-
-        if (
-          from == null ||
-          to == null ||
-          from === to ||
-          from < 0 ||
-          to < 0 ||
-          from >= fs.length ||
-          to > fs.length
-        )
-          return fs;
-
-        const arr = [...fs];
-        const [dragged] = arr.splice(from, 1);
-        arr.splice(to > from ? to - 1 : to, 0, dragged);
-        return arr;
-      });
+      setFilters((fs) => reorderBetween(fs, sourceIdx, dropIdx));
 
       clearDnDUI();
     },
@@ -407,25 +465,7 @@ export default function PixelPass() {
 
   const handleSwapDrop = useCallback(
     (targetIdx, sourceIdx) => {
-      setFilters((fs) => {
-        const from = sourceIdx;
-        const to = targetIdx;
-
-        if (
-          from == null ||
-          to == null ||
-          from === to ||
-          from < 0 ||
-          to < 0 ||
-          from >= fs.length ||
-          to >= fs.length
-        )
-          return fs;
-
-        const arr = [...fs];
-        [arr[from], arr[to]] = [arr[to], arr[from]];
-        return arr;
-      });
+      setFilters((fs) => swapFilters(fs, sourceIdx, targetIdx));
 
       clearDnDUI();
     },
@@ -433,10 +473,13 @@ export default function PixelPass() {
   );
 
   const handleDropZoneEnter = useCallback((idx) => setDropZoneActive(idx), []);
-  const handleDropZoneLeave = useCallback(() => setDropZoneActive(-1), []);
+  const handleDropZoneLeave = useCallback(
+    () => setDropZoneActive(INACTIVE_INDEX),
+    [],
+  );
 
   const handleSwapEnter = useCallback((idx) => setSwapIdx(idx), []);
-  const handleSwapLeave = useCallback(() => setSwapIdx(-1), []);
+  const handleSwapLeave = useCallback(() => setSwapIdx(INACTIVE_INDEX), []);
 
   const handleFile = useCallback(
     async (e) => {
@@ -453,6 +496,13 @@ export default function PixelPass() {
     [loadFile, fileURL],
   );
 
+  useEffect(
+    () => () => {
+      if (fileURL) URL.revokeObjectURL(fileURL);
+    },
+    [fileURL],
+  );
+
   const handleExport = useCallback(
     () => exportResult("pixelpass"),
     [exportResult],
@@ -463,17 +513,15 @@ export default function PixelPass() {
       const def = defs[type];
       if (!def) return;
 
-      const opts = {};
-      for (const o of def.options) {
-        opts[o.name === "customColors" ? "customColors" : o.name] =
-          o.name === "customColors"
-            ? ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF", "#000000"]
-            : o.defaultValue;
-      }
-
       setFilters((fs) => [
         ...fs,
-        { id: makeId(), type, opts, open: false, enabled: true },
+        {
+          id: makeId(),
+          type,
+          opts: createFilterDefaults(def),
+          open: false,
+          enabled: true,
+        },
       ]);
 
       setShowAdd(false);
@@ -628,14 +676,14 @@ export default function PixelPass() {
 
           {showAdd && (
             <div className={styles.filterSelection}>
-              {Object.keys(defs).map((type) => (
+              {availableFilterEntries.map(([type, def]) => (
                 <button
                   type="button"
                   key={type}
                   className="xpButton"
                   onClick={() => addFilter(type)}
                 >
-                  {defs[type].title}
+                  {def.title}
                 </button>
               ))}
             </div>

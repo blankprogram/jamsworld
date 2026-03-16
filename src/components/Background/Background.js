@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
 import './Background.css';
-import { getAppIcon } from '../../utils/getAppIcon';
 
-const Background = ({ apps, openApplication, setFocusedApp }) => {
+const Background = ({
+  apps,
+  openApplication,
+  selectedAppIds = [],
+  setSelectedAppIds,
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [box, setBox] = useState(null);
-  const [selectedApps, setSelectedApps] = useState([]);
   const startPoint = useRef(null);
 
   const handleMouseDown = (e) => {
@@ -14,12 +17,10 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
     const clientY = e.clientY;
 
     if (icon) {
-      const appName = icon.id;
-      setSelectedApps([appName]);
-      setFocusedApp(appName);
+      const appId = icon.getAttribute('data-app-id');
+      setSelectedAppIds(appId ? [appId] : []);
     } else {
-      setSelectedApps([]);
-      setFocusedApp(null);
+      setSelectedAppIds([]);
       startPoint.current = { x: clientX, y: clientY };
       setIsDragging(true);
     }
@@ -35,8 +36,10 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
       };
       setBox(newBox);
 
-      const selected = apps.filter((app) => {
-        const appElement = document.getElementById(app.name);
+      const selected = apps
+      .filter((app) => {
+        const appElement = document.getElementById(`desktop-icon-${app.id}`);
+        if (!appElement) return false;
         const appRect = appElement.getBoundingClientRect();
         return !(
           appRect.right < newBox.left ||
@@ -44,9 +47,9 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
           appRect.bottom < newBox.top ||
           appRect.top > newBox.top + newBox.height
         );
-      }).map(app => app.name);
+      }).map((app) => app.id);
 
-      setSelectedApps(selected);
+      setSelectedAppIds(selected);
     }
   };
 
@@ -55,9 +58,9 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
     setBox(null);
   };
 
-  const handleIconDoubleClick = (appName) => {
-    setSelectedApps([]);
-    openApplication(appName);
+  const handleIconDoubleClick = (appId) => {
+    setSelectedAppIds([]);
+    openApplication(appId);
   };
 
   return (
@@ -69,13 +72,14 @@ const Background = ({ apps, openApplication, setFocusedApp }) => {
     >
       {apps.map(app => (
         <div
-          key={app.name}
-          id={app.name}
-          className={`icon ${selectedApps.includes(app.name) ? 'selected' : ''}`}
-          onDoubleClick={() => handleIconDoubleClick(app.name)}
+          key={app.id}
+          id={`desktop-icon-${app.id}`}
+          data-app-id={app.id}
+          className={`icon ${selectedAppIds.includes(app.id) ? 'selected' : ''}`}
+          onDoubleClick={() => handleIconDoubleClick(app.id)}
         >
-          <img src={getAppIcon(app.name)} alt={app.name} className="app-icon" />
-          <span>{app.name}</span>
+          <img src={app.icon} alt={app.title} className="app-icon" />
+          <span>{app.title}</span>
         </div>
       ))}
       {box && (

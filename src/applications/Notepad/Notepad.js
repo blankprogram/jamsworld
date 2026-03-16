@@ -2,8 +2,16 @@ import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import fileContent from './info.md';
+import { createAppManifest } from "../createAppManifest";
+import notepadIcon from "../../assets/Icons/notepad.png";
 
 import './Notepad.css';
+
+export const appManifest = createAppManifest({
+  id: "notepad",
+  title: "Notepad",
+  icon: notepadIcon,
+});
 
 const Notepad = () => {
   const [markdown, setMarkdown] = useState('');

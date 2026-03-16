@@ -1,7 +1,17 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useMemo } from "react";
 import { PixelSortPass } from "../../utils/GL/passes";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
+import startIcon from "../../assets/Icons/start.png";
+import { createAppManifest } from "../createAppManifest";
+import { createPixortIcon } from "../../utils/appIconFactory";
 import "./Pixort.css";
+
+export const appManifest = createAppManifest({
+  id: "pixort",
+  title: "Pixort",
+  icon: createPixortIcon() || startIcon,
+});
+
 const SORT_METHODS = [
   { value: "Luminance", label: "Luminance" },
   { value: "Hue", label: "Hue" },
@@ -32,24 +42,30 @@ export default function Pixort() {
   const [low, setLow] = useState(0.2);
   const [high, setHigh] = useState(0.8);
 
-  const makePixortPasses = useCallback(
-    (gl, opts) => [
-      new PixelSortPass(gl, {
-        direction: opts.direction,
-        sortBy: opts.sortBy,
-        mode: opts.mode,
-        low: opts.low,
-        high: opts.high,
-      }),
-    ],
+  const defs = useMemo(
+    () => ({
+      [PixelSortPass.def.type]: {
+        ...PixelSortPass.def,
+        Pass: PixelSortPass,
+      },
+    }),
     [],
   );
-
-  const pixortOpts = { direction, sortBy, mode, low, high };
+  const filters = useMemo(
+    () => [
+      {
+        id: "pixort-main",
+        type: PixelSortPass.def.type,
+        enabled: true,
+        opts: { direction, sortBy, mode, low, high },
+      },
+    ],
+    [direction, sortBy, mode, low, high],
+  );
+  const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
   const { loadFile, exportResult } = useProcessMedia(
     canvasRef,
-    makePixortPasses,
-    pixortOpts,
+    mediaConfig,
   );
 
   const handleFileChange = useCallback(

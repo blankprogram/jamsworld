@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import './Taskbar.css';
-import { getAppIcon } from '../../utils/getAppIcon';
 import githubIcon from '../../assets/Icons/github.png';
 import linkedinIcon from '../../assets/Icons/linkedin.png';
 import riskIcon from '../../assets/Icons/risk.png';
 
-const Taskbar = ({ openApps, restoreApplication, minimizeApplication, focusedApp }) => {
+const Taskbar = ({
+  windows,
+  appsById,
+  restoreApplication,
+  minimizeApplication,
+  focusedWindowId,
+}) => {
   const [time, setTime] = useState('');
 
   useEffect(() => {
@@ -24,11 +29,11 @@ const Taskbar = ({ openApps, restoreApplication, minimizeApplication, focusedApp
     return () => clearInterval(intervalId);
   }, []);
 
-  const handleTaskbarClick = (appId) => {
-    if (focusedApp === appId) {
-      minimizeApplication(appId);
+  const handleTaskbarClick = (windowItem) => {
+    if (focusedWindowId === windowItem.id && !windowItem.minimized) {
+      minimizeApplication(windowItem.id);
     } else {
-      restoreApplication(appId);
+      restoreApplication(windowItem.id);
     }
   };
 
@@ -36,16 +41,20 @@ const Taskbar = ({ openApps, restoreApplication, minimizeApplication, focusedApp
     <div className="taskbar">
       <div className="start-button"></div>
       <div className="taskbar-items">
-        {openApps.map(app => (
+        {windows.map((windowItem) => {
+          const app = appsById[windowItem.appId];
+          if (!app) return null;
+          return (
           <div
-            key={app.id}
-            className={`taskbar-item ${focusedApp === app.id ? 'focused-taskbar-item' : ''}`}
-            onClick={() => handleTaskbarClick(app.id)}
+            key={windowItem.id}
+            className={`taskbar-item ${focusedWindowId === windowItem.id && !windowItem.minimized ? 'focused-taskbar-item' : ''}`}
+            onClick={() => handleTaskbarClick(windowItem)}
           >
-            <img src={getAppIcon(app.name)} alt={app.name} className="taskbar-icon" />
-            <span>{app.name}</span>
+            <img src={app.icon} alt={app.title} className="taskbar-icon" />
+            <span>{app.title}</span>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="system-tray">
         <a href="https://github.com/blankprogram" target="_blank" rel="noopener noreferrer">

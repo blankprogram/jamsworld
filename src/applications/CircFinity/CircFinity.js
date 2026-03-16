@@ -1,27 +1,21 @@
+import circIcon from "../../assets/Icons/circ.png";
+import ExternalAppFrame from "../../components/ExternalAppFrame/ExternalAppFrame";
+import { createAppManifest } from "../createAppManifest";
+
+export const appManifest = createAppManifest({
+  id: "circfinity",
+  title: "CircFinity",
+  icon: circIcon,
+});
+
 function Circfinity({ isFocused }) {
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-      }}
-    >
-      <iframe
-        src="https://blankprogram.github.io/circfinity/"
-        title="circfinity"
-        style={{
-          width: "100%",
-          height: "100%",
-          pointerEvents: isFocused ? "auto" : "none",
-          margin: 0,
-          padding: 0,
-          border: "none",
-        }}
-      />
-    </div>
+    <ExternalAppFrame
+      src="https://blankprogram.github.io/circfinity/"
+      title="circfinity"
+      isFocused={isFocused}
+    />
   );
 }
 
 export default Circfinity;
-

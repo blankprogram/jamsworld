@@ -1,25 +1,20 @@
+import minecraftIcon from "../../assets/Icons/minecraft.png";
+import ExternalAppFrame from "../../components/ExternalAppFrame/ExternalAppFrame";
+import { createAppManifest } from "../createAppManifest";
+
+export const appManifest = createAppManifest({
+  id: "minecraft",
+  title: "Minecraft",
+  icon: minecraftIcon,
+});
+
 function Minecraft({ isFocused }) {
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-      }}
-    >
-      <iframe
-        src="https://minecraft-threejs.netlify.app/"
-        title="sim"
-        style={{
-          width: '100%',
-          height: '100%',
-          pointerEvents: isFocused ? 'auto' : 'none',
-          margin: 0,
-          padding: 0,
-          border: 'none',
-        }}
-      />
-    </div>
+    <ExternalAppFrame
+      src="https://minecraft-threejs.netlify.app/"
+      title="sim"
+      isFocused={isFocused}
+    />
   );
 }
 

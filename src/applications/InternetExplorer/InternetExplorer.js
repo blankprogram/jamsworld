@@ -8,6 +8,7 @@ import windowsIcon from '../../assets/Icons/windows.png';
 import searchIcon from '../../assets/Icons/search.png';
 import linksIcon from '../../assets/Icons/share.png';
 import internetIcon from '../../assets/Icons/explorer.png';
+import appInternetExplorerIcon from '../../assets/Icons/internetexplorer.png';
 import noFile from '../../assets/Icons/nofile.png';
 import refreshFile from '../../assets/Icons/refreshfile.png';
 import Home from '../../assets/Icons/home.png';
@@ -17,6 +18,13 @@ import openMail from '../../assets/Icons/openmail.png';
 import Printer from '../../assets/Icons/printer.png';
 import Send from '../../assets/Icons/send.png';
 import Globe from '../../assets/Icons/globe.png';
+import { createAppManifest } from '../createAppManifest';
+
+export const appManifest = createAppManifest({
+  id: "internet-explorer",
+  title: "Internet Explorer",
+  icon: appInternetExplorerIcon,
+});
 
 function InternetExplorer({ isFocused }) {
   // Base URL (your own page without query parameters)

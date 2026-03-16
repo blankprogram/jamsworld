@@ -1,9 +1,18 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { SketchPicker } from "react-color";
 import { AsciiPass } from "../../utils/GL/passes";
 import { loadFonts } from "../../utils/fontUtils";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
+import startIcon from "../../assets/Icons/start.png";
+import { createAppManifest } from "../createAppManifest";
+import { createAsciifyIcon } from "../../utils/appIconFactory";
 import "./Asciify.css";
+
+export const appManifest = createAppManifest({
+  id: "asciify",
+  title: "Asciify",
+  icon: createAsciifyIcon() || startIcon,
+});
 
 export default function Asciify() {
   const canvasRef = useRef(null);
@@ -33,15 +42,54 @@ export default function Asciify() {
     });
   }, []);
 
-  const makeAsciiPasses = useCallback(
-    (gl, opts) => [new AsciiPass(gl, { ...opts, alphaThreshold: 0.5 })],
-    [],
+  const defs = useMemo(
+    () => ({
+      [AsciiPass.def.type]: {
+        ...AsciiPass.def,
+        Pass: AsciiPass,
+        options: AsciiPass.def.options.map((opt) =>
+          opt.name === "font"
+            ? {
+                ...opt,
+                type: "select",
+                options: fonts.length ? fonts : ["Arial"],
+                defaultValue: (fonts.length ? fonts : ["Arial"])[0],
+              }
+            : opt,
+        ),
+      },
+    }),
+    [fonts],
   );
-  const asciiOpts = { chars, fontFamily: font, blockSize, fill, density };
+  const filters = useMemo(
+    () => [
+      {
+        id: "asciify-main",
+        type: AsciiPass.def.type,
+        enabled: true,
+        opts: {
+          blockSize,
+          density,
+          mode: "All",
+          low: 0,
+          high: 1,
+          chars,
+          font,
+          fillMode: "Color",
+          fill,
+          textColorMode: "Sampled",
+          textColor: "#ffffff",
+          overlay: "No",
+          alphaThreshold: 0.5,
+        },
+      },
+    ],
+    [blockSize, density, chars, font, fill],
+  );
+  const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
   const { loadFile, exportResult } = useProcessMedia(
     canvasRef,
-    makeAsciiPasses,
-    asciiOpts,
+    mediaConfig,
   );
 
   const handleFileChange = useCallback(
