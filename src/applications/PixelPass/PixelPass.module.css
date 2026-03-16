@@ -1,11 +1,4 @@
 .mainContainer {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  font-family: Tahoma, sans-serif;
-}
-
-:root {
   --primitive-rgb-gradient-blocky: repeating-linear-gradient(
     to right,
     red 0px,
@@ -15,8 +8,24 @@
     blue 24px,
     blue 36px
   );
-  --filter-item-width: 80%;
+  --pp-shell-bg: #ece9d8;
+  --pp-panel-bg: #b9b6a9;
+  --pp-inner-bg: #d4d0c8;
+  --pp-stage-bg: #f0f0f0;
+  --pp-workspace-bg: #f6f4eb;
+  --pp-border-strong: #999;
+  --pp-border-mid: #808080;
+  --pp-border-soft: #9d9d9d;
+  --pp-accent-primary: #1f4b9a;
+  --pp-accent-danger: #a63b1c;
+  --pp-highlight: #fff;
+  --filter-item-width: 100%;
   --pixelpass-spacing: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  font-family: Tahoma, sans-serif;
 }
 
 .filterStack {
@@ -27,17 +36,120 @@
   min-width: 300px;
   display: flex;
   flex-direction: column;
-  background: #ece9d8;
-  border-right: 2px solid #999;
+  background: var(--pp-shell-bg);
+  border-right: 2px solid var(--pp-border-strong);
+}
+
+.topMenuBar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: #edead8;
+  border-bottom: 1px solid #96abff;
+}
+
+.topMenuButton {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #000;
+  font: inherit;
+  outline: none;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+  min-height: 0;
+}
+
+.topMenuButton:not(.topMenuButtonDisabled):not(:disabled):hover {
+  background: #1660e8;
+  color: #fff;
+  border: 0;
+  box-shadow: none;
+}
+
+.topMenuButtonDisabled,
+.topMenuButton:disabled {
+  color: #666;
+  cursor: default;
+}
+
+.topMenuButtonDisabled:hover,
+.topMenuButton:disabled:hover {
+  background: transparent;
+  color: #666;
+  border: 0;
+  box-shadow: none;
+}
+
+.topMenuButton:focus,
+.topMenuButton:focus-visible,
+.topMenuButton:not(.topMenuButtonDisabled):not(:disabled):active {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+}
+
+.topMenuButtonActive {
+  background: #1660e8;
+  color: #fff;
+  border: 0;
+  box-shadow: none;
+}
+
+.topMenuGroup {
+  position: relative;
+}
+
+.maskMenuDropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  border: 1px solid var(--pp-border-soft);
+  background: var(--pp-inner-bg);
+  padding: 0.45rem;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  box-shadow: 2px 2px 0 #777;
+  min-width: 13.5rem;
+  z-index: 30;
+}
+
+.maskMenuDropdown .xpButton {
+  margin: 0;
+}
+
+.mainWorkspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
 
 .filterStackFixed {
-  background: #b9b6a9;
+  background: var(--pp-panel-bg);
   padding: 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-bottom: 2px solid #999;
+  border-bottom: 2px solid var(--pp-border-strong);
+}
+
+.field {
+  display: none;
 }
 
 .filterStack button {
@@ -49,6 +161,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 0 1rem;
+  box-sizing: border-box;
   overflow-y: auto;
 }
 
@@ -57,7 +171,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #fff;
+  background: var(--pp-workspace-bg);
 }
 
 .imageBox {
@@ -66,15 +180,40 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #f0f0f0;
-  border: 2px solid #999;
+  background: var(--pp-stage-bg);
+  border: 2px solid var(--pp-border-strong);
+}
+
+.imageSurface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.imageViewport {
+  position: absolute;
 }
 
 .image {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
   image-rendering: pixelated;
+}
+
+.maskOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.maskOverlayEnabled {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .filterOptions {
@@ -83,31 +222,43 @@
   box-sizing: border-box;
   margin: 0;
   position: relative;
-  background: #b9b6a9;
-  border: 1px solid #808080;
+  background: var(--pp-panel-bg);
+  border: 1px solid var(--pp-border-mid);
 }
 
 .filterHeader {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
 }
 
 .filterIcons {
+  grid-column: 3;
+  justify-self: end;
   display: flex;
   gap: 0.25rem;
   align-items: center;
 }
 
-.filterHeader .filterTitle {
-  flex: 1 1 auto;
+.filterTitle {
+  grid-column: 2;
+  justify-self: center;
   margin: 0;
   text-align: center;
   font-weight: bold;
   cursor: pointer;
 }
 
-.filterIcons .iconBtn {
+.filterTitleDisabled {
+  cursor: grab;
+}
+
+.filterTitleDisabled:active {
+  cursor: grabbing;
+}
+
+.iconBtn {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -115,16 +266,16 @@
   width: 22px;
   height: 22px;
   margin-right: 1px;
-  border: 1px solid #fff;
+  border: 1px solid var(--pp-highlight);
   border-radius: 3px;
-  box-shadow: inset 0 -1px 2px 1px #4646ff;
+  box-shadow: inset 0 -1px 2px 1px #355fc7;
   background-image: radial-gradient(
     circle at 90% 90%,
-    #0054e9 0%,
-    #2263d5 55%,
-    #4479e4 70%,
-    #a3bbec 90%,
-    white 100%
+    #124fbf 0%,
+    #2e66c9 55%,
+    #4f80d5 70%,
+    #adc4ef 90%,
+    var(--pp-highlight) 100%
   );
   padding: 0;
   font-size: 0.9rem;
@@ -133,34 +284,34 @@
   min-height: 0;
 }
 
-.filterIcons .iconBtn:hover {
+.iconBtn:hover {
   filter: brightness(120%);
 }
 
-.filterIcons .iconBtn:active {
+.iconBtn:active {
   filter: brightness(90%);
 }
 
-.filterIcons .iconBtn.disable {
+.iconBtn.disable {
   opacity: 0.5;
   cursor: default;
   filter: none;
 }
 
-.filterIcons .iconBtn.delete {
-  box-shadow: inset 0 -1px 2px 1px #da4600;
+.iconBtn.delete {
+  box-shadow: inset 0 -1px 2px 1px #b64a22;
   background-image: radial-gradient(
     circle at 90% 90%,
-    #cc4600 0%,
-    #dc6527 55%,
-    #cd7546 70%,
-    #ffccb2 90%,
-    white 100%
+    #a94018 0%,
+    #bf5b35 55%,
+    #ca7a55 70%,
+    #efc4b0 90%,
+    var(--pp-highlight) 100%
   );
 }
 
-.filterIcons .iconBtn.delete::before,
-.filterIcons .iconBtn.delete::after {
+.iconBtn.delete::before,
+.iconBtn.delete::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -170,16 +321,23 @@
   background-color: white;
 }
 
-.filterIcons .iconBtn.delete::before {
+.iconBtn.delete::before {
   transform: translate(-50%, -50%) rotate(45deg);
 }
 
-.filterIcons .iconBtn.delete::after {
+.iconBtn.delete::after {
   transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .filterContent {
   margin-top: var(--pixelpass-spacing);
+  border: 1px solid var(--pp-border-soft);
+  background: var(--pp-inner-bg);
+  padding: 0.45rem;
+}
+
+.filterLabel {
+  width: 100%;
 }
 
 .filterOptions label {
@@ -206,6 +364,10 @@
   gap: 0.5rem;
 }
 
+.rangeInput {
+  flex: 1 1 auto;
+}
+
 .rangeValue {
   width: 3ch;
   text-align: right;
@@ -213,10 +375,19 @@
 }
 
 .filterSelection {
+  width: var(--filter-item-width);
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.25rem;
+  border: 1px solid var(--pp-border-soft);
+  background: var(--pp-inner-bg);
+  padding: 0.45rem;
+}
+
+.filterSelection .xpButton {
+  margin: 0;
 }
 
 .customColors > div {
@@ -271,6 +442,51 @@
   mask-composite: exclude;
   pointer-events: none;
   z-index: 10;
+}
+
+.enabled {
+  background: var(--pp-panel-bg);
+}
+
+.maskButtonsRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.maskButtonActive {
+  box-shadow: inset 0 0 0 1px var(--pp-accent-primary);
+}
+
+.maskTools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.maskToolActive {
+  box-shadow: inset 0 0 0 1px var(--pp-accent-primary);
+}
+
+.maskBrushSize {
+  width: 12rem;
+  max-width: 100%;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.maskBrushSize input[type="range"] {
+  width: 100%;
+}
+
+.maskActions {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 @keyframes scrollSteps {

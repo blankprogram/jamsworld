@@ -1,0 +1,55 @@
+.segmentOutline {
+  fill: none;
+  stroke-dasharray: 0.012 0.01;
+}
+
+.segmentPath {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.eraserOverlay {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.eraserOverlayGroup {
+  opacity: 0.62;
+}
+
+.resizeHandle {
+  fill: #f7f7f4;
+  stroke: #3d3d3d;
+  stroke-width: 0.0026;
+}
+
+.previewLayer {
+  pointer-events: none;
+}
+
+.previewRingOuter {
+  fill: none;
+  stroke: #1f130c;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 3.6;
+  opacity: 0.9;
+}
+
+.previewRingInner {
+  fill: none;
+  stroke: #f5e7db;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.6;
+  stroke-dasharray: 0.012 0.01;
+  opacity: 0.95;
+}
+
+.previewCenter {
+  fill: #7e2811;
+  stroke: #f5e7db;
+  stroke-width: 0.0007;
+  opacity: 0.95;
+}

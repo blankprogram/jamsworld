@@ -191,6 +191,9 @@ export default class GLPipeline {
       width: this._imgSize.width,
       height: this._imgSize.height,
       temp: null,
+      originalTexture: this._inputTexture,
+      originalWidth: this._imgSize.width,
+      originalHeight: this._imgSize.height,
     };
 
     let state = state0;
@@ -208,7 +211,13 @@ export default class GLPipeline {
     };
 
     for (const pass of this.passes) {
-      state = pass.render(gl, state, trackedPool, this.quadVAO);
+      const next = pass.render(gl, state, trackedPool, this.quadVAO);
+      state = {
+        ...next,
+        originalTexture: state.originalTexture,
+        originalWidth: state.originalWidth,
+        originalHeight: state.originalHeight,
+      };
     }
 
     this._setCanvasSize(state.width, state.height);

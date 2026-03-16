@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import GLPipeline from "../utils/GL/GLPipeline";
 import { decodeGIF, encodeGIF } from "../utils/gifUtils";
+import { MaskCompositePass } from "../utils/GL/passes";
 
 function readImageDataFromWebGL(gl, width, height) {
   const pixels = new Uint8Array(width * height * 4);
@@ -77,6 +78,8 @@ function getSupportedVideoMimeType() {
   ];
   return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || null;
 }
+
+const MASK_PASS_ID = "__mask_composite__";
 
 export function useProcessMedia(canvasRef, config, camera) {
   const pipelineRef = useRef(null);
@@ -236,8 +239,11 @@ export function useProcessMedia(canvasRef, config, camera) {
 
     const defs = config?.defs || {};
     const filters = Array.isArray(config?.filters) ? config.filters : [];
+    const maskCfg = config?.mask || null;
+    const hasMask = !!(maskCfg?.enabled && maskCfg?.canvas);
 
     const aliveIds = new Set(filters.map((f) => f?.id).filter(Boolean));
+    if (hasMask) aliveIds.add(MASK_PASS_ID);
     for (const [id, rec] of passCacheRef.current.entries()) {
       if (!aliveIds.has(id)) {
         rec.pass?.destroy?.();
@@ -294,6 +300,43 @@ export function useProcessMedia(canvasRef, config, camera) {
       }
 
       nextPassChain.push(passCacheRef.current.get(f.id).pass);
+    }
+
+    if (hasMask) {
+      const prevRec = passCacheRef.current.get(MASK_PASS_ID) || {
+        type: "MASK",
+        pass: null,
+        optsSnapshot: null,
+      };
+
+      const nextOpts = {
+        canvas: maskCfg.canvas,
+        invert: !!maskCfg.invert,
+        version: Number(maskCfg.version ?? 0),
+      };
+      const changed = diffKeys(prevRec.optsSnapshot || {}, nextOpts);
+
+      if (!prevRec.pass) {
+        const pass = new MaskCompositePass(p.gl, nextOpts);
+        passCacheRef.current.set(MASK_PASS_ID, {
+          type: "MASK",
+          pass,
+          optsSnapshot: nextOpts,
+        });
+      } else if (changed.length) {
+        for (const key of changed) {
+          try {
+            prevRec.pass.setOption?.(key, nextOpts[key]);
+          } catch {}
+        }
+        passCacheRef.current.set(MASK_PASS_ID, {
+          ...prevRec,
+          optsSnapshot: nextOpts,
+        });
+      }
+
+      const maskPass = passCacheRef.current.get(MASK_PASS_ID)?.pass;
+      if (maskPass) nextPassChain.push(maskPass);
     }
 
     p.passes = nextPassChain;
@@ -542,6 +585,7 @@ export function useProcessMedia(canvasRef, config, camera) {
       const defs = config?.defs || {};
       const filters = Array.isArray(config?.filters) ? config.filters : [];
       const enabled = filters.filter((f) => f && f.enabled);
+      const maskCfg = config?.mask || null;
 
       if (
         sourceKindRef.current === "video" ||
@@ -581,6 +625,16 @@ export function useProcessMedia(canvasRef, config, camera) {
           return new def.Pass(exp.gl, { ...f.opts, invalidate: () => {} });
         })
         .filter(Boolean);
+
+      if (maskCfg?.enabled && maskCfg?.canvas) {
+        exp.passes.push(
+          new MaskCompositePass(exp.gl, {
+            canvas: maskCfg.canvas,
+            invert: !!maskCfg.invert,
+            version: Number(maskCfg.version ?? 0),
+          }),
+        );
+      }
 
       const out = frames.map(({ imgData, frameInfo }) => {
         gifCanvas.current.width = imgData.width;
