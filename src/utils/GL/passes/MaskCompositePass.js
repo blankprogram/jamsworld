@@ -1,5 +1,12 @@
 import GLPass from "../GLPass.js";
-import { bindTexture } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 
 const BLACK_PIXEL = new Uint8Array([0, 0, 0, 0]);
 
@@ -109,7 +116,7 @@ export default class MaskCompositePass extends GLPass {
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { texture, width, height, originalTexture } = state;
     if (!texture || !originalTexture) return state;
 
@@ -124,19 +131,17 @@ export default class MaskCompositePass extends GLPass {
     );
     const { fbo, tex } = temp;
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, texture, this.prog.locs.u_texture);
     bindTexture(gl, 1, originalTexture, this.prog.locs.u_original);
     bindTexture(gl, 2, this.maskTexture, this.prog.locs.u_mask);
     this.prog.setUniforms();
 
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return { texture: tex, width, height, temp };

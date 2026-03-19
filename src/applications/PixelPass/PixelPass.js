@@ -4,6 +4,7 @@ import React, {
   useRef,
   useCallback,
   useMemo,
+  useReducer,
 } from "react";
 import { loadFonts } from "../../utils/fontUtils";
 import styles from "./PixelPass.module.css";
@@ -74,6 +75,8 @@ const DEFAULT_CUSTOM_COLORS = [
   "#000000",
 ];
 const INACTIVE_INDEX = -1;
+const HEADER_INTERACTIVE_SELECTOR = "button, input, select, textarea, label, a";
+const MASK_HISTORY_LIMIT = 100;
 const MASK_TOOL_OPTIONS = [
   { id: "select", label: "Select" },
   { id: "rect", label: "Rect" },
@@ -91,6 +94,107 @@ const createOffscreenMaskCanvas = () => {
   if (typeof document === "undefined") return null;
   return document.createElement("canvas");
 };
+
+function isEditableEventTarget(target) {
+  return (
+    target instanceof Element &&
+    !!target.closest("input, textarea, select, [contenteditable='true']")
+  );
+}
+
+function areSegmentListsEqual(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function pushHistory(past, snapshot) {
+  const next = [...past, snapshot];
+  if (next.length > MASK_HISTORY_LIMIT) {
+    return next.slice(next.length - MASK_HISTORY_LIMIT);
+  }
+  return next;
+}
+
+function maskHistoryReducer(state, action) {
+  switch (action.type) {
+    case "start-interaction": {
+      if (state.interactionBase) return state;
+      return {
+        ...state,
+        interactionBase: state.segments,
+      };
+    }
+
+    case "end-interaction": {
+      if (!state.interactionBase) return state;
+      const base = state.interactionBase;
+      if (areSegmentListsEqual(base, state.segments)) {
+        return {
+          ...state,
+          interactionBase: null,
+        };
+      }
+      return {
+        segments: state.segments,
+        past: pushHistory(state.past, base),
+        future: [],
+        interactionBase: null,
+      };
+    }
+
+    case "set": {
+      const nextSegments =
+        typeof action.next === "function"
+          ? action.next(state.segments)
+          : action.next;
+      if (!Array.isArray(nextSegments)) return state;
+      if (areSegmentListsEqual(nextSegments, state.segments)) return state;
+      if (state.interactionBase) {
+        return {
+          ...state,
+          segments: nextSegments,
+        };
+      }
+      return {
+        segments: nextSegments,
+        past: pushHistory(state.past, state.segments),
+        future: [],
+        interactionBase: null,
+      };
+    }
+
+    case "undo": {
+      if (!state.past.length) return state;
+      const previous = state.past[state.past.length - 1];
+      const nextFuture = [state.segments, ...state.future];
+      return {
+        segments: previous,
+        past: state.past.slice(0, -1),
+        future: nextFuture.slice(0, MASK_HISTORY_LIMIT),
+        interactionBase: null,
+      };
+    }
+
+    case "redo": {
+      if (!state.future.length) return state;
+      const [nextSegments, ...remainingFuture] = state.future;
+      return {
+        segments: nextSegments,
+        past: pushHistory(state.past, state.segments),
+        future: remainingFuture,
+        interactionBase: null,
+      };
+    }
+
+    default:
+      return state;
+  }
+}
 
 function shouldHideOption(filter, optionName) {
   if (
@@ -439,6 +543,7 @@ const FilterOptions = React.memo(function FilterOptions({
   onSwapLeave,
 }) {
   const ref = useRef(null);
+  const headerRef = useRef(null);
   const cfg = filter ? defs[filter.type] : null;
   const visibleOptions = useMemo(() => {
     if (!cfg) return [];
@@ -455,6 +560,20 @@ const FilterOptions = React.memo(function FilterOptions({
     });
   }, [cfg, filter]);
   const canToggleOpen = visibleOptions.length > 0;
+  const handleHeaderClick = useCallback(
+    (e) => {
+      if (!canToggleOpen) return;
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest(HEADER_INTERACTIVE_SELECTOR)
+      ) {
+        return;
+      }
+      toggleFilter(index);
+    },
+    [canToggleOpen, index, toggleFilter],
+  );
 
   useEffect(() => {
     const el = ref.current;
@@ -462,7 +581,7 @@ const FilterOptions = React.memo(function FilterOptions({
 
     const cleanup = draggable({
       element: el,
-      dragHandle: el.querySelector(`.${styles.filterTitle}`),
+      dragHandle: headerRef.current || el,
       getInitialData: () => ({ index }),
     });
 
@@ -492,10 +611,13 @@ const FilterOptions = React.memo(function FilterOptions({
       ref={ref}
       className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""} ${swapActive ? styles.swapActive : ""}`}
     >
-      <div className={styles.filterHeader}>
+      <div
+        ref={headerRef}
+        className={styles.filterHeader}
+        onClick={handleHeaderClick}
+      >
         <h4
           className={`${styles.filterTitle} ${!canToggleOpen ? styles.filterTitleDisabled : ""}`}
-          onClick={canToggleOpen ? () => toggleFilter(index) : undefined}
         >
           {cfg.title}
         </h4>
@@ -755,9 +877,37 @@ function useMaskState() {
   const [maskShowOutlines, setMaskShowOutlines] = useState(true);
   const [maskTool, setMaskTool] = useState("draw");
   const [maskBrushSize, setMaskBrushSize] = useState(24);
-  const [maskSegments, setMaskSegments] = useState([]);
+  const [maskHistory, dispatchMaskHistory] = useReducer(maskHistoryReducer, {
+    segments: [],
+    past: [],
+    future: [],
+    interactionBase: null,
+  });
+  const maskSegments = maskHistory.segments;
+  const setMaskSegments = useCallback(
+    (next) => dispatchMaskHistory({ type: "set", next }),
+    [],
+  );
   const [selectedMaskSegmentId, setSelectedMaskSegmentId] = useState(null);
   const [maskVersion, setMaskVersion] = useState(0);
+  const canUndoMask = maskHistory.past.length > 0;
+  const canRedoMask = maskHistory.future.length > 0;
+  const undoMask = useCallback(
+    () => dispatchMaskHistory({ type: "undo" }),
+    [],
+  );
+  const redoMask = useCallback(
+    () => dispatchMaskHistory({ type: "redo" }),
+    [],
+  );
+  const startMaskInteraction = useCallback(
+    () => dispatchMaskHistory({ type: "start-interaction" }),
+    [],
+  );
+  const endMaskInteraction = useCallback(
+    () => dispatchMaskHistory({ type: "end-interaction" }),
+    [],
+  );
 
   useEffect(() => {
     if (!maskEnabled) setSelectedMaskSegmentId(null);
@@ -775,12 +925,12 @@ function useMaskState() {
       prev.filter((segment) => segment.id !== selectedMaskSegmentId),
     );
     setSelectedMaskSegmentId(null);
-  }, [selectedMaskSegmentId]);
+  }, [selectedMaskSegmentId, setMaskSegments]);
 
   const clearMask = useCallback(() => {
-    setMaskSegments([]);
+    setMaskSegments(() => []);
     setSelectedMaskSegmentId(null);
-  }, []);
+  }, [setMaskSegments]);
 
   return {
     showMaskSettings,
@@ -801,6 +951,12 @@ function useMaskState() {
     setSelectedMaskSegmentId,
     maskVersion,
     setMaskVersion,
+    canUndoMask,
+    canRedoMask,
+    undoMask,
+    redoMask,
+    startMaskInteraction,
+    endMaskInteraction,
     removeSelectedMaskSegment,
     clearMask,
   };
@@ -974,6 +1130,12 @@ export default function PixelPass() {
     setSelectedMaskSegmentId,
     maskVersion,
     setMaskVersion,
+    canUndoMask,
+    canRedoMask,
+    undoMask,
+    redoMask,
+    startMaskInteraction,
+    endMaskInteraction,
     removeSelectedMaskSegment,
     clearMask,
   } = useMaskState();
@@ -1029,6 +1191,26 @@ export default function PixelPass() {
     contentSize,
     setMaskVersion,
   );
+
+  useEffect(() => {
+    const handleMaskHistoryKeydown = (event) => {
+      if (!maskEnabled) return;
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (isEditableEventTarget(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = key === "y" || (key === "z" && event.shiftKey);
+      if (!isUndo && !isRedo) return;
+
+      event.preventDefault();
+      if (isUndo) undoMask();
+      else redoMask();
+    };
+
+    window.addEventListener("keydown", handleMaskHistoryKeydown);
+    return () => window.removeEventListener("keydown", handleMaskHistoryKeydown);
+  }, [maskEnabled, undoMask, redoMask]);
 
   const imageViewportStyle = useMemo(() => {
     const sw = surfaceSize.width;
@@ -1160,6 +1342,22 @@ export default function PixelPass() {
                 <button
                   type="button"
                   className="xpButton"
+                  disabled={!maskEnabled || !canUndoMask}
+                  onClick={undoMask}
+                >
+                  Undo Mask
+                </button>
+                <button
+                  type="button"
+                  className="xpButton"
+                  disabled={!maskEnabled || !canRedoMask}
+                  onClick={redoMask}
+                >
+                  Redo Mask
+                </button>
+                <button
+                  type="button"
+                  className="xpButton"
                   disabled={!maskEnabled || !selectedMaskSegmentId}
                   onClick={removeSelectedMaskSegment}
                 >
@@ -1263,6 +1461,8 @@ export default function PixelPass() {
                   segments={maskSegments}
                   selectedSegmentId={selectedMaskSegmentId}
                   onSegmentsChange={setMaskSegments}
+                  onInteractionStart={startMaskInteraction}
+                  onInteractionEnd={endMaskInteraction}
                   onSelectSegment={setSelectedMaskSegmentId}
                   className={styles.maskOverlay}
                   enabledClassName={styles.maskOverlayEnabled}

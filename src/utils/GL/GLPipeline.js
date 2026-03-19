@@ -1,6 +1,15 @@
 import FBOPool from "./FBOPool";
 import ShaderProgram from "./ShaderProgram";
-import { bindTexture } from "./helpers";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  createGLStateCache,
+  resetGLStateCache,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "./helpers";
 
 export const SIMPLE_QUAD_VS = `#version 300 es
 precision highp float;
@@ -46,6 +55,7 @@ export default class GLPipeline {
     this._inputTexture = null;
     this._imgSize = { width: 0, height: 0 };
     this._lastTemp = null;
+    this._renderState = createGLStateCache();
   }
 
   use(pass) {
@@ -185,6 +195,7 @@ export default class GLPipeline {
 
   renderFrame() {
     const gl = this.gl;
+    resetGLStateCache(this._renderState);
 
     const state0 = {
       texture: this._inputTexture,
@@ -202,8 +213,8 @@ export default class GLPipeline {
     const allTemps = [];
 
     const trackedPool = {
-      getTemp: (w, h) => {
-        const temp = pool.getTemp(w, h);
+      getTemp: (w, h, exclude) => {
+        const temp = pool.getTemp(w, h, exclude);
         allTemps.push(temp);
         return temp;
       },
@@ -211,7 +222,13 @@ export default class GLPipeline {
     };
 
     for (const pass of this.passes) {
-      const next = pass.render(gl, state, trackedPool, this.quadVAO);
+      const next = pass.render(
+        gl,
+        state,
+        trackedPool,
+        this.quadVAO,
+        this._renderState,
+      );
       state = {
         ...next,
         originalTexture: state.originalTexture,
@@ -221,7 +238,7 @@ export default class GLPipeline {
     }
 
     this._setCanvasSize(state.width, state.height);
-    this._blitToScreen(state);
+    this._blitToScreen(state, this._renderState);
 
     if (this._lastTemp && this._lastTemp !== state.temp) {
       pool.returnTemp(this._lastTemp);
@@ -235,18 +252,16 @@ export default class GLPipeline {
     return state;
   }
 
-  _blitToScreen({ texture }) {
+  _blitToScreen({ texture }, glState) {
     const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    bindFramebufferCached(gl, null, glState);
+    setViewportCached(gl, 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, glState);
 
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.copyProg.use();
+    setProgramCached(gl, this.copyProg.prog, glState);
     bindTexture(gl, 0, texture, this.copyProg.locs.u_texture);
-    gl.bindVertexArray(this.quadVAO);
+    bindVertexArrayCached(gl, this.quadVAO, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 

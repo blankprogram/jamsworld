@@ -1,6 +1,13 @@
 import GLPass from "../GLPass.js";
 import GaussianBlurPass from "./GaussianBlurPass.js";
-import { bindTexture } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 
 export class LabConvertPass extends GLPass {
   static def = {
@@ -104,22 +111,20 @@ export class XDoGThresholdPass extends GLPass {
     this[name] = parseFloat(value);
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { texture, texture2, width, height } = state;
     const out = pool.getTemp(width, height);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, out.fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, texture, this.prog.locs.u_texture);
     bindTexture(gl, 1, texture2, this.prog.locs.u_texture2);
     this.prog.setUniforms(state);
 
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return {
@@ -189,18 +194,17 @@ export class StructureTensorPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { width, height, texture } = state;
 
     const raw = pool.getTemp(width, height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, raw.fbo);
-    gl.viewport(0, 0, width, height);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, raw.fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, texture, this.prog.locs.u_texture);
     this.prog.setUniforms(state);
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     const blurred = this._blur.render(
@@ -208,6 +212,7 @@ export class StructureTensorPass extends GLPass {
       { texture: raw.tex, width, height },
       pool,
       vao,
+      glState,
     );
 
     return blurred;
@@ -317,20 +322,19 @@ export class FlowAlignedBlurPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { texture: srcTex, directionTex, width, height } = state;
     const pass = pool.getTemp(width, height);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, pass.fbo);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.BLEND);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, pass.fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, srcTex, this.prog.locs.u_texture);
     bindTexture(gl, 1, directionTex, this.prog.locs.u_directionTex);
     this.prog.setUniforms(state);
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return { texture: pass.tex, width, height, temp: pass };
@@ -516,18 +520,25 @@ export default class XDoGPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { texture, width, height } = state;
 
-    const blurC = this._blurC.render(gl, { texture, width, height }, pool, vao);
+    const blurC = this._blurC.render(
+      gl,
+      { texture, width, height },
+      pool,
+      vao,
+      glState,
+    );
 
-    const tensor = this._tensor.render(gl, blurC, pool, vao);
+    const tensor = this._tensor.render(gl, blurC, pool, vao, glState);
 
     const direction = this._orientation.render(
       gl,
       { texture: tensor.texture, width, height },
       pool,
       vao,
+      glState,
     );
 
     const flowInput = {
@@ -536,14 +547,15 @@ export default class XDoGPass extends GLPass {
       width,
       height,
     };
-    const blurE1 = this._blurE1.render(gl, flowInput, pool, vao);
-    const blurE2 = this._blurE2.render(gl, flowInput, pool, vao);
+    const blurE1 = this._blurE1.render(gl, flowInput, pool, vao, glState);
+    const blurE2 = this._blurE2.render(gl, flowInput, pool, vao, glState);
 
     const thresh = this._thresh.render(
       gl,
       { texture: blurE1.texture, texture2: blurE2.texture, width, height },
       pool,
       vao,
+      glState,
     );
 
     const blurM = this._blurM.render(
@@ -556,6 +568,7 @@ export default class XDoGPass extends GLPass {
       },
       pool,
       vao,
+      glState,
     );
 
     const blurA = this._blurA.render(
@@ -563,12 +576,14 @@ export default class XDoGPass extends GLPass {
       { texture: blurM.texture, width, height },
       pool,
       vao,
+      glState,
     );
 
     return { texture: blurA.texture, width, height, temp: blurA.temp };
   }
 
   destroy() {
+    super.destroy();
     this._blurC?.destroy?.();
     this._tensor?.destroy?.();
     this._orientation?.destroy?.();

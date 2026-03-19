@@ -4,6 +4,7 @@ export default class ShaderProgram {
     this.prog = this._createProgram(vsSrc, fsSrc);
     this.uniformDefs = uniforms;
     this.locs = this._getUniformLocations();
+    this.uniformCache = new Map();
   }
 
   use() {
@@ -23,6 +24,8 @@ export default class ShaderProgram {
         console.warn(`Uniform ${u.name} has undefined value`);
         continue;
       }
+
+      if (!this._shouldUpdateUniform(u.name, val)) continue;
 
       switch (u.type) {
         case "1f":
@@ -59,11 +62,43 @@ export default class ShaderProgram {
           console.warn(`Unknown uniform type: ${u.type}`);
           break;
       }
+
+      this.uniformCache.set(u.name, this._cloneUniformValue(val));
     }
   }
 
   destroy() {
+    this.uniformCache.clear();
     this.gl.deleteProgram(this.prog);
+  }
+
+  _cloneUniformValue(value) {
+    if (Array.isArray(value)) return value.slice();
+    if (ArrayBuffer.isView(value)) return Array.from(value);
+    return value;
+  }
+
+  _uniformValuesEqual(a, b) {
+    if (Object.is(a, b)) return true;
+
+    const aArr = Array.isArray(a) || ArrayBuffer.isView(a);
+    const bArr = Array.isArray(b) || ArrayBuffer.isView(b);
+    if (aArr && bArr) {
+      const lenA = a.length;
+      const lenB = b.length;
+      if (lenA !== lenB) return false;
+      for (let i = 0; i < lenA; i++) {
+        if (!Object.is(a[i], b[i])) return false;
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  _shouldUpdateUniform(name, nextValue) {
+    if (!this.uniformCache.has(name)) return true;
+    return !this._uniformValuesEqual(this.uniformCache.get(name), nextValue);
   }
 
   _getUniformLocations() {

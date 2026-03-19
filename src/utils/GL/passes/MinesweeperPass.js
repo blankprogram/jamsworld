@@ -1,5 +1,12 @@
 import GLPass from "../GLPass.js";
-import { bindTexture } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 import atlasUrl from "../../../assets/atlas/minesweeper.png";
 
 let _atlasImg = null;
@@ -176,7 +183,7 @@ export default class MinesweeperPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const cellSize = Math.max(1, this.blockSize);
 
     const cols = Math.max(1, Math.floor(state.width / cellSize));
@@ -187,19 +194,18 @@ export default class MinesweeperPass extends GLPass {
       { texture: state.texture, width: cols, height: rows },
       pool,
       vao,
+      glState,
     );
 
     const outW = state.width;
     const outH = state.height;
     const out = pool.getTemp(outW, outH);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
-    gl.viewport(0, 0, outW, outH);
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, out.fbo, glState);
+    setViewportCached(gl, 0, 0, outW, outH, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, downState.texture, this.prog.locs.u_texture);
     bindTexture(
       gl,
@@ -214,7 +220,7 @@ export default class MinesweeperPass extends GLPass {
       { texture: out.tex, width: outW, height: outH },
     );
 
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return { texture: out.tex, width: outW, height: outH, temp: out };
@@ -222,9 +228,12 @@ export default class MinesweeperPass extends GLPass {
 
   destroy() {
     this._destroyed = true;
-    this.prog.destroy();
+    super.destroy();
     this.downPass.destroy();
-    if (this.atlasTex) this.gl.deleteTexture(this.atlasTex);
+    if (this.atlasTex) {
+      this.gl.deleteTexture(this.atlasTex);
+      this.atlasTex = null;
+    }
   }
 }
 

@@ -231,6 +231,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
+  cursor: grab;
+}
+
+.filterHeader:active {
+  cursor: grabbing;
 }
 
 .filterIcons {
@@ -247,15 +252,15 @@
   margin: 0;
   text-align: center;
   font-weight: bold;
-  cursor: pointer;
+  cursor: inherit;
 }
 
 .filterTitleDisabled {
-  cursor: grab;
+  cursor: inherit;
 }
 
 .filterTitleDisabled:active {
-  cursor: grabbing;
+  cursor: inherit;
 }
 
 .iconBtn {

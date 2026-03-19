@@ -1,5 +1,24 @@
 import GLPass from "../GLPass.js";
-import { bindTexture } from "../helpers.js";
+import ShaderProgram from "../ShaderProgram.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
+
+const QUAD_VS = `#version 300 es
+precision highp float;
+void main() {
+  vec2 pos = vec2(
+    float((gl_VertexID << 1) & 2),
+    float(gl_VertexID & 2)
+  );
+  gl_Position = vec4(pos * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
 
 export default class PixelSortPass extends GLPass {
   static def = {
@@ -53,11 +72,9 @@ export default class PixelSortPass extends GLPass {
     structuralKeys: ["mode", "sortBy", "direction"],
     uniformKeys: [
       "u_texture",
-      "u_sortBy",
       "u_sortVec",
       "u_width",
       "u_height",
-      "u_mode",
       "u_low",
       "u_high",
       "u_pass",
@@ -65,32 +82,39 @@ export default class PixelSortPass extends GLPass {
     ],
   };
 
+  static UNIFORMS = [
+    { name: "u_texture", type: "1i", value: 0 },
+    { name: "u_sortVec", type: "2f", value: ({ sortVec }) => sortVec },
+    { name: "u_width", type: "1i", value: ({ width }) => width },
+    { name: "u_height", type: "1i", value: ({ height }) => height },
+    { name: "u_low", type: "1f", value: ({ low }) => low },
+    { name: "u_high", type: "1f", value: ({ high }) => high },
+    { name: "u_pass", type: "1i", value: ({ pass }) => pass },
+    { name: "u_reverse", type: "1i", value: ({ reverse }) => reverse },
+  ];
+
   constructor(gl, opts = {}) {
-    super(gl, PixelSortPass.FS, [
-      { name: "u_texture", type: "1i", value: 0 },
-      { name: "u_sortBy", type: "1i", value: () => this.sortByIndex },
-      { name: "u_sortVec", type: "2f", value: () => this.sortVec },
-      { name: "u_width", type: "1i", value: ({ width }) => width },
-      { name: "u_height", type: "1i", value: ({ height }) => height },
-      {
-        name: "u_mode",
-        type: "1i",
-        value: () => (this.mode === "Threshold" ? 1 : 0),
-      },
-      { name: "u_low", type: "1f", value: () => this.low },
-      { name: "u_high", type: "1f", value: () => this.high },
-      { name: "u_pass", type: "1i", value: () => this.pass },
-      { name: "u_reverse", type: "1i", value: () => this.reverse },
-    ]);
-    this.mode = opts.mode || "Fully Sorted";
+    const mode = opts.mode || "Fully Sorted";
+    const sortBy = opts.sortBy || "Luminance";
+    const sortByIndex = PixelSortPass.indexMap[sortBy] ?? 0;
+    super(
+      gl,
+      PixelSortPass.buildFragmentSource(mode, sortByIndex),
+      PixelSortPass.UNIFORMS,
+    );
+
+    this.mode = mode;
     this.low = opts.low ?? 0.2;
     this.high = opts.high ?? 0.8;
-    this.sortBy = opts.sortBy || "Luminance";
+    this.sortBy = sortBy;
     this.direction = opts.direction || "Down";
-    this.sortByIndex = PixelSortPass.indexMap[this.sortBy];
+    this.sortByIndex = sortByIndex;
     this.sortVec = PixelSortPass.dirMap[this.direction].vec;
     this.reverse = PixelSortPass.dirMap[this.direction].reverse ? 1 : 0;
     this.pass = 0;
+
+    this.programCache = new Map();
+    this.programCache.set(this._programKey(), this.prog);
   }
 
   setOption(name, value) {
@@ -107,38 +131,61 @@ export default class PixelSortPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  _programKey() {
+    return `${this.mode}:${this.sortByIndex}`;
+  }
+
+  _getProgram() {
+    const key = this._programKey();
+    const cached = this.programCache.get(key);
+    if (cached) return cached;
+
+    const program = new ShaderProgram(
+      this.gl,
+      QUAD_VS,
+      PixelSortPass.buildFragmentSource(this.mode, this.sortByIndex),
+      PixelSortPass.UNIFORMS,
+    );
+    this.programCache.set(key, program);
+    return program;
+  }
+
+  render(gl, state, pool, vao, glState) {
     const { texture, width, height } = state;
     const vertical = Math.abs(this.sortVec[1]) > Math.abs(this.sortVec[0]);
     const spanLength = vertical ? height : width;
-    const passes = spanLength;
+    if (spanLength <= 1) return state;
 
+    let passes = spanLength;
+    if (this.mode === "Threshold") {
+      if (this.low >= this.high) return state;
+    }
+
+    const prog = this._getProgram();
     let src = { texture, width, height };
     const pair = pool.getPair(width, height);
+    setBlendEnabledCached(gl, false, glState);
 
     for (let i = 0; i < passes; ++i) {
       this.pass = i;
       const dst = pair.next();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
-      gl.viewport(0, 0, width, height);
-      gl.disable(gl.BLEND);
+      bindFramebufferCached(gl, dst.fbo, glState);
+      setViewportCached(gl, 0, 0, width, height, glState);
+      setProgramCached(gl, prog.prog, glState);
+      bindVertexArrayCached(gl, vao, glState);
 
-      this.prog.use();
-      bindTexture(gl, 0, src.texture, this.prog.locs.u_texture);
-      this.prog.setUniforms({
+      bindTexture(gl, 0, src.texture, prog.locs.u_texture);
+      prog.setUniforms({
         texture: 0,
-        sortBy: this.sortByIndex,
         sortVec: this.sortVec,
         width,
         height,
-        mode: this.mode === "Threshold" ? 1 : 0,
         low: this.low,
         high: this.high,
         pass: i,
         reverse: this.reverse,
       });
 
-      gl.bindVertexArray(vao);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       src = { texture: dst.tex, width, height };
@@ -147,79 +194,37 @@ export default class PixelSortPass extends GLPass {
     return src;
   }
 
-  static indexMap = {
-    Luminance: 0,
-    Hue: 1,
-    Saturation: 2,
-    "RGB Average": 3,
-    Red: 4,
-    Green: 5,
-    Blue: 6,
-  };
+  static buildFragmentSource(mode, sortByIndex) {
+    const keySource = PixelSortPass.getKeySource(sortByIndex);
+    const thresholdSource =
+      mode === "Threshold"
+        ? `
+uniform float u_low;
+uniform float u_high;
 
-  static dirMap = {
-    Up: { vec: [0, -1], reverse: 1 },
-    Down: { vec: [0, 1], reverse: 0 },
-    Left: { vec: [-1, 0], reverse: 1 },
-    Right: { vec: [1, 0], reverse: 0 },
-  };
+bool inSpan(float key) {
+    return key >= u_low && key <= u_high;
 }
-PixelSortPass.FS = `#version 300 es
-precision highp float;
+`
+        : `
+bool inSpan(float key) {
+    return true;
+}
+`;
 
-in vec2 v_uv;
+    return `#version 300 es
+precision highp float;
 
 uniform sampler2D u_texture;
 uniform vec2 u_sortVec;
-uniform int u_sortBy;
 uniform int u_width;
 uniform int u_height;
-uniform int u_mode;
-uniform float u_low;
-uniform float u_high;
 uniform int u_pass;
 uniform int u_reverse;
-
+${thresholdSource}
 out vec4 outColor;
 
-vec3 rgb2hsl(vec3 c) {
-    float maxC = max(c.r, max(c.g, c.b));
-    float minC = min(c.r, min(c.g, c.b));
-    float delta = maxC - minC;
-    float h = 0.0;
-
-    if (delta > 0.0) {
-        if (maxC == c.r)
-            h = mod((c.g - c.b) / delta, 6.0);
-        else if (maxC == c.g)
-            h = (c.b - c.r) / delta + 2.0;
-        else
-            h = (c.r - c.g) / delta + 4.0;
-        h /= 6.0;
-        if (h < 0.0) h += 1.0;
-    }
-
-    float l = 0.5 * (maxC + minC);
-    float s = delta == 0.0 ? 0.0 : delta / (1.0 - abs(2.0 * l - 1.0));
-    return vec3(h, s, l);
-}
-
-float getKey(vec3 c) {
-    vec3 hsl = rgb2hsl(c);
-    if (u_sortBy == 0) return hsl.z;
-    if (u_sortBy == 1) return hsl.x;
-    if (u_sortBy == 2) return hsl.y;
-    if (u_sortBy == 3) return (c.r + c.g + c.b) / 3.0;
-    if (u_sortBy == 4) return c.r;
-    if (u_sortBy == 5) return c.g;
-    if (u_sortBy == 6) return c.b;
-    return hsl.z;
-}
-
-bool inSpan(float key) {
-    if (u_mode == 0) return true;
-    return key >= u_low && key <= u_high;
-}
+${keySource}
 
 void main() {
     ivec2 coord = ivec2(gl_FragCoord.xy);
@@ -257,3 +262,87 @@ void main() {
     outColor = shouldSwap ? neighbor : self;
 }
 `;
+  }
+
+  static getKeySource(sortByIndex) {
+    switch (sortByIndex) {
+      case 1:
+        return `float getKey(vec3 c) {
+    float maxC = max(c.r, max(c.g, c.b));
+    float minC = min(c.r, min(c.g, c.b));
+    float delta = maxC - minC;
+    float h = 0.0;
+
+    if (delta > 0.0) {
+        if (maxC == c.r)
+            h = mod((c.g - c.b) / delta, 6.0);
+        else if (maxC == c.g)
+            h = (c.b - c.r) / delta + 2.0;
+        else
+            h = (c.r - c.g) / delta + 4.0;
+        h /= 6.0;
+        if (h < 0.0) h += 1.0;
+    }
+
+    return h;
+}`;
+      case 2:
+        return `float getKey(vec3 c) {
+    float maxC = max(c.r, max(c.g, c.b));
+    float minC = min(c.r, min(c.g, c.b));
+    float delta = maxC - minC;
+    float l = 0.5 * (maxC + minC);
+    return delta == 0.0 ? 0.0 : delta / (1.0 - abs(2.0 * l - 1.0));
+}`;
+      case 3:
+        return `float getKey(vec3 c) {
+    return (c.r + c.g + c.b) / 3.0;
+}`;
+      case 4:
+        return `float getKey(vec3 c) {
+    return c.r;
+}`;
+      case 5:
+        return `float getKey(vec3 c) {
+    return c.g;
+}`;
+      case 6:
+        return `float getKey(vec3 c) {
+    return c.b;
+}`;
+      case 0:
+      default:
+        return `float getKey(vec3 c) {
+    float maxC = max(c.r, max(c.g, c.b));
+    float minC = min(c.r, min(c.g, c.b));
+    return 0.5 * (maxC + minC);
+}`;
+    }
+  }
+
+  static indexMap = {
+    Luminance: 0,
+    Hue: 1,
+    Saturation: 2,
+    "RGB Average": 3,
+    Red: 4,
+    Green: 5,
+    Blue: 6,
+  };
+
+  static dirMap = {
+    Up: { vec: [0, -1], reverse: 1 },
+    Down: { vec: [0, 1], reverse: 0 },
+    Left: { vec: [-1, 0], reverse: 1 },
+    Right: { vec: [1, 0], reverse: 0 },
+  };
+
+  destroy() {
+    const uniquePrograms = new Set(this.programCache.values());
+    for (const program of uniquePrograms) {
+      program.destroy();
+    }
+    this.programCache.clear();
+    this.prog = null;
+  }
+}

@@ -1,6 +1,13 @@
 import GLPass from "../GLPass.js";
 
-import { bindTexture } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 
 export default class GaussianBlurPass extends GLPass {
   static def = {
@@ -56,25 +63,23 @@ export default class GaussianBlurPass extends GLPass {
     this.radius = Math.ceil(2 * this.sigma);
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const { texture: srcTex, width, height } = state;
 
     const passH = pool.getTemp(width, height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, passH.fbo);
-    gl.viewport(0, 0, width, height);
-    gl.disable(gl.BLEND);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, passH.fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, srcTex, this.prog.locs.u_texture);
     this.prog.setUniforms(state, { u_direction: [1, 0] });
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     const passV = pool.getTemp(width, height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, passV.fbo);
-    gl.viewport(0, 0, width, height);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, passV.fbo, glState);
+    setViewportCached(gl, 0, 0, width, height, glState);
 
     bindTexture(gl, 0, passH.tex, this.prog.locs.u_texture);
     this.prog.setUniforms(state, { u_direction: [0, 1] });

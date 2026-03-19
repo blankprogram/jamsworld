@@ -307,6 +307,8 @@ function MaskEditor({
   segments,
   selectedSegmentId,
   onSegmentsChange,
+  onInteractionStart,
+  onInteractionEnd,
   onSelectSegment,
   className,
   enabledClassName,
@@ -450,6 +452,7 @@ function MaskEditor({
           erasers: [],
         };
 
+        onInteractionStart?.();
         onSegmentsChange((prev) => [...prev, polygon]);
         onSelectSegment(segmentId);
         interactionRef.current = { mode: "draw-polygon", segmentId, pointerId };
@@ -480,6 +483,7 @@ function MaskEditor({
           points: [{ x: point.x, y: point.y }],
         };
 
+        onInteractionStart?.();
         updateSegment(targetShape.id, (segment) => ({
           ...segment,
           erasers: [...(segment.erasers || []), eraserStroke],
@@ -507,6 +511,7 @@ function MaskEditor({
           erasers: [],
         };
 
+        onInteractionStart?.();
         onSegmentsChange((prev) => [...prev, shape]);
         onSelectSegment(segmentId);
         interactionRef.current = {
@@ -536,6 +541,7 @@ function MaskEditor({
               h: selectedShape.h,
             },
           };
+          onInteractionStart?.();
           return;
         }
       }
@@ -570,6 +576,7 @@ function MaskEditor({
         originErasers: cloneEraserStrokes(hit.erasers),
         origin: { x: hit.x, y: hit.y, w: hit.w, h: hit.h },
       };
+      onInteractionStart?.();
     },
     [
       enabled,
@@ -583,6 +590,7 @@ function MaskEditor({
       segments,
       selectedSegmentId,
       showOutlines,
+      onInteractionStart,
     ],
   );
 
@@ -780,14 +788,23 @@ function MaskEditor({
       }
 
       interactionRef.current = null;
+      onInteractionEnd?.();
     },
-    [segments, removeSegment, updateSegment],
+    [segments, removeSegment, updateSegment, onInteractionEnd],
   );
 
   const handlePointerLeave = useCallback(() => {
     lastHoverPointRef.current = null;
     setEraserPreview(null);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (!interactionRef.current) return;
+      interactionRef.current = null;
+      onInteractionEnd?.();
+    };
+  }, [onInteractionEnd]);
 
   const selectedSegment = segments.find((segment) => segment.id === selectedSegmentId);
 

@@ -1,5 +1,13 @@
 import GLPass from "../GLPass.js";
-import { bindTexture, hexToRgbArray } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  hexToRgbArray,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 import { generateFontAtlasTexture } from "../../fontUtils.js";
 
 export default class AsciiPass extends GLPass {
@@ -250,7 +258,7 @@ export default class AsciiPass extends GLPass {
     }
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const cellSize = Math.max(1, this.blockSize / this.density);
 
     const cols = Math.max(1, Math.floor(state.width / cellSize));
@@ -261,19 +269,18 @@ export default class AsciiPass extends GLPass {
       { texture: state.texture, width: cols, height: rows },
       pool,
       vao,
+      glState,
     );
 
     const outW = state.width;
     const outH = state.height;
     const out = pool.getTemp(outW, outH);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
-    gl.viewport(0, 0, outW, outH);
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, out.fbo, glState);
+    setViewportCached(gl, 0, 0, outW, outH, glState);
+    setBlendEnabledCached(gl, false, glState);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, downState.texture, this.prog.locs.u_texture);
     bindTexture(gl, 1, this.atlas, this.prog.locs.u_fontAtlas);
     bindTexture(gl, 2, state.texture, this.prog.locs.u_background);
@@ -283,7 +290,7 @@ export default class AsciiPass extends GLPass {
       { texture: out.tex, width: outW, height: outH },
     );
 
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return {
@@ -295,9 +302,12 @@ export default class AsciiPass extends GLPass {
   }
 
   destroy() {
-    this.prog.destroy();
+    super.destroy();
     this.downPass.destroy();
-    this.gl.deleteTexture(this.atlas);
+    if (this.atlas) {
+      this.gl.deleteTexture(this.atlas);
+      this.atlas = null;
+    }
   }
 }
 

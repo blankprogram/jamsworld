@@ -1,5 +1,13 @@
 import GLPass from "../GLPass.js";
-import { bindTexture } from "../helpers.js";
+import {
+  bindFramebufferCached,
+  bindTexture,
+  bindVertexArrayCached,
+  cacheTextureFilterState,
+  setBlendEnabledCached,
+  setViewportCached,
+  setProgramCached,
+} from "../helpers.js";
 
 export default class ScalePass extends GLPass {
   static def = {
@@ -55,6 +63,7 @@ export default class ScalePass extends GLPass {
     this.scaleY = Number(opts.scaleY ?? 1);
     this.filter = opts.filter || "Nearest";
     this.uniform = opts.uniform || "Yes";
+    this._filterCache = new WeakMap();
   }
 
   setOption(name, value) {
@@ -65,7 +74,7 @@ export default class ScalePass extends GLPass {
     else if (name === "uniform") this.uniform = value;
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     const sx = this.uniform === "Yes" ? this.scale : this.scaleX;
     const sy = this.uniform === "Yes" ? this.scale : this.scaleY;
 
@@ -73,33 +82,33 @@ export default class ScalePass extends GLPass {
     const outH = Math.max(1, Math.round(state.height * sy));
     const out = pool.getTemp(outW, outH, new Set([state.texture]));
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fbo);
-    gl.viewport(0, 0, outW, outH);
-    gl.disable(gl.BLEND);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    bindFramebufferCached(gl, out.fbo, glState);
+    setViewportCached(gl, 0, 0, outW, outH, glState);
+    setBlendEnabledCached(gl, false, glState);
 
+    const minFilter = this.filter === "Nearest" ? gl.NEAREST : gl.LINEAR;
+    const magFilter = minFilter;
+    const filterStateChanged = cacheTextureFilterState(
+      { textureFilterCache: this._filterCache },
+      state.texture,
+      minFilter,
+      magFilter,
+    );
     gl.bindTexture(gl.TEXTURE_2D, state.texture);
-    gl.texParameteri(
-      gl.TEXTURE_2D,
-      gl.TEXTURE_MIN_FILTER,
-      this.filter === "Nearest" ? gl.NEAREST : gl.LINEAR,
-    );
-    gl.texParameteri(
-      gl.TEXTURE_2D,
-      gl.TEXTURE_MAG_FILTER,
-      this.filter === "Nearest" ? gl.NEAREST : gl.LINEAR,
-    );
+    if (filterStateChanged) {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+    }
     gl.bindTexture(gl.TEXTURE_2D, null);
 
-    this.prog.use();
+    setProgramCached(gl, this.prog.prog, glState);
     bindTexture(gl, 0, state.texture, this.prog.locs.u_texture);
     this.prog.setUniforms(
       { texture: state.texture, width: state.width, height: state.height },
       { texture: out.tex, width: outW, height: outH },
     );
 
-    gl.bindVertexArray(vao);
+    bindVertexArrayCached(gl, vao, glState);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     return {

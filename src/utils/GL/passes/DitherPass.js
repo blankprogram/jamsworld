@@ -1,4 +1,5 @@
 import GLPass from "../GLPass.js";
+import { bindFramebufferCached } from "../helpers.js";
 
 export default class DitherPass extends GLPass {
   static def = {
@@ -41,6 +42,10 @@ export default class DitherPass extends GLPass {
             : 0;
     this.levels = opts.levels ?? 2;
     this.cpuTexture = null;
+    this.cpuTextureSize = { width: 0, height: 0 };
+    this.readbackFbo = null;
+    this.pixelBuffer = null;
+    this.floatPixelBuffer = null;
   }
 
   setOption(name, value) {
@@ -58,13 +63,15 @@ export default class DitherPass extends GLPass {
     if (name === "levels") this.levels = Math.max(2, parseInt(value, 10) || 2);
   }
 
-  render(gl, state, pool, vao) {
+  render(gl, state, pool, vao, glState) {
     if (this.algo !== "Error Diffusion")
-      return super.render(gl, state, pool, vao);
+      return super.render(gl, state, pool, vao, glState);
 
     const { texture, width, height } = state;
-    const fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    if (!this.readbackFbo) {
+      this.readbackFbo = gl.createFramebuffer();
+    }
+    bindFramebufferCached(gl, this.readbackFbo, glState);
     gl.framebufferTexture2D(
       gl.FRAMEBUFFER,
       gl.COLOR_ATTACHMENT0,
@@ -73,11 +80,21 @@ export default class DitherPass extends GLPass {
       0,
     );
 
-    const pixels = new Uint8Array(width * height * 4);
+    const needed = width * height * 4;
+    if (!this.pixelBuffer || this.pixelBuffer.length !== needed) {
+      this.pixelBuffer = new Uint8Array(needed);
+    }
+    const pixels = this.pixelBuffer;
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      null,
+      0,
+    );
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.deleteFramebuffer(fbo);
+    bindFramebufferCached(gl, null, glState);
 
     this.applyFloydSteinberg(pixels, width, height, this.levels);
 
@@ -88,6 +105,14 @@ export default class DitherPass extends GLPass {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, this.cpuTexture);
+    }
+
+    const sizeChanged =
+      this.cpuTextureSize.width !== width ||
+      this.cpuTextureSize.height !== height;
+    if (sizeChanged) {
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
@@ -99,8 +124,8 @@ export default class DitherPass extends GLPass {
         gl.UNSIGNED_BYTE,
         pixels,
       );
+      this.cpuTextureSize = { width, height };
     } else {
-      gl.bindTexture(gl.TEXTURE_2D, this.cpuTexture);
       gl.texSubImage2D(
         gl.TEXTURE_2D,
         0,
@@ -121,7 +146,10 @@ export default class DitherPass extends GLPass {
     const idx = (x, y) => 4 * (y * width + x);
     const quantize = (v) => Math.round(v * quantLevel) / quantLevel;
 
-    const floatPixels = new Float32Array(pixels.length);
+    if (!this.floatPixelBuffer || this.floatPixelBuffer.length !== pixels.length) {
+      this.floatPixelBuffer = new Float32Array(pixels.length);
+    }
+    const floatPixels = this.floatPixelBuffer;
     for (let i = 0; i < pixels.length; i++) floatPixels[i] = pixels[i] / 255;
 
     for (let y = 0; y < height; y++) {
@@ -156,6 +184,13 @@ export default class DitherPass extends GLPass {
       this.gl.deleteTexture(this.cpuTexture);
       this.cpuTexture = null;
     }
+    if (this.readbackFbo) {
+      this.gl.deleteFramebuffer(this.readbackFbo);
+      this.readbackFbo = null;
+    }
+    this.pixelBuffer = null;
+    this.floatPixelBuffer = null;
+    this.cpuTextureSize = { width: 0, height: 0 };
   }
 }
 
