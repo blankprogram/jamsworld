@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import './Taskbar.css';
-import githubIcon from '../../assets/Icons/github.png';
-import linkedinIcon from '../../assets/Icons/linkedin.png';
-import riskIcon from '../../assets/Icons/risk.png';
+import React, { useState, useEffect } from "react";
+import "./Taskbar.css";
+import githubIcon from "../../assets/Icons/github.png";
+import linkedinIcon from "../../assets/Icons/linkedin.png";
+import riskIcon from "../../assets/Icons/risk.png";
 
 const Taskbar = ({
   windows,
@@ -11,14 +11,14 @@ const Taskbar = ({
   minimizeApplication,
   focusedWindowId,
 }) => {
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState("");
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       let hours = now.getHours();
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const suffix = hours >= 12 ? 'PM' : 'AM';
+      const minutes = now.getMinutes().toString().padStart(2, "0");
+      const suffix = hours >= 12 ? "PM" : "AM";
       hours = hours % 12 || 12;
       setTime(`${hours}:${minutes} ${suffix}`);
     };
@@ -37,22 +37,29 @@ const Taskbar = ({
     }
   };
 
+  const taskbarWindows = windows.filter((windowItem) => {
+    const app = appsById[windowItem.appId];
+    return app && app.showInTaskbar !== false;
+  });
+
   return (
     <div className="taskbar">
       <div className="start-button"></div>
       <div className="taskbar-items">
-        {windows.map((windowItem) => {
+        {taskbarWindows.map((windowItem) => {
           const app = appsById[windowItem.appId];
           if (!app) return null;
+          const title = windowItem.titleOverride || app.title;
+          const icon = windowItem.iconOverride || app.icon;
           return (
-          <div
-            key={windowItem.id}
-            className={`taskbar-item ${focusedWindowId === windowItem.id && !windowItem.minimized ? 'focused-taskbar-item' : ''}`}
-            onClick={() => handleTaskbarClick(windowItem)}
-          >
-            <img src={app.icon} alt={app.title} className="taskbar-icon" />
-            <span>{app.title}</span>
-          </div>
+            <div
+              key={windowItem.id}
+              className={`taskbar-item ${focusedWindowId === windowItem.id && !windowItem.minimized ? "focused-taskbar-item" : ""}`}
+              onClick={() => handleTaskbarClick(windowItem)}
+            >
+              <img src={icon} alt={title} className="taskbar-icon" />
+              <span>{title}</span>
+            </div>
           );
         })}
       </div>

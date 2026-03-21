@@ -1,5 +1,6 @@
 export const DESKTOP_ACTIONS = Object.freeze({
   OPEN_APP: "OPEN_APP",
+  OPEN_WINDOW_INSTANCE: "OPEN_WINDOW_INSTANCE",
   CLOSE_WINDOW: "CLOSE_WINDOW",
   MINIMIZE_WINDOW: "MINIMIZE_WINDOW",
   RESTORE_WINDOW: "RESTORE_WINDOW",
@@ -64,16 +65,52 @@ const createWindowId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const createWindowInstance = (app, index) => ({
-  id: createWindowId(),
-  appId: app.id,
-  minimized: false,
-  maximized: false,
-  rect: centerWindowRect(app.windowDefaults, index),
-  minWidth: app.windowDefaults.minWidth,
-  minHeight: app.windowDefaults.minHeight,
-  resizable: app.windowDefaults.resizable,
-});
+const createWindowInstance = (app, index, options = {}) => {
+  const defaults = {
+    ...app.windowDefaults,
+    ...(options.windowDefaultsOverride || {}),
+  };
+  const rect = options.rect
+    ? clampWindowRect(options.rect, defaults.minWidth, defaults.minHeight)
+    : centerWindowRect(defaults, index);
+
+  return {
+    id: options.windowId || createWindowId(),
+    appId: app.id,
+    minimized: false,
+    maximized: false,
+    rect,
+    minWidth: defaults.minWidth,
+    minHeight: defaults.minHeight,
+    resizable: defaults.resizable,
+    parentWindowId: options.parentWindowId || null,
+    windowProps:
+      options.windowProps && typeof options.windowProps === "object"
+        ? options.windowProps
+        : {},
+    modal: !!options.modal,
+    titleOverride:
+      typeof options.titleOverride === "string" ? options.titleOverride : null,
+    iconOverride: options.iconOverride || null,
+  };
+};
+
+const collectWindowClosureSet = (windows, rootWindowId) => {
+  const closureSet = new Set([rootWindowId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < windows.length; i += 1) {
+      const windowItem = windows[i];
+      if (!windowItem?.parentWindowId) continue;
+      if (!closureSet.has(windowItem.parentWindowId)) continue;
+      if (closureSet.has(windowItem.id)) continue;
+      closureSet.add(windowItem.id);
+      changed = true;
+    }
+  }
+  return closureSet;
+};
 
 const moveWindowToFront = (windows, windowId) => {
   const index = windows.findIndex((windowItem) => windowItem.id === windowId);
@@ -83,6 +120,44 @@ const moveWindowToFront = (windows, windowId) => {
   const [target] = nextWindows.splice(index, 1);
   nextWindows.push(target);
   return nextWindows;
+};
+
+const moveWindowSetToFront = (windows, windowIds) => {
+  if (!(windowIds instanceof Set) || !windowIds.size) return windows;
+  const front = [];
+  const rest = [];
+  for (let i = 0; i < windows.length; i += 1) {
+    const windowItem = windows[i];
+    if (windowIds.has(windowItem.id)) front.push(windowItem);
+    else rest.push(windowItem);
+  }
+  if (!front.length || !rest.length) return windows;
+  return [...rest, ...front];
+};
+
+const getWindowById = (windows, windowId) =>
+  windows.find((windowItem) => windowItem.id === windowId) || null;
+
+const getFamilyRootId = (windows, windowId) => {
+  const byId = new Map(windows.map((windowItem) => [windowItem.id, windowItem]));
+  let currentId = windowId;
+  let current = byId.get(currentId) || null;
+  while (current?.parentWindowId && byId.has(current.parentWindowId)) {
+    currentId = current.parentWindowId;
+    current = byId.get(currentId) || null;
+  }
+  return currentId;
+};
+
+const getTopVisibleModalDescendantId = (windows, rootWindowId) => {
+  const closureSet = collectWindowClosureSet(windows, rootWindowId);
+  for (let i = windows.length - 1; i >= 0; i -= 1) {
+    const windowItem = windows[i];
+    if (!closureSet.has(windowItem.id)) continue;
+    if (!windowItem.modal || windowItem.minimized) continue;
+    return windowItem.id;
+  }
+  return null;
 };
 
 const getTopVisibleWindowId = (windows) => {
@@ -123,13 +198,31 @@ export const desktopReducer = (state, action) => {
       };
     }
 
+    case DESKTOP_ACTIONS.OPEN_WINDOW_INSTANCE: {
+      const { app, options } = action.payload;
+      if (!app) return state;
+
+      const windowItem = createWindowInstance(
+        app,
+        state.windows.length,
+        options || {},
+      );
+      return {
+        ...state,
+        windows: [...state.windows, windowItem],
+        focusedWindowId: windowItem.id,
+        selectedDesktopAppIds: [],
+      };
+    }
+
     case DESKTOP_ACTIONS.CLOSE_WINDOW: {
       const { windowId } = action.payload;
+      const closureSet = collectWindowClosureSet(state.windows, windowId);
       const nextWindows = state.windows.filter(
-        (windowItem) => windowItem.id !== windowId,
+        (windowItem) => !closureSet.has(windowItem.id),
       );
       const focusedWindowId =
-        state.focusedWindowId === windowId
+        closureSet.has(state.focusedWindowId)
           ? getTopVisibleWindowId(nextWindows)
           : state.focusedWindowId;
       return { ...state, windows: nextWindows, focusedWindowId };
@@ -137,13 +230,14 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.MINIMIZE_WINDOW: {
       const { windowId } = action.payload;
+      const closureSet = collectWindowClosureSet(state.windows, windowId);
       const nextWindows = state.windows.map((windowItem) =>
-        windowItem.id === windowId
+        closureSet.has(windowItem.id)
           ? { ...windowItem, minimized: true }
           : windowItem,
       );
       const focusedWindowId =
-        state.focusedWindowId === windowId
+        closureSet.has(state.focusedWindowId)
           ? getTopVisibleWindowId(nextWindows)
           : state.focusedWindowId;
       return { ...state, windows: nextWindows, focusedWindowId };
@@ -151,21 +245,28 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.RESTORE_WINDOW: {
       const { windowId } = action.payload;
+      const closureSet = collectWindowClosureSet(state.windows, windowId);
       const restoredWindows = state.windows.map((windowItem) =>
-        windowItem.id === windowId
+        closureSet.has(windowItem.id)
           ? { ...windowItem, minimized: false }
           : windowItem,
       );
-      const nextWindows = moveWindowToFront(restoredWindows, windowId);
+      const nextWindows = moveWindowSetToFront(restoredWindows, closureSet);
+      const focusedWindowId =
+        getTopVisibleModalDescendantId(nextWindows, windowId) || windowId;
       return {
         ...state,
         windows: nextWindows,
-        focusedWindowId: windowId,
+        focusedWindowId,
       };
     }
 
     case DESKTOP_ACTIONS.TOGGLE_MAXIMIZE_WINDOW: {
       const { windowId } = action.payload;
+      const targetWindow = state.windows.find(
+        (windowItem) => windowItem.id === windowId,
+      );
+      if (!targetWindow || !targetWindow.resizable) return state;
       const toggledWindows = state.windows.map((windowItem) =>
         windowItem.id === windowId
           ? {
@@ -189,10 +290,19 @@ export const desktopReducer = (state, action) => {
         (windowItem) => windowItem.id === windowId,
       );
       if (!targetWindow || targetWindow.minimized) return state;
+
+      const familyRootId = getFamilyRootId(state.windows, windowId);
+      const familySet = collectWindowClosureSet(state.windows, familyRootId);
+      const blockingModalId =
+        getTopVisibleModalDescendantId(state.windows, familyRootId);
+      const focusTargetId = blockingModalId || windowId;
+      const focusTarget = getWindowById(state.windows, focusTargetId);
+      if (!focusTarget || focusTarget.minimized) return state;
+
       return {
         ...state,
-        windows: moveWindowToFront(state.windows, windowId),
-        focusedWindowId: windowId,
+        windows: moveWindowSetToFront(state.windows, familySet),
+        focusedWindowId: focusTargetId,
       };
     }
 

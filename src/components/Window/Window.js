@@ -15,14 +15,18 @@ const HeaderButtons = ({
   onClose,
   maximized,
   resizable,
+  minimizable,
   isFocus,
 }) => {
   const buttonElements = {
     minimize: (
       <button
         key="minimize"
-        className={`header__button header__button--minimize ${!isFocus ? "header__button--unfocused" : ""}`}
-        onMouseUp={onMinimize}
+        className={`header__button header__button--minimize ${!isFocus ? "header__button--unfocused" : ""} ${
+          minimizable ? "" : "header__button--disable"
+        }`}
+        disabled={!minimizable}
+        onMouseUp={minimizable ? onMinimize : undefined}
       />
     ),
     maximize: (
@@ -30,8 +34,11 @@ const HeaderButtons = ({
         key="maximize"
         className={`header__button ${
           maximized ? "header__button--maximized" : "header__button--maximize"
-        } ${!isFocus ? "header__button--unfocused" : ""} ${resizable ? "" : "header__button--disable"}`}
-        onMouseUp={onMaximize}
+        } ${!isFocus ? "header__button--unfocused" : ""} ${
+          resizable ? "" : "header__button--disable"
+        }`}
+        disabled={!resizable}
+        onMouseUp={resizable ? onMaximize : undefined}
       />
     ),
     close: (
@@ -66,10 +73,13 @@ const Window = memo(
     isMinimized,
     maximized,
     useStyledWindow = true,
+    buttons,
     rect,
     minWidth = 600,
     minHeight = 200,
     resizable = true,
+    minimizable = true,
+    interactionLocked = false,
     zIndex,
   }) => {
     const { windowRef, startDrag, startResize } = useResizableAndDraggable({
@@ -86,7 +96,7 @@ const Window = memo(
     };
 
     const handleDoubleClick = () => {
-      if (onToggleMaximize) onToggleMaximize();
+      if (onToggleMaximize && resizable) onToggleMaximize();
     };
 
     const containerStyle = maximized
@@ -111,7 +121,10 @@ const Window = memo(
     const containerProps = {
       ref: windowRef,
       onMouseDown: handleFocus,
-      style: containerStyle,
+      style: {
+        ...containerStyle,
+        pointerEvents: interactionLocked ? "none" : undefined,
+      },
     };
 
     if (!useStyledWindow) {
@@ -142,12 +155,14 @@ const Window = memo(
           />
           <div className="app__header__title">{title}</div>
           <HeaderButtons
+            buttons={buttons}
             onMinimize={onMinimize}
             onMaximize={onToggleMaximize}
             onClose={onClose}
             isFocus={isFocused}
             maximized={maximized}
             resizable={resizable}
+            minimizable={minimizable}
           />
         </StyledHeader>
         <StyledWindowBody>

@@ -84,11 +84,93 @@ const MASK_TOOL_OPTIONS = [
   { id: "draw", label: "Draw" },
   { id: "eraser", label: "Eraser" },
 ];
+const MASK_GROUP_STROKE_PALETTE = [
+  "#2f6db5",
+  "#2f8f67",
+  "#b06d1f",
+  "#8b4ca8",
+  "#9d3d3d",
+  "#3b7f9a",
+  "#6f8f2b",
+  "#94547a",
+];
+const PIPELINE_MODE_GLOBAL = "global";
+const PIPELINE_MODE_PER_MASK = "perMask";
 
 const makeId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+function createMaskGroup(index = 1) {
+  return {
+    id: makeId(),
+    displayIndex: index,
+    enabled: true,
+    invert: false,
+    filters: [],
+  };
+}
+
+function getMaskGroupDisplayIndex(group, fallback = 1) {
+  const value = Number(group?.displayIndex);
+  if (Number.isFinite(value) && value > 0) return Math.floor(value);
+  return fallback;
+}
+
+function getMaskGroupLabel(group, fallback = 1) {
+  return `G${getMaskGroupDisplayIndex(group, fallback)}`;
+}
+
+function toProcessingFilters(filters) {
+  if (!Array.isArray(filters)) return [];
+  return filters.map(({ id, type, opts, enabled }) => ({
+    id,
+    type,
+    opts,
+    enabled,
+  }));
+}
+
+function normalizeSegmentGroupId(segment, defaultGroupId) {
+  if (segment?.groupId) return segment.groupId;
+  return defaultGroupId || null;
+}
+
+function hashString(input = "") {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function getMaskGroupRemovalPlan(
+  maskGroups,
+  selectedGroupId,
+  maskSegments,
+  defaultGroupId,
+) {
+  if (!selectedGroupId || !Array.isArray(maskGroups) || maskGroups.length <= 1) {
+    return null;
+  }
+
+  const removeIndex = maskGroups.findIndex((group) => group.id === selectedGroupId);
+  if (removeIndex < 0) return null;
+
+  const selectedGroup = maskGroups[removeIndex];
+  const deletedCount = (maskSegments || []).reduce((count, segment) => {
+    const groupId = normalizeSegmentGroupId(segment, defaultGroupId);
+    return groupId === selectedGroupId ? count + 1 : count;
+  }, 0);
+
+  return {
+    selectedGroupLabel: selectedGroup
+      ? getMaskGroupLabel(selectedGroup, removeIndex + 1)
+      : "Selected Group",
+    deletedCount,
+  };
+}
 
 const createOffscreenMaskCanvas = () => {
   if (typeof document === "undefined") return null;
@@ -374,7 +456,7 @@ function strokeMaskSegment(ctx, stroke, width, height, maxDimension) {
   return true;
 }
 
-function rasterizeMask(canvas, segments) {
+function rasterizeMask(canvas, segments, includeSegment = () => true) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -389,6 +471,8 @@ function rasterizeMask(canvas, segments) {
   ctx.fillRect(0, 0, w, h);
 
   for (const segment of segments) {
+    if (!includeSegment(segment)) continue;
+
     const include = segment.mode !== "exclude";
     ctx.fillStyle = "rgba(255,255,255,1)";
     ctx.strokeStyle = "rgba(255,255,255,1)";
@@ -719,20 +803,32 @@ const TopMenuAction = React.memo(function TopMenuAction({
   );
 });
 
-function useFilterStackState(defs) {
-  const [filters, setFilters] = useState([]);
+const MaskEyeIcon = React.memo(function MaskEyeIcon() {
+  return (
+    <svg
+      className={styles.maskIconSvg}
+      viewBox="0 0 16 10"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M1 5s2.5-3.5 7-3.5S15 5 15 5s-2.5 3.5-7 3.5S1 5 1 5z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      />
+      <circle cx="8" cy="5" r="1.8" fill="currentColor" />
+    </svg>
+  );
+});
+
+function useFilterStackState(defs, filters, setFilters) {
   const [showAdd, setShowAdd] = useState(false);
   const [dropZoneActive, setDropZoneActive] = useState(INACTIVE_INDEX);
   const [swapIdx, setSwapIdx] = useState(INACTIVE_INDEX);
 
   const processingFilters = useMemo(
-    () =>
-      filters.map(({ id, type, opts, enabled }) => ({
-        id,
-        type,
-        opts,
-        enabled,
-      })),
+    () => toProcessingFilters(filters),
     [filters],
   );
   const availableFilterEntries = useMemo(() => Object.entries(defs), [defs]);
@@ -747,7 +843,7 @@ function useFilterStackState(defs) {
       setFilters((fs) => reorderBetween(fs, sourceIdx, dropIdx));
       clearDnDUI();
     },
-    [clearDnDUI],
+    [clearDnDUI, setFilters],
   );
 
   const handleSwapDrop = useCallback(
@@ -755,7 +851,7 @@ function useFilterStackState(defs) {
       setFilters((fs) => swapFilters(fs, sourceIdx, targetIdx));
       clearDnDUI();
     },
-    [clearDnDUI],
+    [clearDnDUI, setFilters],
   );
 
   const handleDropZoneEnter = useCallback((idx) => setDropZoneActive(idx), []);
@@ -786,7 +882,7 @@ function useFilterStackState(defs) {
       ]);
       setShowAdd(false);
     },
-    [defs],
+    [defs, setFilters],
   );
 
   const handleOptionChange = useCallback((i, name, val) => {
@@ -795,7 +891,7 @@ function useFilterStackState(defs) {
         j === i ? { ...f, opts: { ...f.opts, [name]: val } } : f,
       ),
     );
-  }, []);
+  }, [setFilters]);
 
   const addCustomColor = useCallback((i) => {
     setFilters((fs) =>
@@ -811,7 +907,7 @@ function useFilterStackState(defs) {
           : f,
       ),
     );
-  }, []);
+  }, [setFilters]);
 
   const removeCustomColor = useCallback((i, ci) => {
     setFilters((fs) =>
@@ -827,23 +923,23 @@ function useFilterStackState(defs) {
           : f,
       ),
     );
-  }, []);
+  }, [setFilters]);
 
   const removeFilter = useCallback((i) => {
     setFilters((fs) => fs.filter((_, j) => j !== i));
-  }, []);
+  }, [setFilters]);
 
   const toggleFilter = useCallback((i) => {
     setFilters((fs) =>
       fs.map((f, j) => (j === i ? { ...f, open: !f.open } : f)),
     );
-  }, []);
+  }, [setFilters]);
 
   const toggleEnabled = useCallback((i) => {
     setFilters((fs) =>
       fs.map((f, j) => (j === i ? { ...f, enabled: !f.enabled } : f)),
     );
-  }, []);
+  }, [setFilters]);
 
   return {
     filters,
@@ -874,6 +970,10 @@ function useMaskState() {
   const [showMaskSettings, setShowMaskSettings] = useState(false);
   const [maskEnabled, setMaskEnabled] = useState(false);
   const [maskInvert, setMaskInvert] = useState(false);
+  const [pipelineMode, setPipelineMode] = useState(PIPELINE_MODE_GLOBAL);
+  const [maskGroups, setMaskGroups] = useState(() => [createMaskGroup(1)]);
+  const [nextMaskGroupDisplayIndex, setNextMaskGroupDisplayIndex] = useState(2);
+  const [selectedMaskGroupId, setSelectedMaskGroupId] = useState(null);
   const [maskShowOutlines, setMaskShowOutlines] = useState(true);
   const [maskTool, setMaskTool] = useState("draw");
   const [maskBrushSize, setMaskBrushSize] = useState(24);
@@ -914,6 +1014,33 @@ function useMaskState() {
   }, [maskEnabled]);
 
   useEffect(() => {
+    if (selectedMaskGroupId && maskGroups.some((group) => group.id === selectedMaskGroupId)) {
+      return;
+    }
+    setSelectedMaskGroupId(maskGroups[0]?.id || null);
+  }, [maskGroups, selectedMaskGroupId]);
+
+  useEffect(() => {
+    let maxDisplayIndex = 0;
+    let shouldPatchGroups = false;
+    const patchedGroups = maskGroups.map((group, idx) => {
+      const nextDisplayIndex = getMaskGroupDisplayIndex(group, idx + 1);
+      if (group?.displayIndex !== nextDisplayIndex) shouldPatchGroups = true;
+      maxDisplayIndex = Math.max(maxDisplayIndex, nextDisplayIndex);
+      return shouldPatchGroups ? { ...group, displayIndex: nextDisplayIndex } : group;
+    });
+
+    if (shouldPatchGroups) {
+      setMaskGroups(patchedGroups);
+      return;
+    }
+
+    setNextMaskGroupDisplayIndex((prev) =>
+      Math.max(prev, maxDisplayIndex + 1),
+    );
+  }, [maskGroups, setMaskGroups]);
+
+  useEffect(() => {
     if (!selectedMaskSegmentId) return;
     const exists = maskSegments.some((segment) => segment.id === selectedMaskSegmentId);
     if (!exists) setSelectedMaskSegmentId(null);
@@ -932,6 +1059,69 @@ function useMaskState() {
     setSelectedMaskSegmentId(null);
   }, [setMaskSegments]);
 
+  const addMaskGroup = useCallback(() => {
+    const nextGroup = createMaskGroup(nextMaskGroupDisplayIndex);
+    setMaskGroups((prev) => [...prev, nextGroup]);
+    setSelectedMaskGroupId(nextGroup.id);
+    setNextMaskGroupDisplayIndex((prev) => prev + 1);
+  }, [nextMaskGroupDisplayIndex]);
+
+  const removeSelectedMaskGroup = useCallback((groupIdArg) => {
+    const groupId = groupIdArg || selectedMaskGroupId;
+    if (!groupId || maskGroups.length <= 1) return;
+
+    const removeIndex = maskGroups.findIndex(
+      (group) => group.id === groupId,
+    );
+    if (removeIndex < 0) return;
+
+    const nextSelectedGroup =
+      maskGroups[removeIndex === 0 ? 1 : removeIndex - 1] ||
+      maskGroups[removeIndex + 1] ||
+      null;
+    const currentDefaultGroupId = maskGroups[0]?.id || null;
+
+    setMaskGroups((prev) =>
+      prev.filter((group) => group.id !== groupId),
+    );
+    setSelectedMaskGroupId(nextSelectedGroup?.id || null);
+    setMaskSegments((prev) =>
+      prev.filter(
+        (segment) =>
+          normalizeSegmentGroupId(segment, currentDefaultGroupId) !== groupId,
+      ),
+    );
+  }, [selectedMaskGroupId, maskGroups, setMaskSegments]);
+
+  const toggleMaskGroupEnabled = useCallback((groupId) => {
+    if (!groupId) return;
+    setMaskGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId ? { ...group, enabled: !group.enabled } : group,
+      ),
+    );
+  }, []);
+
+  const toggleMaskGroupInvert = useCallback((groupId) => {
+    if (!groupId) return;
+    setMaskGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId ? { ...group, invert: !group.invert } : group,
+      ),
+    );
+  }, []);
+
+  const assignSelectedSegmentToActiveGroup = useCallback(() => {
+    if (!selectedMaskSegmentId || !selectedMaskGroupId) return;
+    setMaskSegments((prev) =>
+      prev.map((segment) =>
+        segment.id === selectedMaskSegmentId
+          ? { ...segment, groupId: selectedMaskGroupId }
+          : segment,
+      ),
+    );
+  }, [selectedMaskSegmentId, selectedMaskGroupId, setMaskSegments]);
+
   return {
     showMaskSettings,
     setShowMaskSettings,
@@ -939,6 +1129,17 @@ function useMaskState() {
     setMaskEnabled,
     maskInvert,
     setMaskInvert,
+    pipelineMode,
+    setPipelineMode,
+    maskGroups,
+    setMaskGroups,
+    selectedMaskGroupId,
+    setSelectedMaskGroupId,
+    addMaskGroup,
+    removeSelectedMaskGroup,
+    toggleMaskGroupEnabled,
+    toggleMaskGroupInvert,
+    assignSelectedSegmentToActiveGroup,
     maskShowOutlines,
     setMaskShowOutlines,
     maskTool,
@@ -1036,14 +1237,19 @@ function useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef) 
 
 function useMaskRasterization(
   maskCanvasRef,
+  maskGroupCanvasesRef,
   maskEnabled,
   maskSegments,
+  maskGroupIds,
+  pipelineMode,
   contentSize,
   setMaskVersion,
 ) {
   useEffect(() => {
     const maskCanvas = maskCanvasRef.current;
     if (!maskCanvas) return;
+    const groupCanvases = maskGroupCanvasesRef.current;
+    if (!(groupCanvases instanceof Map)) return;
 
     const targetWidth = Math.max(1, contentSize.width || 1);
     const targetHeight = Math.max(1, contentSize.height || 1);
@@ -1051,43 +1257,276 @@ function useMaskRasterization(
     if (maskCanvas.width !== targetWidth) maskCanvas.width = targetWidth;
     if (maskCanvas.height !== targetHeight) maskCanvas.height = targetHeight;
 
-    if (!maskEnabled || !maskSegments.length) {
-      const ctx = maskCanvas.getContext("2d");
-      if (ctx) ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-      setMaskVersion((v) => v + 1);
-      return;
+    const clearMaskCanvas = (canvas) => {
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    if (maskEnabled && maskSegments.length) {
+      rasterizeMask(maskCanvas, maskSegments);
+    } else {
+      clearMaskCanvas(maskCanvas);
     }
 
-    rasterizeMask(maskCanvas, maskSegments);
+    if (pipelineMode === PIPELINE_MODE_PER_MASK) {
+      const ids = maskGroupIds;
+      const aliveIds = new Set(ids);
+
+      for (const [groupId] of groupCanvases.entries()) {
+        if (!aliveIds.has(groupId)) {
+          groupCanvases.delete(groupId);
+        }
+      }
+
+      if (!maskEnabled || !maskSegments.length) {
+        groupCanvases.clear();
+      } else {
+        const defaultGroupId = ids[0] || null;
+        for (let i = 0; i < ids.length; i += 1) {
+          const groupId = ids[i];
+          let groupCanvas = groupCanvases.get(groupId);
+          if (!groupCanvas) {
+            groupCanvas = createOffscreenMaskCanvas();
+            if (!groupCanvas) continue;
+            groupCanvases.set(groupId, groupCanvas);
+          }
+
+          if (groupCanvas.width !== targetWidth) groupCanvas.width = targetWidth;
+          if (groupCanvas.height !== targetHeight) groupCanvas.height = targetHeight;
+
+          rasterizeMask(
+            groupCanvas,
+            maskSegments,
+            (segment) =>
+              normalizeSegmentGroupId(segment, defaultGroupId) === groupId,
+          );
+        }
+      }
+    } else {
+      groupCanvases.clear();
+    }
+
     setMaskVersion((v) => v + 1);
   }, [
     maskCanvasRef,
+    maskGroupCanvasesRef,
     maskEnabled,
     maskSegments,
+    maskGroupIds,
+    pipelineMode,
     contentSize.width,
     contentSize.height,
     setMaskVersion,
   ]);
 }
 
-export default function PixelPass() {
+export default function PixelPass({ windowRuntime }) {
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
   const imageSurfaceRef = useRef(null);
   const maskMenuRef = useRef(null);
   const maskCanvasRef = useRef(createOffscreenMaskCanvas());
+  const maskGroupCanvasesRef = useRef(new Map());
 
   const [fonts, setFonts] = useState([]);
   const [canExport, setCanExport] = useState(false);
   const [fileURL, setFileURL] = useState(null);
   const [cameraOn, setCameraOn] = useState(false);
+  const [globalFilters, setGlobalFilters] = useState([]);
 
   useEffect(() => {
     loadFonts().then(setFonts);
   }, []);
 
   const defs = useMemo(() => getFilterDefs(fonts), [fonts]);
+  const {
+    showMaskSettings,
+    setShowMaskSettings,
+    maskEnabled,
+    setMaskEnabled,
+    maskInvert,
+    setMaskInvert,
+    pipelineMode,
+    setPipelineMode,
+    maskGroups,
+    setMaskGroups,
+    selectedMaskGroupId,
+    setSelectedMaskGroupId,
+    addMaskGroup,
+    removeSelectedMaskGroup,
+    toggleMaskGroupEnabled,
+    toggleMaskGroupInvert,
+    assignSelectedSegmentToActiveGroup,
+    maskShowOutlines,
+    setMaskShowOutlines,
+    maskTool,
+    setMaskTool,
+    maskBrushSize,
+    setMaskBrushSize,
+    maskSegments,
+    setMaskSegments,
+    selectedMaskSegmentId,
+    setSelectedMaskSegmentId,
+    maskVersion,
+    setMaskVersion,
+    canUndoMask,
+    canRedoMask,
+    undoMask,
+    redoMask,
+    startMaskInteraction,
+    endMaskInteraction,
+    removeSelectedMaskSegment,
+    clearMask,
+  } = useMaskState();
+
+  const perMaskEnabled = pipelineMode === PIPELINE_MODE_PER_MASK;
+  const defaultMaskGroupId = maskGroups[0]?.id || null;
+  const activeMaskGroup =
+    maskGroups.find((group) => group.id === selectedMaskGroupId) ||
+    maskGroups[0] ||
+    null;
+  const maskContextBadgeLabel = useMemo(() => {
+    if (!perMaskEnabled) return "GLOBAL";
+    if (!activeMaskGroup) return "G?";
+    return getMaskGroupLabel(activeMaskGroup, 1);
+  }, [perMaskEnabled, activeMaskGroup]);
+  const cycleMaskContext = useCallback(
+    (direction) => {
+      if (!direction) return;
+      const contexts = [
+        { mode: PIPELINE_MODE_GLOBAL, groupId: null },
+        ...maskGroups.map((group) => ({
+          mode: PIPELINE_MODE_PER_MASK,
+          groupId: group.id,
+        })),
+      ];
+
+      const currentPerMaskGroupId = activeMaskGroup?.id || selectedMaskGroupId || null;
+      const currentIndex =
+        pipelineMode === PIPELINE_MODE_GLOBAL
+          ? 0
+          : Math.max(
+              1,
+              contexts.findIndex(
+                (context) =>
+                  context.mode === PIPELINE_MODE_PER_MASK &&
+                  context.groupId === currentPerMaskGroupId,
+              ),
+            );
+      const nextIndex =
+        (currentIndex + direction + contexts.length) % contexts.length;
+      const nextContext = contexts[nextIndex];
+      if (!nextContext) return;
+
+      if (nextContext.mode === PIPELINE_MODE_GLOBAL) {
+        setPipelineMode(PIPELINE_MODE_GLOBAL);
+        return;
+      }
+
+      setPipelineMode(PIPELINE_MODE_PER_MASK);
+      setSelectedMaskGroupId(nextContext.groupId);
+    },
+    [
+      maskGroups,
+      pipelineMode,
+      activeMaskGroup?.id,
+      selectedMaskGroupId,
+      setPipelineMode,
+      setSelectedMaskGroupId,
+    ],
+  );
+  const handleMaskContextBookmarkWheel = useCallback(
+    (event) => {
+      if (!event.deltaY) return;
+      event.preventDefault();
+      event.stopPropagation();
+      cycleMaskContext(event.deltaY > 0 ? 1 : -1);
+    },
+    [cycleMaskContext],
+  );
+  const selectedSegmentGroupId = useMemo(() => {
+    if (!selectedMaskSegmentId) return null;
+    const segment = maskSegments.find((item) => item.id === selectedMaskSegmentId);
+    return normalizeSegmentGroupId(segment, defaultMaskGroupId);
+  }, [selectedMaskSegmentId, maskSegments, defaultMaskGroupId]);
+  const canMoveSelectedToActiveGroup =
+    !!selectedMaskSegmentId &&
+    !!activeMaskGroup &&
+    !!selectedSegmentGroupId &&
+    selectedSegmentGroupId !== activeMaskGroup.id;
+  const allMaskGroupsInverted = useMemo(
+    () => maskGroups.length > 0 && maskGroups.every((group) => group.invert),
+    [maskGroups],
+  );
+  const invertAllMaskGroups = useCallback(() => {
+    setMaskGroups((prev) => {
+      if (prev.length === 0) return prev;
+      const shouldInvert = !prev.every((group) => group.invert);
+      return prev.map((group) => ({ ...group, invert: shouldInvert }));
+    });
+  }, [setMaskGroups]);
+  const autoSyncSelectionRef = useRef({
+    segmentId: null,
+    groupId: null,
+  });
+  useEffect(() => {
+    const prev = autoSyncSelectionRef.current;
+    const selectionChanged = prev.segmentId !== selectedMaskSegmentId;
+    const selectedSegmentGroupChanged =
+      prev.segmentId === selectedMaskSegmentId &&
+      prev.groupId !== selectedSegmentGroupId;
+    autoSyncSelectionRef.current = {
+      segmentId: selectedMaskSegmentId,
+      groupId: selectedSegmentGroupId,
+    };
+
+    if (!perMaskEnabled) return;
+    if (!selectionChanged && !selectedSegmentGroupChanged) return;
+    if (!selectedMaskSegmentId || !selectedSegmentGroupId) return;
+    if (selectedMaskGroupId === selectedSegmentGroupId) return;
+
+    const groupExists = maskGroups.some(
+      (group) => group.id === selectedSegmentGroupId,
+    );
+    if (!groupExists) return;
+
+    setSelectedMaskGroupId(selectedSegmentGroupId);
+  }, [
+    perMaskEnabled,
+    selectedMaskSegmentId,
+    selectedSegmentGroupId,
+    selectedMaskGroupId,
+    maskGroups,
+    setSelectedMaskGroupId,
+  ]);
+  const activeFilters = perMaskEnabled
+    ? activeMaskGroup?.filters || []
+    : globalFilters;
+  const setActiveFilters = useCallback(
+    (next) => {
+      if (!perMaskEnabled) {
+        setGlobalFilters((prev) =>
+          typeof next === "function" ? next(prev) : next,
+        );
+        return;
+      }
+
+      const activeGroupId = activeMaskGroup?.id;
+      if (!activeGroupId) return;
+
+      setMaskGroups((prev) =>
+        prev.map((group) => {
+          if (group.id !== activeGroupId) return group;
+          const current = group.filters || [];
+          const updated = typeof next === "function" ? next(current) : next;
+          return { ...group, filters: updated };
+        }),
+      );
+    },
+    [perMaskEnabled, activeMaskGroup?.id, setMaskGroups],
+  );
+
   const {
     filters,
     showAdd,
@@ -1110,57 +1549,165 @@ export default function PixelPass() {
     removeFilter,
     toggleFilter,
     toggleEnabled,
-  } = useFilterStackState(defs);
-  const {
-    showMaskSettings,
-    setShowMaskSettings,
-    maskEnabled,
-    setMaskEnabled,
-    maskInvert,
-    setMaskInvert,
-    maskShowOutlines,
-    setMaskShowOutlines,
-    maskTool,
-    setMaskTool,
-    maskBrushSize,
-    setMaskBrushSize,
-    maskSegments,
-    setMaskSegments,
-    selectedMaskSegmentId,
-    setSelectedMaskSegmentId,
-    maskVersion,
-    setMaskVersion,
-    canUndoMask,
-    canRedoMask,
-    undoMask,
-    redoMask,
-    startMaskInteraction,
-    endMaskInteraction,
-    removeSelectedMaskSegment,
-    clearMask,
-  } = useMaskState();
+  } = useFilterStackState(defs, activeFilters, setActiveFilters);
+  const maskGroupStrokeById = useMemo(
+    () =>
+      Object.fromEntries(
+        maskGroups.map((group) => {
+          const colorIdx = hashString(group.id) % MASK_GROUP_STROKE_PALETTE.length;
+          return [group.id, MASK_GROUP_STROKE_PALETTE[colorIdx]];
+        }),
+      ),
+    [maskGroups],
+  );
+  const segmentCountByGroup = useMemo(() => {
+    const counts = Object.create(null);
+    const fallbackGroupId = defaultMaskGroupId;
+    for (let i = 0; i < maskSegments.length; i += 1) {
+      const groupId = normalizeSegmentGroupId(maskSegments[i], fallbackGroupId);
+      if (!groupId) continue;
+      counts[groupId] = (counts[groupId] || 0) + 1;
+    }
+    return counts;
+  }, [maskSegments, defaultMaskGroupId]);
+  const maskGroupMeta = useMemo(
+    () =>
+      maskGroups.map((group, idx) => ({
+        id: group.id,
+        label: getMaskGroupLabel(group, idx + 1),
+        enabled: group.enabled,
+        invert: group.invert,
+        count: Number(segmentCountByGroup[group.id] || 0),
+      })),
+    [maskGroups, segmentCountByGroup],
+  );
+  const removeGroupPlan = useMemo(
+    () =>
+      getMaskGroupRemovalPlan(
+        maskGroups,
+        selectedMaskGroupId,
+        maskSegments,
+        defaultMaskGroupId,
+      ),
+    [maskGroups, selectedMaskGroupId, maskSegments, defaultMaskGroupId],
+  );
+  const defaultMaskGroupStroke =
+    (defaultMaskGroupId && maskGroupStrokeById[defaultMaskGroupId]) || "#1f4b9a";
+  const maskGroupIds = useMemo(
+    () => maskGroups.map((group) => group.id).filter(Boolean),
+    [maskGroups],
+  );
   const { surfaceSize, contentSize } = useViewportSizing(
     imageSurfaceRef,
     canvasRef,
   );
+  useMaskRasterization(
+    maskCanvasRef,
+    maskGroupCanvasesRef,
+    maskEnabled,
+    maskSegments,
+    maskGroupIds,
+    pipelineMode,
+    contentSize,
+    setMaskVersion,
+  );
 
+  const globalProcessingFilters = useMemo(
+    () => toProcessingFilters(globalFilters),
+    [globalFilters],
+  );
+  const perMaskGroupsConfig = useMemo(
+    () =>
+      maskGroups.map((group) => ({
+        id: group.id,
+        enabled: !!group.enabled,
+        invert: !!group.invert,
+        filters: toProcessingFilters(group.filters || []),
+        canvas: maskGroupCanvasesRef.current.get(group.id) || null,
+        version: maskVersion,
+      })),
+    [maskGroups, maskVersion],
+  );
   const maskConfig = useMemo(
     () => ({
       enabled: maskEnabled,
       invert: maskInvert,
       canvas: maskCanvasRef.current,
       version: maskVersion,
+      pipelineMode,
+      groups: perMaskGroupsConfig,
+      groupCanvases: maskGroupCanvasesRef.current,
     }),
-    [maskEnabled, maskInvert, maskVersion],
+    [
+      maskEnabled,
+      maskInvert,
+      maskVersion,
+      pipelineMode,
+      perMaskGroupsConfig,
+      maskGroupCanvasesRef,
+    ],
   );
   const mediaConfig = useMemo(() => {
-    return { defs, filters: processingFilters, mask: maskConfig };
-  }, [defs, processingFilters, maskConfig]);
+    return {
+      defs,
+      filters: perMaskEnabled ? globalProcessingFilters : processingFilters,
+      mask: maskConfig,
+    };
+  }, [
+    defs,
+    perMaskEnabled,
+    globalProcessingFilters,
+    processingFilters,
+    maskConfig,
+  ]);
 
   const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
     cameraOn,
     videoRef,
   });
+  const requestRemoveGroup = useCallback(async () => {
+    if (!maskEnabled || !removeGroupPlan || !selectedMaskGroupId) return;
+    const groupId = selectedMaskGroupId;
+    const {
+      selectedGroupLabel = "Selected Group",
+      deletedCount = 0,
+    } = removeGroupPlan;
+    const deleteLabel = `${deletedCount} segment${deletedCount === 1 ? "" : "s"} in this group will be deleted.`;
+
+    let confirmed = false;
+    if (windowRuntime?.openDialog) {
+      const result = await windowRuntime.openDialog("system-confirm-dialog", {
+        titleOverride: "Confirm Group Removal",
+        parentWindowId: windowRuntime.windowId,
+        windowDefaultsOverride: {
+          width: 390,
+          height: 198,
+          minWidth: 350,
+          minHeight: 190,
+          resizable: false,
+        },
+        windowProps: {
+          title: "Confirm Group Removal",
+          message: [`Remove "${selectedGroupLabel}"?`, deleteLabel],
+          confirmLabel: "Delete Group",
+          cancelLabel: "Cancel",
+        },
+      });
+      confirmed = result === true;
+    } else if (typeof window !== "undefined" && window.confirm) {
+      confirmed = window.confirm(`Remove "${selectedGroupLabel}"?\n${deleteLabel}`);
+    }
+
+    if (confirmed) {
+      removeSelectedMaskGroup(groupId);
+    }
+  }, [
+    maskEnabled,
+    removeGroupPlan,
+    selectedMaskGroupId,
+    windowRuntime,
+    removeSelectedMaskGroup,
+  ]);
 
   const handleFile = useCallback(
     async (e) => {
@@ -1184,13 +1731,6 @@ export default function PixelPass() {
     [fileURL],
   );
   useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef);
-  useMaskRasterization(
-    maskCanvasRef,
-    maskEnabled,
-    maskSegments,
-    contentSize,
-    setMaskVersion,
-  );
 
   useEffect(() => {
     const handleMaskHistoryKeydown = (event) => {
@@ -1280,98 +1820,241 @@ export default function PixelPass() {
             expanded={showMaskSettings}
             onActivate={() => setShowMaskSettings((v) => !v)}
           />
+          <span
+            className={styles.maskContextBookmark}
+            onWheel={handleMaskContextBookmarkWheel}
+            title="Scroll to cycle: Global and groups"
+          >
+            {maskContextBadgeLabel}
+          </span>
 
           {showMaskSettings && (
             <div className={styles.maskMenuDropdown}>
-              <div className={styles.maskButtonsRow}>
-                <button
-                  type="button"
-                  className="xpButton"
-                  onClick={() => setMaskEnabled((v) => !v)}
-                >
-                  {maskEnabled ? "Disable Mask" : "Enable Mask"}
-                </button>
-
-                <button
-                  type="button"
-                  className={`xpButton ${maskInvert ? styles.maskButtonActive : ""}`}
-                  disabled={!maskEnabled}
-                  onClick={() => setMaskInvert((v) => !v)}
-                >
-                  Invert Mask {maskInvert ? "On" : "Off"}
-                </button>
-
-                <button
-                  type="button"
-                  className={`xpButton ${!maskShowOutlines ? styles.maskButtonActive : ""}`}
-                  disabled={!maskEnabled}
-                  onClick={() => setMaskShowOutlines((v) => !v)}
-                >
-                  {maskShowOutlines ? "Hide Outlines" : "Show Outlines"}
-                </button>
+              <div className={styles.maskStatusLine}>
+                Editing: {maskContextBadgeLabel}
               </div>
 
-              <div className={styles.maskTools}>
-                {MASK_TOOL_OPTIONS.map((toolDef) => (
+              <div className={styles.maskSection}>
+                <div className={styles.maskSectionLabel}>Context</div>
+                <div className={styles.maskButtonsRow}>
                   <button
-                    key={toolDef.id}
                     type="button"
-                    className={`xpButton ${maskTool === toolDef.id ? styles.maskToolActive : ""}`}
-                    disabled={!maskEnabled}
-                    onClick={() => setMaskTool(toolDef.id)}
+                    className={`xpButton ${!perMaskEnabled ? styles.maskButtonActive : ""}`}
+                    onClick={() => setPipelineMode(PIPELINE_MODE_GLOBAL)}
                   >
-                    {toolDef.label}
+                    Global
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    className={`xpButton ${perMaskEnabled ? styles.maskButtonActive : ""}`}
+                    onClick={() => setPipelineMode(PIPELINE_MODE_PER_MASK)}
+                  >
+                    Per Group
+                  </button>
+                </div>
               </div>
 
-              <label className={styles.maskBrushSize}>
-                Eraser Size
-                <input
-                  type="range"
-                  min={4}
-                  max={96}
-                  step={1}
-                  value={maskBrushSize}
-                  disabled={!maskEnabled || maskTool !== "eraser"}
-                  onChange={(e) => setMaskBrushSize(Number(e.target.value))}
-                />
-              </label>
+              <div className={styles.maskSection}>
+                <div className={styles.maskSectionLabel}>State</div>
+                <div className={styles.maskButtonsRow}>
+                  <button
+                    type="button"
+                    className={`xpButton ${maskEnabled ? styles.maskButtonActive : ""}`}
+                    onClick={() => setMaskEnabled((v) => !v)}
+                  >
+                    Mask {maskEnabled ? "On" : "Off"}
+                  </button>
 
-              <div className={styles.maskActions}>
-                <button
-                  type="button"
-                  className="xpButton"
-                  disabled={!maskEnabled || !canUndoMask}
-                  onClick={undoMask}
-                >
-                  Undo Mask
-                </button>
-                <button
-                  type="button"
-                  className="xpButton"
-                  disabled={!maskEnabled || !canRedoMask}
-                  onClick={redoMask}
-                >
-                  Redo Mask
-                </button>
-                <button
-                  type="button"
-                  className="xpButton"
-                  disabled={!maskEnabled || !selectedMaskSegmentId}
-                  onClick={removeSelectedMaskSegment}
-                >
-                  Delete Selected
-                </button>
-                <button
-                  type="button"
-                  className="xpButton"
-                  disabled={!maskEnabled || maskSegments.length === 0}
-                  onClick={clearMask}
-                >
-                  Clear Mask
-                </button>
+                  <button
+                    type="button"
+                    className={`xpButton ${maskShowOutlines ? styles.maskButtonActive : ""}`}
+                    disabled={!maskEnabled}
+                    onClick={() => setMaskShowOutlines((v) => !v)}
+                  >
+                    Outlines {maskShowOutlines ? "On" : "Off"}
+                  </button>
+
+                  {!perMaskEnabled && (
+                    <button
+                      type="button"
+                      className={`xpButton ${maskInvert ? styles.maskButtonActive : ""}`}
+                      disabled={!maskEnabled}
+                      onClick={() => setMaskInvert((v) => !v)}
+                    >
+                      Invert {maskInvert ? "On" : "Off"}
+                    </button>
+                  )}
+
+                  {perMaskEnabled && (
+                    <button
+                      type="button"
+                      className={`xpButton ${allMaskGroupsInverted ? styles.maskButtonActive : ""}`}
+                      disabled={!maskEnabled || maskGroups.length === 0}
+                      onClick={invertAllMaskGroups}
+                    >
+                      Invert All Groups
+                    </button>
+                  )}
+                </div>
               </div>
+
+              <div className={styles.maskSection}>
+                <div className={styles.maskSectionLabel}>Draw</div>
+                <div className={styles.maskTools}>
+                  {MASK_TOOL_OPTIONS.map((toolDef) => (
+                    <button
+                      key={toolDef.id}
+                      type="button"
+                      className={`xpButton ${maskTool === toolDef.id ? styles.maskToolActive : ""}`}
+                      disabled={!maskEnabled}
+                      onClick={() => setMaskTool(toolDef.id)}
+                    >
+                      {toolDef.label}
+                    </button>
+                  ))}
+                </div>
+
+                {maskTool === "eraser" && (
+                  <label className={styles.maskBrushSize}>
+                    Eraser Size
+                    <input
+                      type="range"
+                      min={4}
+                      max={96}
+                      step={1}
+                      value={maskBrushSize}
+                      disabled={!maskEnabled}
+                      onChange={(e) => setMaskBrushSize(Number(e.target.value))}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {perMaskEnabled && (
+                <div className={styles.maskSection}>
+                  <div className={styles.maskSectionLabel}>Group</div>
+                  <div className={styles.maskGroupCompactRow}>
+                    <select
+                      className={styles.maskGroupCompactSelect}
+                      value={activeMaskGroup?.id || ""}
+                      disabled={!maskEnabled}
+                      onChange={(e) => setSelectedMaskGroupId(e.target.value)}
+                    >
+                      {maskGroupMeta.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {`${group.label} (${group.count})`}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className={`xpButton ${styles.maskIconButton}`}
+                      disabled={!maskEnabled}
+                      onClick={addMaskGroup}
+                      title="Add Group"
+                      aria-label="Add Group"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className={`xpButton ${styles.maskIconButton}`}
+                      disabled={!maskEnabled || maskGroupMeta.length <= 1}
+                      onClick={requestRemoveGroup}
+                      title="Remove Group"
+                      aria-label="Remove Group"
+                    >
+                      −
+                    </button>
+                    <button
+                      type="button"
+                      className={`xpButton ${styles.maskIconButton} ${activeMaskGroup?.enabled ? styles.maskButtonActive : ""}`}
+                      disabled={!maskEnabled || !activeMaskGroup}
+                      onClick={() => toggleMaskGroupEnabled(activeMaskGroup?.id)}
+                      title={
+                        activeMaskGroup?.enabled
+                          ? "Group Visible"
+                          : "Group Hidden"
+                      }
+                      aria-label={
+                        activeMaskGroup?.enabled
+                          ? "Hide Group"
+                          : "Show Group"
+                      }
+                    >
+                      <MaskEyeIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className={`xpButton ${styles.maskIconButton} ${activeMaskGroup?.invert ? styles.maskButtonActive : ""}`}
+                      disabled={!maskEnabled || !activeMaskGroup}
+                      onClick={() => toggleMaskGroupInvert(activeMaskGroup?.id)}
+                      title="Group Invert"
+                      aria-label="Group Invert"
+                    >
+                      Inv
+                    </button>
+                  </div>
+
+                  {canMoveSelectedToActiveGroup && (
+                    <button
+                      type="button"
+                      className={`xpButton ${styles.maskInlineAction}`}
+                      disabled={!maskEnabled}
+                      onClick={assignSelectedSegmentToActiveGroup}
+                    >
+                      Move Selected Here
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className={styles.maskSection}>
+                <div className={styles.maskSectionLabel}>History / Reset</div>
+                <div className={styles.maskButtonsRow}>
+                  <button
+                    type="button"
+                    className="xpButton"
+                    disabled={!maskEnabled || !canUndoMask}
+                    onClick={undoMask}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    className="xpButton"
+                    disabled={!maskEnabled || !canRedoMask}
+                    onClick={redoMask}
+                  >
+                    Redo
+                  </button>
+                  <button
+                    type="button"
+                    className="xpButton"
+                    disabled={!maskEnabled || maskSegments.length === 0}
+                    onClick={clearMask}
+                  >
+                    Clear Mask
+                  </button>
+                </div>
+              </div>
+
+              {selectedMaskSegmentId && (
+                <div className={styles.maskSection}>
+                  <div className={styles.maskSectionLabel}>More</div>
+                  <div className={styles.maskButtonsRow}>
+                    <button
+                      type="button"
+                      className="xpButton"
+                      disabled={!maskEnabled}
+                      onClick={removeSelectedMaskSegment}
+                    >
+                      Delete Selected
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1425,6 +2108,7 @@ export default function PixelPass() {
             <button
               type="button"
               className="xpButton"
+              disabled={perMaskEnabled && !activeMaskGroup}
               onClick={toggleShowAdd}
             >
               + Add Filter
@@ -1460,6 +2144,10 @@ export default function PixelPass() {
                   onBrushSizeChange={setMaskBrushSize}
                   segments={maskSegments}
                   selectedSegmentId={selectedMaskSegmentId}
+                  activeGroupId={perMaskEnabled ? activeMaskGroup?.id : null}
+                  defaultGroupId={defaultMaskGroupId}
+                  groupStrokeById={maskGroupStrokeById}
+                  defaultGroupStroke={defaultMaskGroupStroke}
                   onSegmentsChange={setMaskSegments}
                   onInteractionStart={startMaskInteraction}
                   onInteractionEnd={endMaskInteraction}

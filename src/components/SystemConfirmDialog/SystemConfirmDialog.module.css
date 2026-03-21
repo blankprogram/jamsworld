@@ -1,0 +1,36 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding: 14px 16px 12px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f6f9ff 0%, #edf3ff 100%);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #12356c;
+}
+
+.message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #1a1a1a;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

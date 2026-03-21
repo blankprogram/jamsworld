@@ -18,3 +18,4 @@ export { default as CRTPass } from "./CRTPass.js";
 export { default as MinesweeperPass } from "./MinesweeperPass.js";
 export { default as ScalePass } from "./ScalePass.js";
 export { default as MaskCompositePass } from "./MaskCompositePass.js";
+export { default as PerMaskPipelinePass } from "./PerMaskPipelinePass.js";

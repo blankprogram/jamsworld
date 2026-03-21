@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import GLPipeline from "../utils/GL/GLPipeline";
 import { decodeGIF, encodeGIF } from "../utils/gifUtils";
-import { MaskCompositePass } from "../utils/GL/passes";
+import { MaskCompositePass, PerMaskPipelinePass } from "../utils/GL/passes";
+import { diffKeys, applyPassOptions } from "../utils/GL/optionUtils";
 
 function readImageDataFromWebGL(gl, width, height) {
   const pixels = new Uint8Array(width * height * 4);
@@ -16,39 +17,6 @@ function readImageDataFromWebGL(gl, width, height) {
     );
   }
   return new ImageData(flipped, width, height);
-}
-
-const isPlainObject = (v) =>
-  v != null && typeof v === "object" && v.constructor === Object;
-
-function deepEqual(a, b) {
-  if (a === b) return true;
-  if (Number.isNaN(a) && Number.isNaN(b)) return true;
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (!deepEqual(a[i], b[i])) return false;
-    return true;
-  }
-
-  if (isPlainObject(a) && isPlainObject(b)) {
-    const ak = Object.keys(a);
-    const bk = Object.keys(b);
-    if (ak.length !== bk.length) return false;
-    for (const k of ak) if (!deepEqual(a[k], b[k])) return false;
-    return true;
-  }
-
-  return false;
-}
-
-function diffKeys(prev = {}, next = {}) {
-  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
-  const changed = [];
-  for (const k of keys) {
-    if (!deepEqual(prev[k], next[k])) changed.push(k);
-  }
-  return changed;
 }
 
 function waitForEvent(target, eventName) {
@@ -80,6 +48,23 @@ function getSupportedVideoMimeType() {
 }
 
 const MASK_PASS_ID = "__mask_composite__";
+const PER_MASK_PASS_ID = "__per_mask_pipeline__";
+
+function getPerMaskGroups(maskCfg) {
+  if (!Array.isArray(maskCfg?.groups)) return [];
+  const groupCanvases =
+    maskCfg?.groupCanvases instanceof Map ? maskCfg.groupCanvases : null;
+  return maskCfg.groups
+    .filter((group) => group && group.id)
+    .map((group) => {
+      const liveCanvas = groupCanvases?.get(group.id) || null;
+      return {
+        ...group,
+        canvas: liveCanvas || group.canvas || null,
+      };
+    })
+    .filter((group) => !!group.canvas);
+}
 
 export function useProcessMedia(canvasRef, config, camera) {
   const pipelineRef = useRef(null);
@@ -122,7 +107,11 @@ export function useProcessMedia(canvasRef, config, camera) {
 
     try {
       video.pause();
-    } catch {}
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[useProcessMedia] video.pause() failed during cleanup", err);
+      }
+    }
 
     if (video.srcObject) {
       video.srcObject.getTracks().forEach((t) => t.stop());
@@ -241,6 +230,56 @@ export function useProcessMedia(canvasRef, config, camera) {
     const filters = Array.isArray(config?.filters) ? config.filters : [];
     const maskCfg = config?.mask || null;
     const hasMask = !!(maskCfg?.enabled && maskCfg?.canvas);
+    const perMaskEnabled = !!(
+      maskCfg?.enabled &&
+      maskCfg?.pipelineMode === "perMask"
+    );
+    const perMaskGroups = getPerMaskGroups(maskCfg);
+
+    if (perMaskEnabled) {
+      const aliveIds = new Set([PER_MASK_PASS_ID]);
+      for (const [id, rec] of passCacheRef.current.entries()) {
+        if (!aliveIds.has(id)) {
+          rec.pass?.destroy?.();
+          passCacheRef.current.delete(id);
+        }
+      }
+
+      const nextOpts = { defs, groups: perMaskGroups, invalidate };
+      const prevRec = passCacheRef.current.get(PER_MASK_PASS_ID) || {
+        type: "PER_MASK",
+        pass: null,
+        optsSnapshot: null,
+      };
+
+      if (!prevRec.pass) {
+        prevRec.pass = new PerMaskPipelinePass(p.gl, nextOpts);
+      } else {
+        const changed = diffKeys(prevRec.optsSnapshot || {}, nextOpts);
+        applyPassOptions(
+          prevRec.pass,
+          changed,
+          nextOpts,
+          "useProcessMedia/per-mask",
+        );
+      }
+
+      passCacheRef.current.set(PER_MASK_PASS_ID, {
+        type: "PER_MASK",
+        pass: prevRec.pass,
+        optsSnapshot: nextOpts,
+      });
+      p.passes = [prevRec.pass];
+
+      const hasSource =
+        !!lastSource.current ||
+        !!frames ||
+        cameraReadyRef.current ||
+        sourceKindRef.current === "video";
+
+      if (hasSource) p.renderFrame();
+      return;
+    }
 
     const aliveIds = new Set(filters.map((f) => f?.id).filter(Boolean));
     if (hasMask) aliveIds.add(MASK_PASS_ID);
@@ -291,11 +330,12 @@ export function useProcessMedia(canvasRef, config, camera) {
       }
 
       if (prevRec.pass && changed.length) {
-        for (const k of changed) {
-          try {
-            prevRec.pass.setOption?.(k, nextOpts[k]);
-          } catch {}
-        }
+        applyPassOptions(
+          prevRec.pass,
+          changed,
+          nextOpts,
+          `useProcessMedia/filter:${f.type}`,
+        );
         passCacheRef.current.set(f.id, { ...prevRec, optsSnapshot: nextOpts });
       }
 
@@ -324,11 +364,12 @@ export function useProcessMedia(canvasRef, config, camera) {
           optsSnapshot: nextOpts,
         });
       } else if (changed.length) {
-        for (const key of changed) {
-          try {
-            prevRec.pass.setOption?.(key, nextOpts[key]);
-          } catch {}
-        }
+        applyPassOptions(
+          prevRec.pass,
+          changed,
+          nextOpts,
+          "useProcessMedia/mask",
+        );
         passCacheRef.current.set(MASK_PASS_ID, {
           ...prevRec,
           optsSnapshot: nextOpts,
@@ -586,6 +627,11 @@ export function useProcessMedia(canvasRef, config, camera) {
       const filters = Array.isArray(config?.filters) ? config.filters : [];
       const enabled = filters.filter((f) => f && f.enabled);
       const maskCfg = config?.mask || null;
+      const perMaskEnabled = !!(
+        maskCfg?.enabled &&
+        maskCfg?.pipelineMode === "perMask"
+      );
+      const perMaskGroups = getPerMaskGroups(maskCfg);
 
       if (
         sourceKindRef.current === "video" ||
@@ -618,22 +664,32 @@ export function useProcessMedia(canvasRef, config, camera) {
 
       const exp = GLPipeline.for(off);
 
-      exp.passes = enabled
-        .map((f) => {
-          const def = defs[f.type];
-          if (!def?.Pass) return null;
-          return new def.Pass(exp.gl, { ...f.opts, invalidate: () => {} });
-        })
-        .filter(Boolean);
-
-      if (maskCfg?.enabled && maskCfg?.canvas) {
-        exp.passes.push(
-          new MaskCompositePass(exp.gl, {
-            canvas: maskCfg.canvas,
-            invert: !!maskCfg.invert,
-            version: Number(maskCfg.version ?? 0),
+      if (perMaskEnabled) {
+        exp.passes = [
+          new PerMaskPipelinePass(exp.gl, {
+            defs,
+            groups: perMaskGroups,
+            invalidate: () => {},
           }),
-        );
+        ];
+      } else {
+        exp.passes = enabled
+          .map((f) => {
+            const def = defs[f.type];
+            if (!def?.Pass) return null;
+            return new def.Pass(exp.gl, { ...f.opts, invalidate: () => {} });
+          })
+          .filter(Boolean);
+
+        if (maskCfg?.enabled && maskCfg?.canvas) {
+          exp.passes.push(
+            new MaskCompositePass(exp.gl, {
+              canvas: maskCfg.canvas,
+              invert: !!maskCfg.invert,
+              version: Number(maskCfg.version ?? 0),
+            }),
+          );
+        }
       }
 
       const out = frames.map(({ imgData, frameInfo }) => {

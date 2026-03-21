@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   createInitialDesktopState,
   DESKTOP_ACTIONS,
@@ -6,27 +6,82 @@ import {
 } from "./desktopReducer";
 
 const STARTUP_APP_IDS = ["notepad", "winamp"];
+const createWindowId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export function useDesktopSession(appsById) {
+  const dialogResolversRef = useRef(new Map());
   const [desktopState, dispatch] = useReducer(
     desktopReducer,
     undefined,
     () => createInitialDesktopState(appsById, STARTUP_APP_IDS),
   );
 
-  const openApplication = useCallback(
-    (appId) => {
+  const openWindow = useCallback(
+    (appId, options = {}) => {
       const app = appsById[appId];
-      if (!app) return;
+      if (!app) return null;
+      const normalizedOptions =
+        options && typeof options === "object" ? options : {};
+      const windowId = normalizedOptions.windowId || createWindowId();
       dispatch({
-        type: DESKTOP_ACTIONS.OPEN_APP,
-        payload: { app },
+        type: DESKTOP_ACTIONS.OPEN_WINDOW_INSTANCE,
+        payload: {
+          app,
+          options: {
+            ...normalizedOptions,
+            windowId,
+          },
+        },
+      });
+      return windowId;
+    },
+    [appsById],
+  );
+
+  const openApplication = useCallback((appId) => openWindow(appId), [openWindow]);
+
+  const closeApplication = useCallback((windowId) => {
+    dispatch({
+      type: DESKTOP_ACTIONS.CLOSE_WINDOW,
+      payload: { windowId },
+    });
+  }, []);
+
+  const openDialog = useCallback(
+    (appId, options = {}) => {
+      const app = appsById[appId];
+      if (!app) return Promise.resolve(null);
+
+      const normalizedOptions =
+        options && typeof options === "object" ? options : {};
+      const windowId = normalizedOptions.windowId || createWindowId();
+      return new Promise((resolve) => {
+        dialogResolversRef.current.set(windowId, resolve);
+        dispatch({
+          type: DESKTOP_ACTIONS.OPEN_WINDOW_INSTANCE,
+          payload: {
+            app,
+            options: {
+              ...normalizedOptions,
+              windowId,
+              modal: normalizedOptions.modal ?? true,
+            },
+          },
+        });
       });
     },
     [appsById],
   );
 
-  const closeApplication = useCallback((windowId) => {
+  const resolveDialog = useCallback((windowId, value = null) => {
+    const resolve = dialogResolversRef.current.get(windowId);
+    if (resolve) {
+      dialogResolversRef.current.delete(windowId);
+      resolve(value);
+    }
     dispatch({
       type: DESKTOP_ACTIONS.CLOSE_WINDOW,
       payload: { windowId },
@@ -82,10 +137,32 @@ export function useDesktopSession(appsById) {
     return appsById[focusedWindow?.appId]?.title || "";
   }, [appsById, desktopState.focusedWindowId, desktopState.windows]);
 
+  useEffect(() => {
+    const openWindowIds = new Set(desktopState.windows.map((windowItem) => windowItem.id));
+    for (const [windowId, resolve] of dialogResolversRef.current.entries()) {
+      if (openWindowIds.has(windowId)) continue;
+      dialogResolversRef.current.delete(windowId);
+      resolve(null);
+    }
+  }, [desktopState.windows]);
+
+  useEffect(
+    () => () => {
+      for (const resolve of dialogResolversRef.current.values()) {
+        resolve(null);
+      }
+      dialogResolversRef.current.clear();
+    },
+    [],
+  );
+
   return {
     desktopState,
     focusedAppName,
     openApplication,
+    openWindow,
+    openDialog,
+    resolveDialog,
     closeApplication,
     minimizeApplication,
     restoreApplication,

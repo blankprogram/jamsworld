@@ -168,7 +168,6 @@ const TOOL_CURSOR = {
 
 const INCLUDE_STROKE = "#1f4b9a";
 const EXCLUDE_STROKE = "#a63b1c";
-const SELECTED_STROKE = "#f2df86";
 const SHAPE_STROKE_WIDTH = 0.002;
 const SHAPE_STROKE_WIDTH_SELECTED = 0.0026;
 const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
@@ -249,6 +248,38 @@ function getResizeHandleAtPoint(segment, point) {
   return nearest;
 }
 
+function hexToRgb(hex) {
+  if (typeof hex !== "string") return null;
+  const raw = hex.trim().replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return null;
+  return {
+    r: parseInt(raw.slice(0, 2), 16),
+    g: parseInt(raw.slice(2, 4), 16),
+    b: parseInt(raw.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const rr = Math.max(0, Math.min(255, Math.round(r)));
+  const gg = Math.max(0, Math.min(255, Math.round(g)));
+  const bb = Math.max(0, Math.min(255, Math.round(b)));
+  return `#${rr.toString(16).padStart(2, "0")}${gg.toString(16).padStart(2, "0")}${bb.toString(16).padStart(2, "0")}`;
+}
+
+function mixHex(a, b, t) {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  if (!ca && !cb) return INCLUDE_STROKE;
+  if (!ca) return b;
+  if (!cb) return a;
+  const mix = Math.max(0, Math.min(1, t));
+  return rgbToHex({
+    r: ca.r + (cb.r - ca.r) * mix,
+    g: ca.g + (cb.g - ca.g) * mix,
+    b: ca.b + (cb.b - ca.b) * mix,
+  });
+}
+
 function getNormalizedStrokeSize(stroke) {
   if (Number.isFinite(stroke?.size) && stroke.size > 0) return stroke.size;
   if (
@@ -306,6 +337,10 @@ function MaskEditor({
   onBrushSizeChange,
   segments,
   selectedSegmentId,
+  activeGroupId,
+  defaultGroupId,
+  groupStrokeById = {},
+  defaultGroupStroke = INCLUDE_STROKE,
   onSegmentsChange,
   onInteractionStart,
   onInteractionEnd,
@@ -448,13 +483,15 @@ function MaskEditor({
           id: segmentId,
           type: "polygon",
           mode: "include",
+          groupId: activeGroupId || null,
           points: [{ x: point.x, y: point.y }],
           erasers: [],
         };
 
         onInteractionStart?.();
+        // Creating a new segment should not implicitly change selection.
+        onSelectSegment(null);
         onSegmentsChange((prev) => [...prev, polygon]);
-        onSelectSegment(segmentId);
         interactionRef.current = { mode: "draw-polygon", segmentId, pointerId };
         return;
       }
@@ -504,6 +541,7 @@ function MaskEditor({
           id: segmentId,
           type: tool,
           mode: "include",
+          groupId: activeGroupId || null,
           x: point.x,
           y: point.y,
           w: MIN_SHAPE_SIZE,
@@ -512,8 +550,9 @@ function MaskEditor({
         };
 
         onInteractionStart?.();
+        // Creating a new segment should not implicitly change selection.
+        onSelectSegment(null);
         onSegmentsChange((prev) => [...prev, shape]);
-        onSelectSegment(segmentId);
         interactionRef.current = {
           mode: "create-shape",
           pointerId,
@@ -589,6 +628,7 @@ function MaskEditor({
       updateSegment,
       segments,
       selectedSegmentId,
+      activeGroupId,
       showOutlines,
       onInteractionStart,
     ],
@@ -825,8 +865,16 @@ function MaskEditor({
       {showOutlines &&
         segments.map((segment) => {
           const isSelected = segment.id === selectedSegmentId;
+          const segmentGroupId = segment?.groupId || defaultGroupId || null;
+          const groupStroke =
+            (segmentGroupId && groupStrokeById[segmentGroupId]) ||
+            defaultGroupStroke ||
+            INCLUDE_STROKE;
+          const includeStroke = groupStroke;
+          const excludeStroke = mixHex(groupStroke, EXCLUDE_STROKE, 0.45);
+          const selectedStroke = mixHex(groupStroke, "#ffffff", 0.38);
           const include = segment.mode !== "exclude";
-          const stroke = include ? INCLUDE_STROKE : EXCLUDE_STROKE;
+          const stroke = include ? includeStroke : excludeStroke;
           const clipId = `mask-clip-${segment.id}`;
           const eraserOverlays = (segment.erasers || []).map((eraserStroke) => {
             const widthPx = getStrokeWidthPx(
@@ -842,7 +890,7 @@ function MaskEditor({
                 <path
                   d={formatPath(eraserStroke.points)}
                   className={styles.eraserOverlay}
-                  stroke={EXCLUDE_STROKE}
+                  stroke={excludeStroke}
                   strokeWidth={overlayWidthPx}
                 />
               </g>
@@ -859,7 +907,7 @@ function MaskEditor({
                 </defs>
                 {renderSegmentShape(segment, {
                   className: styles.segmentOutline,
-                  stroke: isSelected ? SELECTED_STROKE : stroke,
+                  stroke: isSelected ? selectedStroke : stroke,
                   strokeWidth: isSelected
                     ? SHAPE_STROKE_WIDTH_SELECTED
                     : SHAPE_STROKE_WIDTH,
@@ -879,7 +927,7 @@ function MaskEditor({
               key={segment.id}
               className={styles.segmentPath}
               d={formatPath(segment.points)}
-              stroke={isSelected ? SELECTED_STROKE : stroke}
+              stroke={isSelected ? selectedStroke : stroke}
               strokeWidth={segment.size}
             />
           );

@@ -10,6 +10,7 @@ const Background = ({
   const [isDragging, setIsDragging] = useState(false);
   const [box, setBox] = useState(null);
   const startPoint = useRef(null);
+  const visibleApps = apps.filter((app) => app.showOnDesktop !== false);
 
   const handleMouseDown = (e) => {
     const icon = e.target.closest('.icon');
@@ -36,18 +37,19 @@ const Background = ({
       };
       setBox(newBox);
 
-      const selected = apps
-      .filter((app) => {
-        const appElement = document.getElementById(`desktop-icon-${app.id}`);
-        if (!appElement) return false;
-        const appRect = appElement.getBoundingClientRect();
-        return !(
-          appRect.right < newBox.left ||
-          appRect.left > newBox.left + newBox.width ||
-          appRect.bottom < newBox.top ||
-          appRect.top > newBox.top + newBox.height
-        );
-      }).map((app) => app.id);
+      const selected = visibleApps
+        .filter((app) => {
+          const appElement = document.getElementById(`desktop-icon-${app.id}`);
+          if (!appElement) return false;
+          const appRect = appElement.getBoundingClientRect();
+          return !(
+            appRect.right < newBox.left ||
+            appRect.left > newBox.left + newBox.width ||
+            appRect.bottom < newBox.top ||
+            appRect.top > newBox.top + newBox.height
+          );
+        })
+        .map((app) => app.id);
 
       setSelectedAppIds(selected);
     }
@@ -70,7 +72,7 @@ const Background = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
     >
-      {apps.map(app => (
+      {visibleApps.map((app) => (
         <div
           key={app.id}
           id={`desktop-icon-${app.id}`}
