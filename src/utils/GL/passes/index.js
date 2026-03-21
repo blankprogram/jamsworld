@@ -16,6 +16,7 @@ export { default as XDoGPass } from "./XDoGPass.js";
 export { default as VHSPass } from "./VHSPass.js";
 export { default as CRTPass } from "./CRTPass.js";
 export { default as MinesweeperPass } from "./MinesweeperPass.js";
+export { default as MinecraftPass } from "./MinecraftPass.js";
 export { default as ScalePass } from "./ScalePass.js";
 export { default as MaskCompositePass } from "./MaskCompositePass.js";
 export { default as PerMaskPipelinePass } from "./PerMaskPipelinePass.js";

@@ -32,6 +32,7 @@ import {
   VHSPass,
   CRTPass,
   MinesweeperPass,
+  MinecraftPass,
   ScalePass,
 } from "../../utils/GL/passes";
 import startIcon from "../../assets/Icons/start.png";
@@ -65,6 +66,7 @@ const ALL_PASSES = [
   VHSPass,
   CRTPass,
   MinesweeperPass,
+  MinecraftPass,
 ];
 
 const DEFAULT_CUSTOM_COLORS = [
@@ -151,11 +153,17 @@ function getMaskGroupRemovalPlan(
   maskSegments,
   defaultGroupId,
 ) {
-  if (!selectedGroupId || !Array.isArray(maskGroups) || maskGroups.length <= 1) {
+  if (
+    !selectedGroupId ||
+    !Array.isArray(maskGroups) ||
+    maskGroups.length <= 1
+  ) {
     return null;
   }
 
-  const removeIndex = maskGroups.findIndex((group) => group.id === selectedGroupId);
+  const removeIndex = maskGroups.findIndex(
+    (group) => group.id === selectedGroupId,
+  );
   if (removeIndex < 0) return null;
 
   const selectedGroup = maskGroups[removeIndex];
@@ -282,7 +290,8 @@ function shouldHideOption(filter, optionName) {
   if (
     (filter.type === "PIXELSORT" ||
       filter.type === "ASCII" ||
-      filter.type === "MINESWEEPER") &&
+      filter.type === "MINESWEEPER" ||
+      filter.type === "MINECRAFT") &&
     (optionName === "low" || optionName === "high") &&
     filter.opts.mode !== "Threshold"
   ) {
@@ -627,7 +636,6 @@ const FilterOptions = React.memo(function FilterOptions({
   onSwapLeave,
 }) {
   const ref = useRef(null);
-  const headerRef = useRef(null);
   const cfg = filter ? defs[filter.type] : null;
   const visibleOptions = useMemo(() => {
     if (!cfg) return [];
@@ -665,7 +673,13 @@ const FilterOptions = React.memo(function FilterOptions({
 
     const cleanup = draggable({
       element: el,
-      dragHandle: headerRef.current || el,
+      dragHandle: el,
+      canDrag: ({ input }) => {
+        if (typeof document === "undefined") return true;
+        const target = document.elementFromPoint(input.clientX, input.clientY);
+        if (!(target instanceof Element)) return true;
+        return !target.closest(HEADER_INTERACTIVE_SELECTOR);
+      },
       getInitialData: () => ({ index }),
     });
 
@@ -696,7 +710,6 @@ const FilterOptions = React.memo(function FilterOptions({
       className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""} ${swapActive ? styles.swapActive : ""}`}
     >
       <div
-        ref={headerRef}
         className={styles.filterHeader}
         onClick={handleHeaderClick}
       >
@@ -885,61 +898,79 @@ function useFilterStackState(defs, filters, setFilters) {
     [defs, setFilters],
   );
 
-  const handleOptionChange = useCallback((i, name, val) => {
-    setFilters((fs) =>
-      fs.map((f, j) =>
-        j === i ? { ...f, opts: { ...f.opts, [name]: val } } : f,
-      ),
-    );
-  }, [setFilters]);
+  const handleOptionChange = useCallback(
+    (i, name, val) => {
+      setFilters((fs) =>
+        fs.map((f, j) =>
+          j === i ? { ...f, opts: { ...f.opts, [name]: val } } : f,
+        ),
+      );
+    },
+    [setFilters],
+  );
 
-  const addCustomColor = useCallback((i) => {
-    setFilters((fs) =>
-      fs.map((f, j) =>
-        j === i
-          ? {
-              ...f,
-              opts: {
-                ...f.opts,
-                customColors: [...f.opts.customColors, "#000000"],
-              },
-            }
-          : f,
-      ),
-    );
-  }, [setFilters]);
+  const addCustomColor = useCallback(
+    (i) => {
+      setFilters((fs) =>
+        fs.map((f, j) =>
+          j === i
+            ? {
+                ...f,
+                opts: {
+                  ...f.opts,
+                  customColors: [...f.opts.customColors, "#000000"],
+                },
+              }
+            : f,
+        ),
+      );
+    },
+    [setFilters],
+  );
 
-  const removeCustomColor = useCallback((i, ci) => {
-    setFilters((fs) =>
-      fs.map((f, j) =>
-        j === i
-          ? {
-              ...f,
-              opts: {
-                ...f.opts,
-                customColors: f.opts.customColors.filter((_, k) => k !== ci),
-              },
-            }
-          : f,
-      ),
-    );
-  }, [setFilters]);
+  const removeCustomColor = useCallback(
+    (i, ci) => {
+      setFilters((fs) =>
+        fs.map((f, j) =>
+          j === i
+            ? {
+                ...f,
+                opts: {
+                  ...f.opts,
+                  customColors: f.opts.customColors.filter((_, k) => k !== ci),
+                },
+              }
+            : f,
+        ),
+      );
+    },
+    [setFilters],
+  );
 
-  const removeFilter = useCallback((i) => {
-    setFilters((fs) => fs.filter((_, j) => j !== i));
-  }, [setFilters]);
+  const removeFilter = useCallback(
+    (i) => {
+      setFilters((fs) => fs.filter((_, j) => j !== i));
+    },
+    [setFilters],
+  );
 
-  const toggleFilter = useCallback((i) => {
-    setFilters((fs) =>
-      fs.map((f, j) => (j === i ? { ...f, open: !f.open } : f)),
-    );
-  }, [setFilters]);
+  const toggleFilter = useCallback(
+    (i) => {
+      setFilters((fs) =>
+        fs.map((f, j) => (j === i ? { ...f, open: !f.open } : f)),
+      );
+    },
+    [setFilters],
+  );
 
-  const toggleEnabled = useCallback((i) => {
-    setFilters((fs) =>
-      fs.map((f, j) => (j === i ? { ...f, enabled: !f.enabled } : f)),
-    );
-  }, [setFilters]);
+  const toggleEnabled = useCallback(
+    (i) => {
+      setFilters((fs) =>
+        fs.map((f, j) => (j === i ? { ...f, enabled: !f.enabled } : f)),
+      );
+    },
+    [setFilters],
+  );
 
   return {
     filters,
@@ -992,14 +1023,8 @@ function useMaskState() {
   const [maskVersion, setMaskVersion] = useState(0);
   const canUndoMask = maskHistory.past.length > 0;
   const canRedoMask = maskHistory.future.length > 0;
-  const undoMask = useCallback(
-    () => dispatchMaskHistory({ type: "undo" }),
-    [],
-  );
-  const redoMask = useCallback(
-    () => dispatchMaskHistory({ type: "redo" }),
-    [],
-  );
+  const undoMask = useCallback(() => dispatchMaskHistory({ type: "undo" }), []);
+  const redoMask = useCallback(() => dispatchMaskHistory({ type: "redo" }), []);
   const startMaskInteraction = useCallback(
     () => dispatchMaskHistory({ type: "start-interaction" }),
     [],
@@ -1014,7 +1039,10 @@ function useMaskState() {
   }, [maskEnabled]);
 
   useEffect(() => {
-    if (selectedMaskGroupId && maskGroups.some((group) => group.id === selectedMaskGroupId)) {
+    if (
+      selectedMaskGroupId &&
+      maskGroups.some((group) => group.id === selectedMaskGroupId)
+    ) {
       return;
     }
     setSelectedMaskGroupId(maskGroups[0]?.id || null);
@@ -1027,7 +1055,9 @@ function useMaskState() {
       const nextDisplayIndex = getMaskGroupDisplayIndex(group, idx + 1);
       if (group?.displayIndex !== nextDisplayIndex) shouldPatchGroups = true;
       maxDisplayIndex = Math.max(maxDisplayIndex, nextDisplayIndex);
-      return shouldPatchGroups ? { ...group, displayIndex: nextDisplayIndex } : group;
+      return shouldPatchGroups
+        ? { ...group, displayIndex: nextDisplayIndex }
+        : group;
     });
 
     if (shouldPatchGroups) {
@@ -1035,14 +1065,14 @@ function useMaskState() {
       return;
     }
 
-    setNextMaskGroupDisplayIndex((prev) =>
-      Math.max(prev, maxDisplayIndex + 1),
-    );
+    setNextMaskGroupDisplayIndex((prev) => Math.max(prev, maxDisplayIndex + 1));
   }, [maskGroups, setMaskGroups]);
 
   useEffect(() => {
     if (!selectedMaskSegmentId) return;
-    const exists = maskSegments.some((segment) => segment.id === selectedMaskSegmentId);
+    const exists = maskSegments.some(
+      (segment) => segment.id === selectedMaskSegmentId,
+    );
     if (!exists) setSelectedMaskSegmentId(null);
   }, [maskSegments, selectedMaskSegmentId]);
 
@@ -1066,32 +1096,31 @@ function useMaskState() {
     setNextMaskGroupDisplayIndex((prev) => prev + 1);
   }, [nextMaskGroupDisplayIndex]);
 
-  const removeSelectedMaskGroup = useCallback((groupIdArg) => {
-    const groupId = groupIdArg || selectedMaskGroupId;
-    if (!groupId || maskGroups.length <= 1) return;
+  const removeSelectedMaskGroup = useCallback(
+    (groupIdArg) => {
+      const groupId = groupIdArg || selectedMaskGroupId;
+      if (!groupId || maskGroups.length <= 1) return;
 
-    const removeIndex = maskGroups.findIndex(
-      (group) => group.id === groupId,
-    );
-    if (removeIndex < 0) return;
+      const removeIndex = maskGroups.findIndex((group) => group.id === groupId);
+      if (removeIndex < 0) return;
 
-    const nextSelectedGroup =
-      maskGroups[removeIndex === 0 ? 1 : removeIndex - 1] ||
-      maskGroups[removeIndex + 1] ||
-      null;
-    const currentDefaultGroupId = maskGroups[0]?.id || null;
+      const nextSelectedGroup =
+        maskGroups[removeIndex === 0 ? 1 : removeIndex - 1] ||
+        maskGroups[removeIndex + 1] ||
+        null;
+      const currentDefaultGroupId = maskGroups[0]?.id || null;
 
-    setMaskGroups((prev) =>
-      prev.filter((group) => group.id !== groupId),
-    );
-    setSelectedMaskGroupId(nextSelectedGroup?.id || null);
-    setMaskSegments((prev) =>
-      prev.filter(
-        (segment) =>
-          normalizeSegmentGroupId(segment, currentDefaultGroupId) !== groupId,
-      ),
-    );
-  }, [selectedMaskGroupId, maskGroups, setMaskSegments]);
+      setMaskGroups((prev) => prev.filter((group) => group.id !== groupId));
+      setSelectedMaskGroupId(nextSelectedGroup?.id || null);
+      setMaskSegments((prev) =>
+        prev.filter(
+          (segment) =>
+            normalizeSegmentGroupId(segment, currentDefaultGroupId) !== groupId,
+        ),
+      );
+    },
+    [selectedMaskGroupId, maskGroups, setMaskSegments],
+  );
 
   const toggleMaskGroupEnabled = useCallback((groupId) => {
     if (!groupId) return;
@@ -1211,7 +1240,11 @@ function useViewportSizing(imageSurfaceRef, canvasRef) {
   return { surfaceSize, contentSize };
 }
 
-function useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef) {
+function useMaskMenuDismiss(
+  showMaskSettings,
+  setShowMaskSettings,
+  maskMenuRef,
+) {
   useEffect(() => {
     if (!showMaskSettings) return undefined;
 
@@ -1291,8 +1324,10 @@ function useMaskRasterization(
             groupCanvases.set(groupId, groupCanvas);
           }
 
-          if (groupCanvas.width !== targetWidth) groupCanvas.width = targetWidth;
-          if (groupCanvas.height !== targetHeight) groupCanvas.height = targetHeight;
+          if (groupCanvas.width !== targetWidth)
+            groupCanvas.width = targetWidth;
+          if (groupCanvas.height !== targetHeight)
+            groupCanvas.height = targetHeight;
 
           rasterizeMask(
             groupCanvas,
@@ -1402,7 +1437,8 @@ export default function PixelPass({ windowRuntime }) {
         })),
       ];
 
-      const currentPerMaskGroupId = activeMaskGroup?.id || selectedMaskGroupId || null;
+      const currentPerMaskGroupId =
+        activeMaskGroup?.id || selectedMaskGroupId || null;
       const currentIndex =
         pipelineMode === PIPELINE_MODE_GLOBAL
           ? 0
@@ -1447,7 +1483,9 @@ export default function PixelPass({ windowRuntime }) {
   );
   const selectedSegmentGroupId = useMemo(() => {
     if (!selectedMaskSegmentId) return null;
-    const segment = maskSegments.find((item) => item.id === selectedMaskSegmentId);
+    const segment = maskSegments.find(
+      (item) => item.id === selectedMaskSegmentId,
+    );
     return normalizeSegmentGroupId(segment, defaultMaskGroupId);
   }, [selectedMaskSegmentId, maskSegments, defaultMaskGroupId]);
   const canMoveSelectedToActiveGroup =
@@ -1554,7 +1592,8 @@ export default function PixelPass({ windowRuntime }) {
     () =>
       Object.fromEntries(
         maskGroups.map((group) => {
-          const colorIdx = hashString(group.id) % MASK_GROUP_STROKE_PALETTE.length;
+          const colorIdx =
+            hashString(group.id) % MASK_GROUP_STROKE_PALETTE.length;
           return [group.id, MASK_GROUP_STROKE_PALETTE[colorIdx]];
         }),
       ),
@@ -1592,7 +1631,8 @@ export default function PixelPass({ windowRuntime }) {
     [maskGroups, selectedMaskGroupId, maskSegments, defaultMaskGroupId],
   );
   const defaultMaskGroupStroke =
-    (defaultMaskGroupId && maskGroupStrokeById[defaultMaskGroupId]) || "#1f4b9a";
+    (defaultMaskGroupId && maskGroupStrokeById[defaultMaskGroupId]) ||
+    "#1f4b9a";
   const maskGroupIds = useMemo(
     () => maskGroups.map((group) => group.id).filter(Boolean),
     [maskGroups],
@@ -1668,10 +1708,8 @@ export default function PixelPass({ windowRuntime }) {
   const requestRemoveGroup = useCallback(async () => {
     if (!maskEnabled || !removeGroupPlan || !selectedMaskGroupId) return;
     const groupId = selectedMaskGroupId;
-    const {
-      selectedGroupLabel = "Selected Group",
-      deletedCount = 0,
-    } = removeGroupPlan;
+    const { selectedGroupLabel = "Selected Group", deletedCount = 0 } =
+      removeGroupPlan;
     const deleteLabel = `${deletedCount} segment${deletedCount === 1 ? "" : "s"} in this group will be deleted.`;
 
     let confirmed = false;
@@ -1695,7 +1733,9 @@ export default function PixelPass({ windowRuntime }) {
       });
       confirmed = result === true;
     } else if (typeof window !== "undefined" && window.confirm) {
-      confirmed = window.confirm(`Remove "${selectedGroupLabel}"?\n${deleteLabel}`);
+      confirmed = window.confirm(
+        `Remove "${selectedGroupLabel}"?\n${deleteLabel}`,
+      );
     }
 
     if (confirmed) {
@@ -1749,7 +1789,8 @@ export default function PixelPass({ windowRuntime }) {
     };
 
     window.addEventListener("keydown", handleMaskHistoryKeydown);
-    return () => window.removeEventListener("keydown", handleMaskHistoryKeydown);
+    return () =>
+      window.removeEventListener("keydown", handleMaskHistoryKeydown);
   }, [maskEnabled, undoMask, redoMask]);
 
   const imageViewportStyle = useMemo(() => {
@@ -1823,7 +1864,6 @@ export default function PixelPass({ windowRuntime }) {
           <span
             className={styles.maskContextBookmark}
             onWheel={handleMaskContextBookmarkWheel}
-            title="Scroll to cycle: Global and groups"
           >
             {maskContextBadgeLabel}
           </span>
@@ -1971,16 +2011,16 @@ export default function PixelPass({ windowRuntime }) {
                       type="button"
                       className={`xpButton ${styles.maskIconButton} ${activeMaskGroup?.enabled ? styles.maskButtonActive : ""}`}
                       disabled={!maskEnabled || !activeMaskGroup}
-                      onClick={() => toggleMaskGroupEnabled(activeMaskGroup?.id)}
+                      onClick={() =>
+                        toggleMaskGroupEnabled(activeMaskGroup?.id)
+                      }
                       title={
                         activeMaskGroup?.enabled
                           ? "Group Visible"
                           : "Group Hidden"
                       }
                       aria-label={
-                        activeMaskGroup?.enabled
-                          ? "Hide Group"
-                          : "Show Group"
+                        activeMaskGroup?.enabled ? "Hide Group" : "Show Group"
                       }
                     >
                       <MaskEyeIcon />
@@ -2157,7 +2197,12 @@ export default function PixelPass({ windowRuntime }) {
                 />
               </div>
             </div>
-            <video ref={videoRef} playsInline muted style={{ display: "none" }} />
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              style={{ display: "none" }}
+            />
           </div>
         </div>
       </div>

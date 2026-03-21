@@ -3,7 +3,7 @@ import GLPass from "../GLPass.js";
 export default class SobelPass extends GLPass {
   static def = {
     type: "SOBEL",
-    title: "Sobel Edge Detection",
+    title: "Sobel Edge",
     options: [],
     structuralKeys: [],
     uniformKeys: ["u_texelSize"],
