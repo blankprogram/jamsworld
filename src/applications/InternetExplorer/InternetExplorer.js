@@ -1,24 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { createAppManifest } from "../createAppManifest";
+import goIcon from "../../assets/Icons/go.png";
+import backIcon from "../../assets/Icons/back.png";
+import forwardIcon from "../../assets/Icons/forward.png";
+import windowsIcon from "../../assets/Icons/windows.png";
+import searchIcon from "../../assets/Icons/search.png";
+import linksIcon from "../../assets/Icons/share.png";
+import internetIcon from "../../assets/Icons/explorer.png";
+import appInternetExplorerIcon from "../../assets/Icons/internetexplorer.png";
+import noFile from "../../assets/Icons/nofile.png";
+import refreshFile from "../../assets/Icons/refreshfile.png";
+import Home from "../../assets/Icons/home.png";
+import Star from "../../assets/Icons/star.png";
+import reverseTime from "../../assets/Icons/reversetime.png";
+import openMail from "../../assets/Icons/openmail.png";
+import Printer from "../../assets/Icons/printer.png";
+import Send from "../../assets/Icons/send.png";
+import Globe from "../../assets/Icons/globe.png";
 import styles from "./InternetExplorer.module.css";
-
-import goIcon from '../../assets/Icons/go.png';
-import backIcon from '../../assets/Icons/back.png';
-import forwardIcon from '../../assets/Icons/forward.png';
-import windowsIcon from '../../assets/Icons/windows.png';
-import searchIcon from '../../assets/Icons/search.png';
-import linksIcon from '../../assets/Icons/share.png';
-import internetIcon from '../../assets/Icons/explorer.png';
-import appInternetExplorerIcon from '../../assets/Icons/internetexplorer.png';
-import noFile from '../../assets/Icons/nofile.png';
-import refreshFile from '../../assets/Icons/refreshfile.png';
-import Home from '../../assets/Icons/home.png';
-import Star from '../../assets/Icons/star.png';
-import reverseTime from '../../assets/Icons/reversetime.png';
-import openMail from '../../assets/Icons/openmail.png';
-import Printer from '../../assets/Icons/printer.png';
-import Send from '../../assets/Icons/send.png';
-import Globe from '../../assets/Icons/globe.png';
-import { createAppManifest } from '../createAppManifest';
 
 export const appManifest = createAppManifest({
   id: "internet-explorer",
@@ -26,27 +25,26 @@ export const appManifest = createAppManifest({
   icon: appInternetExplorerIcon,
 });
 
-function InternetExplorer({ isFocused }) {
-  const cx = (...keys) => keys.map((key) => styles[key]).join(" ");
+const MENU_ITEMS = ["File", "Edit", "View", "Favorites", "Tools", "Help"];
 
-  // Base URL (your own page without query parameters)
+const cx = (...classes) => classes.filter(Boolean).join(" ");
+
+function InternetExplorer({ isFocused }) {
   const defaultUrl = window.location.origin + window.location.pathname;
 
-  // Helper: increment the "nest" query parameter
   const getNestedUrl = (baseUrl) => {
     const urlObj = new URL(baseUrl, window.location.href);
-    const currentNest = Number(urlObj.searchParams.get('nest')) || 0;
-    urlObj.searchParams.set('nest', currentNest + 1);
+    const currentNest = Number(urlObj.searchParams.get("nest")) || 0;
+    urlObj.searchParams.set("nest", currentNest + 1);
     return urlObj.toString();
   };
 
-  // Start with the current URL nested once
   const initialUrl = getNestedUrl(window.location.href);
 
   const [url, setUrl] = useState(initialUrl);
   const [inputValue, setInputValue] = useState(initialUrl);
 
-  const handleInputChange = (e) => setInputValue(e.target.value);
+  const handleInputChange = (event) => setInputValue(event.target.value);
 
   const navigate = () => {
     let formattedUrl = inputValue.trim();
@@ -57,150 +55,133 @@ function InternetExplorer({ isFocused }) {
     setInputValue(formattedUrl);
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') navigate();
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter") navigate();
   };
 
   return (
-    <div className={styles.ie}>
-      {/* Toolbar */}
-      <section className={styles.ie__toolbar}>
-        <div className={styles.ie__options}>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>File</div>
-          </div>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>Edit</div>
-          </div>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>View</div>
-          </div>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>Favorites</div>
-          </div>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>Tools</div>
-          </div>
-          <div className={styles["drop-down"]}>
-            <div className={styles["drop-down__label"]}>Help</div>
-          </div>
+    <div className={styles.root}>
+      <section className={styles.toolbar}>
+        <div className={styles.menu}>
+          {MENU_ITEMS.map((item) => (
+            <div key={item} className={styles.menuItem}>
+              {item}
+            </div>
+          ))}
         </div>
-        <img className={styles.ie__windowsLogo} src={windowsIcon} alt="windows" />
+        <img className={styles.windowsLogo} src={windowsIcon} alt="windows" />
       </section>
 
-      {/* Function Bar */}
-      <section className={styles.ie__functionBar}>
-        <div className={cx("ie__functionBar__button", "ie__functionBar__buttonDisable")}>
-          <img className={styles.ie__functionBar__icon} src={backIcon} alt="Back" />
-          <span className={styles.ie__functionBar__text}>Back</span>
-          {/* Drop-down arrow for Back */}
-          <div className={styles.ie__functionBar__arrow} />
+      <section className={styles.functionBar}>
+        <div
+          className={cx(styles.functionButton, styles.functionButtonDisabled)}
+        >
+          <img className={styles.functionIcon} src={backIcon} alt="Back" />
+          <span className={styles.functionText}>Back</span>
+          <div className={styles.arrow} />
         </div>
 
-        <div className={cx("ie__functionBar__button", "ie__functionBar__buttonDisable")}>
-          <img className={styles.ie__functionBar__icon} src={forwardIcon} alt="Forward" />
-          {/* Drop-down arrow for Forward */}
-          <div className={styles.ie__functionBar__arrow} />
+        <div
+          className={cx(styles.functionButton, styles.functionButtonDisabled)}
+        >
+          <img className={styles.functionIcon} src={forwardIcon} alt="Forward" />
+          <div className={styles.arrow} />
         </div>
 
-        <div className={styles.ie__functionBar__button}>
-          <img className={styles.ie__functionBar__icon} src={noFile} alt="No File" />
-          <img className={styles.ie__functionBar__icon} src={refreshFile} alt="Refresh File" />
-          <img className={styles.ie__functionBar__icon} src={Home} alt="Home" />
+        <div className={styles.functionButton}>
+          <img className={styles.functionIcon} src={noFile} alt="No File" />
+          <img
+            className={styles.functionIcon}
+            src={refreshFile}
+            alt="Refresh File"
+          />
+          <img className={styles.functionIcon} src={Home} alt="Home" />
         </div>
 
-        {/* Divider between Home group and Search icon */}
-        <div className={styles.ie__functionBar__divider} />
+        <div className={styles.functionDivider} />
 
-        <div className={styles.ie__functionBar__button}>
-          <img className={styles.ie__functionBar__iconSmall} src={searchIcon} alt="Search" />
-          <span className={styles.ie__functionBar__text}>Search</span>
+        <div className={styles.functionButton}>
+          <img
+            className={styles.functionIconSmall}
+            src={searchIcon}
+            alt="Search"
+          />
+          <span className={styles.functionText}>Search</span>
         </div>
 
-        <div className={styles.ie__functionBar__button}>
-          <img className={styles.ie__functionBar__iconSmall} src={Star} alt="Star" />
-          <span className={styles.ie__functionBar__text}>Favourites</span>
+        <div className={styles.functionButton}>
+          <img className={styles.functionIconSmall} src={Star} alt="Star" />
+          <span className={styles.functionText}>Favourites</span>
         </div>
 
-        <img className={styles.ie__functionBar__icon} src={reverseTime} alt="Reverse Time" />
+        <img
+          className={styles.functionIcon}
+          src={reverseTime}
+          alt="Reverse Time"
+        />
 
-        {/* Divider between ReverseTime and OpenMail icons */}
-        <div className={styles.ie__functionBar__divider} />
+        <div className={styles.functionDivider} />
 
-        <div className={styles.ie__functionBar__button}>
-          <img className={styles.ie__functionBar__icon} src={openMail} alt="Open Mail" />
-          {/* Drop-down arrow for Open Mail */}
-          <div className={styles.ie__functionBar__arrow} />
+        <div className={styles.functionButton}>
+          <img className={styles.functionIcon} src={openMail} alt="Open Mail" />
+          <div className={styles.arrow} />
         </div>
 
-        <img className={styles.ie__functionBar__iconSmall} src={Printer} alt="Printer" />
-        <img className={styles.ie__functionBar__icon} src={Send} alt="Send" />
-        <img className={styles.ie__functionBar__iconSmall} src={linksIcon} alt="Links" />
+        <img className={styles.functionIconSmall} src={Printer} alt="Printer" />
+        <img className={styles.functionIcon} src={Send} alt="Send" />
+        <img className={styles.functionIconSmall} src={linksIcon} alt="Links" />
       </section>
 
-      {/* Address Bar */}
-      <section className={styles.ie__addressBar}>
-        <div className={styles.ie__addressBar__title}>Address</div>
-        <div className={styles.ie__addressBar__content}>
+      <section className={styles.addressBar}>
+        <div className={styles.addressTitle}>Address</div>
+        <div className={styles.addressContent}>
           <img
             src={internetIcon}
             alt="InternetIcon"
-            className={styles.ie__addressBar__content__img}
+            className={styles.addressIcon}
           />
           <input
             type="text"
             value={inputValue}
             onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            className={styles.ie__addressBar__content__text}
+            onKeyDown={handleKeyDown}
+            className={styles.addressInput}
           />
-          <span className={styles.ie__functionBar__arrow} />
+          <span className={styles.arrow} />
         </div>
-        <div className={styles.ie__addressBar__go} onClick={navigate}>
-          <img className={styles.ie__addressBar__go__img} src={goIcon} alt="Go" />
-          <span className={styles.ie__addressBar__go__text}>Go</span>
+        <div className={styles.addressGo} onClick={navigate}>
+          <img className={styles.addressGoIcon} src={goIcon} alt="Go" />
+          <span className={styles.addressGoText}>Go</span>
         </div>
-        <div className={styles.ie__addressBar__separate} />
-        <div className={styles.ie__addressBar__links}>
-          <span className={styles.ie__addressBar__links__text}>Links</span>
+        <div className={styles.addressSeparator} />
+        <div className={styles.addressLinks}>
+          <span className={styles.addressLinksText}>Links</span>
         </div>
       </section>
 
+      <iframe
+        src={url}
+        title="Internet Explorer"
+        className={cx(styles.frame, !isFocused && styles.frameBlocked)}
+      />
 
-  <iframe
-    src={url}
-    title="Internet Explorer"
-    style={{
-      flex: 1,
-      width: '100%',
-      border: 'none',
-      margin: 0,
-      padding: 0,
-      pointerEvents: isFocused ? 'auto' : 'none',
-    }}
-  />
-
-      <footer className={styles.ie__footer}>
-        <div className={styles.ie__footer__status}>
+      <footer className={styles.footer}>
+        <div className={styles.footerStatus}>
           <img
-            className={styles.ie__footer__status__img}
+            className={styles.footerStatusIcon}
             src={internetIcon}
             alt="InternetIcon"
           />
-          <span className={styles.ie__footer__status__text}>Done</span>
+          <span>Done</span>
         </div>
-        <div className={styles.ie__footer__block} />
-        <div className={styles.ie__footer__block} />
-        <div className={styles.ie__footer__block} />
-        <div className={styles.ie__footer__block} />
-        <div className={styles.ie__footer__right}>
-          <img
-            className={styles.ie__footer__right__img}
-            src={Globe}
-            alt="globe"
-          />
-          <span className={styles.ie__footer__right__text}>Internet</span>
-          <div className={styles.ie__footer__right__dots} />
+        <div />
+        <div />
+        <div />
+        <div />
+        <div className={styles.footerRight}>
+          <img className={styles.footerRightIcon} src={Globe} alt="globe" />
+          <span>Internet</span>
+          <div className={styles.footerRightDots} />
         </div>
       </footer>
     </div>

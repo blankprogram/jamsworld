@@ -1,0 +1,12 @@
+:global(#webamp) {
+  pointer-events: none;
+}
+
+:global(#webamp .window),
+:global(#webamp .gen-window) {
+  pointer-events: auto;
+}
+
+:global(#webamp-context-menu) {
+  pointer-events: auto;
+}

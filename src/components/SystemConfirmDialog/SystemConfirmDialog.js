@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import XpButton from "../XpButton/XpButton";
 import styles from "./SystemConfirmDialog.module.css";
 
 const toMessageLines = (message) => {
@@ -31,20 +32,16 @@ export default function SystemConfirmDialog({ windowProps = {}, windowRuntime })
         ))}
       </div>
       <div className={styles.actions}>
-        <button
-          type="button"
-          className="xpButton"
+        <XpButton
           onClick={() => windowRuntime?.resolveDialog?.(true)}
         >
           {confirmLabel}
-        </button>
-        <button
-          type="button"
-          className="xpButton"
+        </XpButton>
+        <XpButton
           onClick={() => windowRuntime?.resolveDialog?.(false)}
         >
           {cancelLabel}
-        </button>
+        </XpButton>
       </div>
     </div>
   );

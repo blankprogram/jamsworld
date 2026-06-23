@@ -1,0 +1,52 @@
+.background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 20px;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  margin-bottom: 20px;
+  text-align: center;
+  cursor: pointer;
+  font-family: 'Tahoma', sans-serif;
+  font-size: 10px;
+  color: white;
+  position: relative;
+  text-shadow: 1px 1px 2px black;
+}
+
+.appIcon {
+  width: 30px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.icon.selected .appIcon {
+  mix-blend-mode: multiply;
+  filter: brightness(0.9) sepia(1) hue-rotate(170deg) saturate(10) opacity(1);
+}
+
+.icon.selected span {
+  background-color: #0b61ff;
+  opacity: 0.5;
+  padding-right: 1px;
+  padding-left: 1px;
+}
+
+.selectionBox {
+  position: absolute;
+  border: 1px dashed grey;
+  pointer-events: none;
+}

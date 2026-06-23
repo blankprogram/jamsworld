@@ -1,4 +1,4 @@
-.ie {
+.root {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -8,7 +8,7 @@
   font-family: Tahoma, sans-serif;
 }
 
-.ie__toolbar {
+.toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -17,11 +17,11 @@
   background-color: var(--xp-color-ie-toolbar, #edebda);
 }
 
-.ie__options {
+.menu {
   display: flex;
 }
 
-.drop-down {
+.menuItem {
   position: relative;
   display: inline-block;
   padding: 4px 8px;
@@ -29,19 +29,16 @@
   cursor: pointer;
 }
 
-.drop-down__label {
-}
-
-.drop-down:hover {
+.menuItem:hover {
   background-color: var(--xp-color-menu-hover, #1660e8);
   color: var(--xp-color-white, #fff);
 }
 
-.ie__windowsLogo {
+.windowsLogo {
   border-left: 1px solid var(--xp-color-ie-toolbar-border, #bab8aa);
 }
 
-.ie__functionBar {
+.functionBar {
   display: flex;
   align-items: center;
   padding: 5px;
@@ -49,40 +46,52 @@
   background-color: var(--xp-color-ie-toolbar, #edebda);
 }
 
-.ie__functionBar__button {
+.functionButton {
   display: flex;
   align-items: center;
   margin-right: 8px;
 }
 
-.ie__functionBar__buttonDisable {
+.functionButtonDisabled {
   opacity: 0.5;
   filter: grayscale(100%);
 }
 
-.ie__functionBar__icon {
+.functionIcon {
   height: 30px;
   margin-right: 2px;
 }
 
-.ie__functionBar__iconSmall {
+.functionIconSmall {
   height: 22px;
   margin-right: 4px;
 }
 
-.ie__functionBar__text {
+.functionText {
   font-size: 12px;
   margin-right: 4px;
 }
 
-.ie__functionBar__divider {
+.functionDivider {
   width: 1px;
   height: 30px;
   margin: 0 5px;
   background-color: var(--xp-color-ie-toolbar-border, #bab8aa);
 }
 
-.ie__addressBar {
+.arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  vertical-align: middle;
+  transform: translateY(1px);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #000;
+}
+
+.addressBar {
   display: flex;
   align-items: center;
   padding: 2px 5px;
@@ -90,13 +99,13 @@
   background-color: var(--xp-color-ie-toolbar, #edebda);
 }
 
-.ie__addressBar__title {
+.addressTitle {
   margin-right: 5px;
   color: var(--xp-color-ie-muted, #767696);
   font-size: 12px;
 }
 
-.ie__addressBar__content {
+.addressContent {
   display: flex;
   align-items: center;
   flex-grow: 1;
@@ -105,62 +114,63 @@
   background-color: var(--xp-color-white, #fff);
 }
 
-.ie__addressBar__content__img {
+.addressIcon {
   height: 16px;
   margin-right: 5px;
 }
 
-.ie__addressBar__content__text {
+.addressContent .addressInput {
   flex-grow: 1;
-  border: none !important;
+  border: none;
 }
 
-.ie__functionBar__arrow {
-  margin-left: 3px;
-  display: inline-block;
-  vertical-align: middle;
-  transform: translateY(1px);
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 4px solid #000;
-}
-
-.ie__addressBar__go {
+.addressGo {
   display: flex;
   align-items: center;
   margin-left: 5px;
   cursor: pointer;
 }
 
-.ie__addressBar__go__img {
+.addressGoIcon {
   height: 16px;
   margin-right: 2px;
 }
 
-.ie__addressBar__go__text {
+.addressGoText {
   font-size: 12px;
 }
 
-.ie__addressBar__separate {
+.addressSeparator {
   width: 1px;
   height: 20px;
   margin: 0 5px;
   background-color: #ccc;
 }
 
-.ie__addressBar__links {
+.addressLinks {
   display: flex;
   align-items: center;
 }
 
-.ie__addressBar__links__text {
+.addressLinksText {
   margin-right: 2px;
   font-size: 12px;
 }
 
-.ie__footer {
+.frame {
+  flex: 1;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  pointer-events: auto;
+}
+
+.frameBlocked {
+  pointer-events: none;
+}
+
+.footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -169,23 +179,17 @@
   background-color: var(--xp-color-ie-toolbar, #edebda);
 }
 
-.ie__footer__status {
+.footerStatus {
   display: flex;
   align-items: center;
 }
 
-.ie__footer__status__text {
-}
-
-.ie__footer__status__img {
+.footerStatusIcon {
   height: 16px;
   margin-right: 3px;
 }
 
-.ie__footer__block {
-}
-
-.ie__footer__right {
+.footerRight {
   position: relative;
   display: flex;
   align-items: center;
@@ -195,25 +199,28 @@
   box-shadow: inset 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-.ie__footer__right__img {
-  height: 14px;
+.footerRightIcon {
   width: 14px;
+  height: 14px;
   margin-right: 3px;
 }
 
-.ie__footer__right__text {
-}
-
-.ie__footer__right__dots {
+.footerRightDots {
   position: absolute;
   right: 11px;
   bottom: -1px;
   width: 2px;
   height: 2px;
-  box-shadow: 2px 0 rgba(0, 0, 0, 0.25), 5.5px 0 rgba(0, 0, 0, 0.25),
-    9px 0 rgba(0, 0, 0, 0.25), 5.5px -3.5px rgba(0, 0, 0, 0.25),
-    9px -3.5px rgba(0, 0, 0, 0.25), 9px -7px rgba(0, 0, 0, 0.25),
-    3px 1px rgba(255, 255, 255, 1), 6.5px 1px rgba(255, 255, 255, 1),
-    10px 1px rgba(255, 255, 255, 1), 10px -2.5px rgba(255, 255, 255, 1),
+  box-shadow:
+    2px 0 rgba(0, 0, 0, 0.25),
+    5.5px 0 rgba(0, 0, 0, 0.25),
+    9px 0 rgba(0, 0, 0, 0.25),
+    5.5px -3.5px rgba(0, 0, 0, 0.25),
+    9px -3.5px rgba(0, 0, 0, 0.25),
+    9px -7px rgba(0, 0, 0, 0.25),
+    3px 1px rgba(255, 255, 255, 1),
+    6.5px 1px rgba(255, 255, 255, 1),
+    10px 1px rgba(255, 255, 255, 1),
+    10px -2.5px rgba(255, 255, 255, 1),
     10px -6px rgba(255, 255, 255, 1);
 }

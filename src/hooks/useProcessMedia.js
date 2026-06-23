@@ -1,801 +1,278 @@
-import { useRef, useState, useEffect, useCallback } from "react";
-import GLPipeline from "../utils/GL/GLPipeline";
-import { decodeGIF, encodeGIF } from "../utils/gifUtils";
-import { MaskCompositePass, PerMaskPipelinePass } from "../utils/GL/passes";
-import { diffKeys, applyPassOptions } from "../utils/GL/optionUtils";
+import { useCallback, useEffect, useRef } from "react";
+import { getErrorMessage, isLiveSourceKind } from "./mediaHelpers";
+import { useCameraSource } from "./useCameraSource";
+import { useGifSource } from "./useGifSource";
+import { useImageSource } from "./useImageSource";
+import { useMediaSourceState } from "./useMediaSourceState";
+import { useMediaExport } from "./useMediaExport";
+import { useVideoSource } from "./useVideoSource";
+import { useWebGPUPipeline } from "./useWebGPUPipeline";
 
-function readImageDataFromWebGL(gl, width, height) {
-  const pixels = new Uint8Array(width * height * 4);
-  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-  const flipped = new Uint8ClampedArray(width * height * 4);
-  const rowSize = width * 4;
-  for (let row = 0; row < height; row++) {
-    flipped.set(
-      pixels.subarray(row * rowSize, (row + 1) * rowSize),
-      (height - 1 - row) * rowSize,
-    );
-  }
-  return new ImageData(flipped, width, height);
-}
-
-function waitForEvent(target, eventName) {
-  return new Promise((resolve, reject) => {
-    const onOk = () => {
-      cleanup();
-      resolve();
-    };
-    const onErr = (e) => {
-      cleanup();
-      reject(e);
-    };
-    const cleanup = () => {
-      target.removeEventListener(eventName, onOk);
-      target.removeEventListener("error", onErr);
-    };
-    target.addEventListener(eventName, onOk, { once: true });
-    target.addEventListener("error", onErr, { once: true });
-  });
-}
-
-function getSupportedVideoMimeType() {
-  const candidates = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-  ];
-  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || null;
-}
-
-const MASK_PASS_ID = "__mask_composite__";
-const PER_MASK_PASS_ID = "__per_mask_pipeline__";
-
-function getPerMaskGroups(maskCfg) {
-  if (!Array.isArray(maskCfg?.groups)) return [];
-  const groupCanvases =
-    maskCfg?.groupCanvases instanceof Map ? maskCfg.groupCanvases : null;
-  return maskCfg.groups
-    .filter((group) => group && group.id)
-    .map((group) => {
-      const liveCanvas = groupCanvases?.get(group.id) || null;
-      return {
-        ...group,
-        canvas: liveCanvas || group.canvas || null,
-      };
-    })
-    .filter((group) => !!group.canvas);
-}
+const isAnimatedSourceKind = (kind) => isLiveSourceKind(kind) || kind === "gif";
 
 export function useProcessMedia(canvasRef, config, camera) {
-  const pipelineRef = useRef(null);
+  const latestInvalidateRef = useRef(() => {});
+  const cleanupRef = useRef(() => {});
+  const scheduledRenderRef = useRef(0);
 
-  const gifCanvas = useRef(document.createElement("canvas"));
-  const gifCtx = useRef(gifCanvas.current.getContext("2d"));
+  const {
+    pipelineRef,
+    ensurePipeline,
+    syncPipeline,
+    mediaError,
+    setMediaError,
+    webgpuSupported,
+  } = useWebGPUPipeline(canvasRef, config, latestInvalidateRef, cleanupRef);
 
-  const [frames, setFrames] = useState(null);
-  const frameIdx = useRef(0);
+  const {
+    source,
+    sourceRef,
+    setSource,
+    clearSource,
+    revokeObjectUrl,
+    resetSourceRef,
+  } = useMediaSourceState(pipelineRef);
 
-  const gifRafRef = useRef(0);
-  const liveVideoRafRef = useRef(0);
-
-  const lastSource = useRef(null);
-  const sourceKindRef = useRef(null); // "image" | "gif" | "video" | "camera" | null
-  const uploadedVideoUrlRef = useRef(null);
-
-  const lastTime = useRef(0);
-  const acc = useRef(0);
-
-  const passCacheRef = useRef(new Map());
-
-  const cameraReadyRef = useRef(false);
-
-  const stopGifLoop = useCallback(() => {
-    cancelAnimationFrame(gifRafRef.current);
-    gifRafRef.current = 0;
-  }, []);
-
-  const stopLiveVideoLoop = useCallback(() => {
-    cancelAnimationFrame(liveVideoRafRef.current);
-    liveVideoRafRef.current = 0;
-  }, []);
-
-  const cleanupVideoElement = useCallback(() => {
-    const video = camera?.videoRef?.current;
-    if (!video) return;
-
-    stopLiveVideoLoop();
-
-    try {
-      video.pause();
-    } catch (err) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("[useProcessMedia] video.pause() failed during cleanup", err);
-      }
-    }
-
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach((t) => t.stop());
-      video.srcObject = null;
-    }
-
-    if (video.src) {
-      video.removeAttribute("src");
-      video.load();
-    }
-  }, [camera?.videoRef, stopLiveVideoLoop]);
-
-  const revokeUploadedVideoUrl = useCallback(() => {
-    if (uploadedVideoUrlRef.current) {
-      URL.revokeObjectURL(uploadedVideoUrlRef.current);
-      uploadedVideoUrlRef.current = null;
-    }
-  }, []);
-
-  const clearOutputAndInput = useCallback(() => {
-    const p = pipelineRef.current;
-    if (!p) return;
-
-    cameraReadyRef.current = false;
-    p.clearInputTexture();
-    lastSource.current = null;
-    p.clearToTransparent();
-  }, []);
-
-  const invalidate = useCallback(() => {
-    const p = pipelineRef.current;
-    if (!p) return;
-    p.renderFrame();
-  }, []);
-
-  const prepare = useCallback((src) => {
-    const p = pipelineRef.current;
-    if (!p) return;
-
-    if (src?.imgData) {
-      gifCanvas.current.width = src.imgData.width;
-      gifCanvas.current.height = src.imgData.height;
-      gifCtx.current.putImageData(src.imgData, 0, 0);
-      p.prepareImage(gifCanvas.current);
-    } else {
-      lastSource.current = src;
-      p.prepareImage(src);
-    }
-
-    p.renderFrame();
-  }, []);
-
-  const startLiveVideoLoop = useCallback(() => {
-    const p = pipelineRef.current;
-    const video = camera?.videoRef?.current;
-    if (!p || !video) return;
-
-    stopLiveVideoLoop();
-
-    const loop = () => {
-      if (!pipelineRef.current || !camera?.videoRef?.current) return;
-      pipelineRef.current.updateVideoFrame(camera.videoRef.current);
-      pipelineRef.current.renderFrame();
-      liveVideoRafRef.current = requestAnimationFrame(loop);
-    };
-
-    liveVideoRafRef.current = requestAnimationFrame(loop);
-  }, [camera?.videoRef, stopLiveVideoLoop]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const p = GLPipeline.for(canvas);
-    pipelineRef.current = p;
-
-    const passCache = passCacheRef.current;
-
-    return () => {
-      stopGifLoop();
-      stopLiveVideoLoop();
-
-      cleanupVideoElement();
-      revokeUploadedVideoUrl();
-
-      for (const rec of passCache.values()) rec.pass?.destroy?.();
-      passCache.clear();
-
-      p.destroy();
-      pipelineRef.current = null;
-    };
-  }, [
-    canvasRef,
-    cleanupVideoElement,
-    revokeUploadedVideoUrl,
-    stopGifLoop,
+  const {
+    liveVideoRafRef,
     stopLiveVideoLoop,
-  ]);
+    cleanupVideoElement,
+    renderVideoFrame,
+    startLiveVideoLoop,
+    loadVideoFile,
+    waitForEnded,
+    restoreVideoPlayback,
+  } = useVideoSource({
+    videoRef: camera?.videoRef,
+    pipelineRef,
+    ensurePipeline,
+    syncPipeline,
+    setSource,
+    setMediaError,
+  });
 
-  useEffect(() => {
-    const onVis = () => {
-      if (!document.hidden) {
-        lastTime.current = performance.now();
-        acc.current = 0;
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
+  const {
+    frameIdx,
+    stopGifLoop,
+    resetGifClock,
+    prepareGifFrame,
+    loadGifFile,
+  } = useGifSource({
+    cameraOn: camera?.cameraOn,
+    ensurePipeline,
+    pipelineRef,
+    source,
+    setSource,
+    sourceRef,
+    syncPipeline,
+  });
 
-  useEffect(() => {
-    const p = pipelineRef.current;
-    if (!p) return;
+  const { loadImageFile } = useImageSource({
+    ensurePipeline,
+    setMediaError,
+    setSource,
+    syncPipeline,
+  });
 
-    const defs = config?.defs || {};
-    const filters = Array.isArray(config?.filters) ? config.filters : [];
-    const maskCfg = config?.mask || null;
-    const hasMask = !!(maskCfg?.enabled && maskCfg?.canvas);
-    const perMaskEnabled = !!(
-      maskCfg?.enabled &&
-      maskCfg?.pipelineMode === "perMask"
-    );
-    const perMaskGroups = getPerMaskGroups(maskCfg);
+  const renderActiveFrame = useCallback(() => {
+    const pipeline = pipelineRef.current;
+    if (!pipeline) return;
 
-    if (perMaskEnabled) {
-      const aliveIds = new Set([PER_MASK_PASS_ID]);
-      for (const [id, rec] of passCacheRef.current.entries()) {
-        if (!aliveIds.has(id)) {
-          rec.pass?.destroy?.();
-          passCacheRef.current.delete(id);
-        }
-      }
-
-      const nextOpts = { defs, groups: perMaskGroups, invalidate };
-      const prevRec = passCacheRef.current.get(PER_MASK_PASS_ID) || {
-        type: "PER_MASK",
-        pass: null,
-        optsSnapshot: null,
-      };
-
-      if (!prevRec.pass) {
-        prevRec.pass = new PerMaskPipelinePass(p.gl, nextOpts);
-      } else {
-        const changed = diffKeys(prevRec.optsSnapshot || {}, nextOpts);
-        applyPassOptions(
-          prevRec.pass,
-          changed,
-          nextOpts,
-          "useProcessMedia/per-mask",
-        );
-      }
-
-      passCacheRef.current.set(PER_MASK_PASS_ID, {
-        type: "PER_MASK",
-        pass: prevRec.pass,
-        optsSnapshot: nextOpts,
-      });
-      p.passes = [prevRec.pass];
-
-      const hasSource =
-        !!lastSource.current ||
-        !!frames ||
-        cameraReadyRef.current ||
-        sourceKindRef.current === "video";
-
-      if (hasSource) p.renderFrame();
+    const current = sourceRef.current;
+    if (isLiveSourceKind(current.kind)) {
+      renderVideoFrame(current.source || camera?.videoRef?.current);
       return;
     }
 
-    const aliveIds = new Set(filters.map((f) => f?.id).filter(Boolean));
-    if (hasMask) aliveIds.add(MASK_PASS_ID);
-    for (const [id, rec] of passCacheRef.current.entries()) {
-      if (!aliveIds.has(id)) {
-        rec.pass?.destroy?.();
-        passCacheRef.current.delete(id);
-      }
+    if (current.kind === "gif" && current.frames?.length) {
+      const frame = current.frames[frameIdx.current] || current.frames[0];
+      prepareGifFrame(pipeline, frame);
+    } else if (current.source) {
+      pipeline.prepareImage(current.source);
     }
 
-    const enabled = filters.filter((f) => f && f.enabled);
-    const nextPassChain = [];
+    pipeline.renderFrame();
+  }, [
+    camera?.videoRef,
+    frameIdx,
+    pipelineRef,
+    prepareGifFrame,
+    renderVideoFrame,
+    sourceRef,
+  ]);
 
-    for (const f of enabled) {
-      const def = defs[f.type];
-      if (!def || !def.Pass) continue;
+  const cancelScheduledRender = useCallback(() => {
+    cancelAnimationFrame(scheduledRenderRef.current);
+    scheduledRenderRef.current = 0;
+  }, []);
 
-      const prevRec = passCacheRef.current.get(f.id) || {
-        type: f.type,
-        pass: null,
-        optsSnapshot: null,
-      };
+  const scheduleRenderActiveFrame = useCallback(() => {
+    if (scheduledRenderRef.current) return;
 
-      const prevOpts = prevRec.optsSnapshot || {};
-      const nextOpts = f.opts || {};
-      const changed = diffKeys(prevOpts, nextOpts);
+    scheduledRenderRef.current = requestAnimationFrame(() => {
+      scheduledRenderRef.current = 0;
+      renderActiveFrame();
+    });
+  }, [renderActiveFrame]);
 
-      const structuralKeys = Array.isArray(def.structuralKeys)
-        ? def.structuralKeys
-        : [];
+  const invalidate = useCallback(() => {
+    const current = sourceRef.current;
+    if (isAnimatedSourceKind(current.kind)) return;
+    scheduleRenderActiveFrame();
+  }, [scheduleRenderActiveFrame, sourceRef]);
 
-      const typeChanged = prevRec.type !== f.type;
-      const needsRebuild =
-        !prevRec.pass ||
-        typeChanged ||
-        changed.some((k) => structuralKeys.includes(k));
+  useEffect(() => {
+    latestInvalidateRef.current = invalidate;
+  }, [invalidate]);
 
-      if (needsRebuild) {
-        prevRec.pass?.destroy?.();
-        const pass = new def.Pass(p.gl, { ...nextOpts, invalidate });
-        passCacheRef.current.set(f.id, {
-          type: f.type,
-          pass,
-          optsSnapshot: nextOpts,
-        });
-        nextPassChain.push(pass);
-        continue;
-      }
+  useEffect(() => {
+    const pipeline = pipelineRef.current;
+    if (!pipeline) return;
 
-      if (prevRec.pass && changed.length) {
-        applyPassOptions(
-          prevRec.pass,
-          changed,
-          nextOpts,
-          `useProcessMedia/filter:${f.type}`,
-        );
-        passCacheRef.current.set(f.id, { ...prevRec, optsSnapshot: nextOpts });
-      }
-
-      nextPassChain.push(passCacheRef.current.get(f.id).pass);
-    }
-
-    if (hasMask) {
-      const prevRec = passCacheRef.current.get(MASK_PASS_ID) || {
-        type: "MASK",
-        pass: null,
-        optsSnapshot: null,
-      };
-
-      const nextOpts = {
-        canvas: maskCfg.canvas,
-        invert: !!maskCfg.invert,
-        version: Number(maskCfg.version ?? 0),
-      };
-      const changed = diffKeys(prevRec.optsSnapshot || {}, nextOpts);
-
-      if (!prevRec.pass) {
-        const pass = new MaskCompositePass(p.gl, nextOpts);
-        passCacheRef.current.set(MASK_PASS_ID, {
-          type: "MASK",
-          pass,
-          optsSnapshot: nextOpts,
-        });
-      } else if (changed.length) {
-        applyPassOptions(
-          prevRec.pass,
-          changed,
-          nextOpts,
-          "useProcessMedia/mask",
-        );
-        passCacheRef.current.set(MASK_PASS_ID, {
-          ...prevRec,
-          optsSnapshot: nextOpts,
-        });
-      }
-
-      const maskPass = passCacheRef.current.get(MASK_PASS_ID)?.pass;
-      if (maskPass) nextPassChain.push(maskPass);
-    }
-
-    p.passes = nextPassChain;
-
+    syncPipeline(pipeline, config, invalidate);
+    const current = sourceRef.current;
     const hasSource =
-      !!lastSource.current ||
-      !!frames ||
-      cameraReadyRef.current ||
-      sourceKindRef.current === "video";
+      current.ready || current.frames?.length || isAnimatedSourceKind(current.kind);
 
-    if (hasSource) p.renderFrame();
-  }, [config, invalidate, frames, camera?.cameraOn]);
+    if (hasSource && !isAnimatedSourceKind(current.kind)) {
+      scheduleRenderActiveFrame();
+    }
+  }, [
+    config,
+    invalidate,
+    pipelineRef,
+    scheduleRenderActiveFrame,
+    source,
+    sourceRef,
+    syncPipeline,
+  ]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!document.hidden) resetGifClock(false);
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [resetGifClock]);
+
+  const resetForNewFile = useCallback(() => {
+    cancelScheduledRender();
+    stopGifLoop();
+    stopLiveVideoLoop();
+    cleanupVideoElement();
+    clearSource();
+  }, [
+    cancelScheduledRender,
+    cleanupVideoElement,
+    clearSource,
+    stopGifLoop,
+    stopLiveVideoLoop,
+  ]);
 
   const loadFile = useCallback(
     async (file) => {
-      const p = pipelineRef.current;
-      const video = camera?.videoRef?.current;
-      if (!p) return null;
+      let url = null;
 
-      stopGifLoop();
-      stopLiveVideoLoop();
+      try {
+        await ensurePipeline();
+        resetForNewFile();
 
-      cameraReadyRef.current = false;
+        url = URL.createObjectURL(file);
 
-      setFrames(null);
-      frameIdx.current = 0;
-      lastTime.current = performance.now();
-      acc.current = 0;
+        if (file.type === "image/gif") {
+          return await loadGifFile(file, url);
+        }
 
-      clearOutputAndInput();
-      cleanupVideoElement();
-      revokeUploadedVideoUrl();
+        if (file.type.startsWith("video/")) {
+          return await loadVideoFile(url);
+        }
 
-      const url = URL.createObjectURL(file);
+        if (file.type.startsWith("image/")) {
+          return await loadImageFile(url);
+        }
 
-      if (file.type === "image/gif") {
-        sourceKindRef.current = "gif";
-
-        const { frames: decoded } = decodeGIF(await file.arrayBuffer());
-        setFrames(decoded);
-        prepare(decoded[0]);
-        return url;
-      }
-
-      if (file.type.startsWith("video/")) {
-        if (!video) {
+        throw new Error(`Unsupported file type: ${file.type}`);
+      } catch (err) {
+        if (url && sourceRef.current.url !== url) {
           URL.revokeObjectURL(url);
-          throw new Error("Video element not available");
         }
 
-        sourceKindRef.current = "video";
-        uploadedVideoUrlRef.current = url;
-
-        video.srcObject = null;
-        video.src = url;
-        video.loop = true;
-        video.muted = true;
-        video.playsInline = true;
-        video.currentTime = 0;
-
-        await waitForEvent(video, "loadedmetadata");
-        await video.play();
-
-        if (!p.prepareVideo(video)) {
-          const wait = () =>
-            new Promise((r) => requestAnimationFrame(() => r()));
-          while (!p.prepareVideo(video)) {
-            await wait();
-          }
+        const message = getErrorMessage(err);
+        setMediaError(message);
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[useProcessMedia] loadFile failed", err);
         }
-
-        p.updateVideoFrame(video);
-        p.renderFrame();
-
-        startLiveVideoLoop();
-        return url;
+        return null;
       }
-
-      if (file.type.startsWith("image/")) {
-        sourceKindRef.current = "image";
-
-        const img = new Image();
-        img.src = url;
-        await new Promise((r, reject) => {
-          img.onload = r;
-          img.onerror = reject;
-        });
-
-        lastSource.current = img;
-        prepare(img);
-        return url;
-      }
-
-      URL.revokeObjectURL(url);
-      throw new Error(`Unsupported file type: ${file.type}`);
     },
     [
-      camera?.videoRef,
-      cleanupVideoElement,
-      clearOutputAndInput,
-      prepare,
-      revokeUploadedVideoUrl,
-      startLiveVideoLoop,
-      stopGifLoop,
-      stopLiveVideoLoop,
+      ensurePipeline,
+      loadGifFile,
+      loadImageFile,
+      loadVideoFile,
+      resetForNewFile,
+      setMediaError,
+      sourceRef,
     ],
   );
 
+  useCameraSource({
+    cameraOn: camera?.cameraOn,
+    videoRef: camera?.videoRef,
+    cleanupVideoElement,
+    clearSource,
+    ensurePipeline,
+    renderVideoFrame,
+    revokeObjectUrl,
+    setMediaError,
+    setSource,
+    startLiveVideoLoop,
+    stopGifLoop,
+    stopLiveVideoLoop,
+    syncPipeline,
+  });
+
+  const { exportResult } = useMediaExport({
+    canvasRef,
+    ensurePipeline,
+    prepareGifFrame,
+    renderVideoFrame,
+    restoreVideoPlayback,
+    liveVideoRafRef,
+    sourceRef,
+    startLiveVideoLoop,
+    stopLiveVideoLoop,
+    videoRef: camera?.videoRef,
+    waitForEnded,
+  });
+
   useEffect(() => {
-    if (!frames) return;
-    if (camera?.cameraOn) return;
-    if (sourceKindRef.current !== "gif") return;
-
-    lastTime.current = performance.now();
-    acc.current = 0;
-
-    let cancelled = false;
-
-    const loop = (now) => {
-      if (cancelled) return;
-
-      let dt = now - lastTime.current;
-      lastTime.current = now;
-
-      const delay = (frames[frameIdx.current].frameInfo.delay || 1) * 10;
-      if (dt > delay) dt = delay;
-      acc.current += dt;
-
-      if (acc.current >= delay) {
-        acc.current -= delay;
-        frameIdx.current = (frameIdx.current + 1) % frames.length;
-      }
-
-      prepare(frames[frameIdx.current]);
-      gifRafRef.current = requestAnimationFrame(loop);
-    };
-
-    gifRafRef.current = requestAnimationFrame(loop);
-    return () => {
-      cancelled = true;
+    cleanupRef.current = () => {
+      cancelScheduledRender();
       stopGifLoop();
-    };
-  }, [frames, prepare, camera?.cameraOn, stopGifLoop]);
-
-  const exportVideo = useCallback(
-    async (name) => {
-      const p = pipelineRef.current;
-      const canvas = canvasRef.current;
-      const video = camera?.videoRef?.current;
-
-      if (!p || !canvas || !video) return;
-
-      const mimeType = getSupportedVideoMimeType();
-      if (!mimeType) {
-        throw new Error("No supported video export mime type found");
-      }
-
-      const wasLooping = video.loop;
-      const wasPaused = video.paused;
-      const prevTime = video.currentTime;
-
       stopLiveVideoLoop();
-
-      video.pause();
-      video.loop = false;
-      video.currentTime = 0;
-
-      await waitForEvent(video, "seeked").catch(() => {});
-
-      p.updateVideoFrame(video);
-      p.renderFrame();
-
-      const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, { mimeType });
-      const chunks = [];
-
-      const stopped = new Promise((resolve, reject) => {
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) chunks.push(e.data);
-        };
-        recorder.onerror = (e) => reject(e.error || e);
-        recorder.onstop = () =>
-          resolve(new Blob(chunks, { type: recorder.mimeType }));
-      });
-
-      let done = false;
-      const renderLoop = () => {
-        if (done) return;
-        p.updateVideoFrame(video);
-        p.renderFrame();
-        liveVideoRafRef.current = requestAnimationFrame(renderLoop);
-      };
-
-      recorder.start();
-      liveVideoRafRef.current = requestAnimationFrame(renderLoop);
-
-      await video.play();
-
-      await new Promise((resolve) => {
-        const onEnded = () => {
-          video.removeEventListener("ended", onEnded);
-          resolve();
-        };
-        video.addEventListener("ended", onEnded);
-      });
-
-      done = true;
-      stopLiveVideoLoop();
-
-      recorder.stop();
-
-      const blob = await stopped;
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${name}.webm`;
-      a.click();
-
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-      video.loop = wasLooping;
-      video.currentTime = prevTime;
-
-      await waitForEvent(video, "seeked").catch(() => {});
-
-      if (!wasPaused) {
-        await video.play().catch(() => {});
-      }
-
-      if (
-        sourceKindRef.current === "video" ||
-        sourceKindRef.current === "camera"
-      ) {
-        startLiveVideoLoop();
-      }
-    },
-    [camera?.videoRef, canvasRef, startLiveVideoLoop, stopLiveVideoLoop],
-  );
-
-  const exportResult = useCallback(
-    async (name) => {
-      const live = pipelineRef.current;
-      if (!live) return;
-
-      const defs = config?.defs || {};
-      const filters = Array.isArray(config?.filters) ? config.filters : [];
-      const enabled = filters.filter((f) => f && f.enabled);
-      const maskCfg = config?.mask || null;
-      const perMaskEnabled = !!(
-        maskCfg?.enabled &&
-        maskCfg?.pipelineMode === "perMask"
-      );
-      const perMaskGroups = getPerMaskGroups(maskCfg);
-
-      if (
-        sourceKindRef.current === "video" ||
-        sourceKindRef.current === "camera"
-      ) {
-        await exportVideo(name);
-        return;
-      }
-
-      if (!frames) {
-        const can = canvasRef.current;
-        if (!can) return;
-
-        can.toBlob((blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${name}.png`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-        });
-        return;
-      }
-
-      const { width: w, height: h } = live.canvas;
-      const off = document.createElement("canvas");
-      off.width = w;
-      off.height = h;
-
-      const exp = GLPipeline.for(off);
-
-      if (perMaskEnabled) {
-        exp.passes = [
-          new PerMaskPipelinePass(exp.gl, {
-            defs,
-            groups: perMaskGroups,
-            invalidate: () => {},
-          }),
-        ];
-      } else {
-        exp.passes = enabled
-          .map((f) => {
-            const def = defs[f.type];
-            if (!def?.Pass) return null;
-            return new def.Pass(exp.gl, { ...f.opts, invalidate: () => {} });
-          })
-          .filter(Boolean);
-
-        if (maskCfg?.enabled && maskCfg?.canvas) {
-          exp.passes.push(
-            new MaskCompositePass(exp.gl, {
-              canvas: maskCfg.canvas,
-              invert: !!maskCfg.invert,
-              version: Number(maskCfg.version ?? 0),
-            }),
-          );
-        }
-      }
-
-      const out = frames.map(({ imgData, frameInfo }) => {
-        gifCanvas.current.width = imgData.width;
-        gifCanvas.current.height = imgData.height;
-        gifCtx.current.putImageData(imgData, 0, 0);
-
-        exp.prepareImage(gifCanvas.current);
-        const st = exp.renderFrame();
-
-        return {
-          imgData: readImageDataFromWebGL(exp.gl, st.width, st.height),
-          frameInfo,
-        };
-      });
-
-      exp.destroy();
-
-      const blobUrl = await encodeGIF(out, w, h);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `${name}.gif`;
-      a.click();
-    },
-    [frames, canvasRef, config, exportVideo],
-  );
-
-  useEffect(() => {
-    const p = pipelineRef.current;
-    const video = camera?.videoRef?.current;
-    if (!p || !video) return;
-
-    if (!camera?.cameraOn) {
-      if (sourceKindRef.current === "camera") {
-        cleanupVideoElement();
-        cameraReadyRef.current = false;
-        clearOutputAndInput();
-        sourceKindRef.current = null;
-      }
-      return;
-    }
-
-    stopGifLoop();
-    stopLiveVideoLoop();
-    setFrames(null);
-    frameIdx.current = 0;
-    acc.current = 0;
-    lastSource.current = null;
-
-    let cancelled = false;
-
-    (async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false,
-      });
-
-      if (cancelled) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-
       cleanupVideoElement();
-      revokeUploadedVideoUrl();
 
-      sourceKindRef.current = "camera";
-
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-
-      await video.play();
-
-      if (!p.prepareVideo(video)) {
-        const wait = () => new Promise((r) => requestAnimationFrame(() => r()));
-        while (!cancelled && !p.prepareVideo(video)) {
-          await wait();
-        }
-      }
-
-      p.updateVideoFrame(video);
-      p.renderFrame();
-      cameraReadyRef.current = true;
-
-      startLiveVideoLoop();
-    })().catch(() => {
-      cameraReadyRef.current = false;
-    });
-
-    return () => {
-      cancelled = true;
-      if (sourceKindRef.current === "camera") {
-        cleanupVideoElement();
-        cameraReadyRef.current = false;
-      }
+      const { url } = sourceRef.current;
+      if (url) URL.revokeObjectURL(url);
+      resetSourceRef();
     };
   }, [
-    camera?.cameraOn,
-    camera?.videoRef,
+    cancelScheduledRender,
     cleanupVideoElement,
-    clearOutputAndInput,
-    revokeUploadedVideoUrl,
-    startLiveVideoLoop,
+    resetSourceRef,
+    sourceRef,
     stopGifLoop,
     stopLiveVideoLoop,
   ]);
 
-  return { loadFile, exportResult, frames };
+  return {
+    loadFile,
+    exportResult,
+    frames: source.frames,
+    mediaError,
+    webgpuSupported,
+  };
 }

@@ -110,6 +110,20 @@
   box-shadow: none;
 }
 
+.topMenuStatus {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 24rem;
+  padding: 4px 8px;
+  color: var(--pp-accent-danger);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .topMenuGroup {
   position: relative;
   display: inline-flex;
@@ -175,7 +189,7 @@
   z-index: 30;
 }
 
-.maskMenuDropdown .xpButton {
+.maskMenuDropdown button {
   margin: 0;
 }
 
@@ -431,13 +445,14 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.25rem;
+  align-items: flex-start;
+  gap: 0.45rem;
   border: 1px solid var(--pp-border-soft);
   background: var(--pp-inner-bg);
-  padding: 0.45rem;
+  padding: 0.55rem;
 }
 
-.filterSelection .xpButton {
+.filterSelection button {
   margin: 0;
 }
 

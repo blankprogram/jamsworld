@@ -1,0 +1,15 @@
+export const GPU_BUFFER_USAGE = {
+  MAP_READ: 1,
+  COPY_SRC: 4,
+  COPY_DST: 8,
+  STORAGE: 128,
+  UNIFORM: 64,
+};
+
+export const GPU_TEXTURE_USAGE = {
+  COPY_SRC: 1,
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+  STORAGE_BINDING: 8,
+  RENDER_ATTACHMENT: 16,
+};

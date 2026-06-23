@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { SketchPicker } from "react-color";
-import { AsciiPass } from "../../utils/GL/passes";
 import { loadFonts } from "../../utils/fontUtils";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
+import { ASCII_FILTER_DEFINITION } from "../../utils/filterDefinitions";
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createAsciifyIcon } from "../../utils/appIconFactory";
+import XpButton from "../../components/XpButton/XpButton";
 import styles from "./Asciify.module.css";
 
 export const appManifest = createAppManifest({
@@ -44,10 +45,9 @@ export default function Asciify() {
 
   const defs = useMemo(
     () => ({
-      [AsciiPass.def.type]: {
-        ...AsciiPass.def,
-        Pass: AsciiPass,
-        options: AsciiPass.def.options.map((opt) =>
+      [ASCII_FILTER_DEFINITION.type]: {
+        ...ASCII_FILTER_DEFINITION,
+        options: ASCII_FILTER_DEFINITION.options.map((opt) =>
           opt.name === "font"
             ? {
                 ...opt,
@@ -65,7 +65,7 @@ export default function Asciify() {
     () => [
       {
         id: "asciify-main",
-        type: AsciiPass.def.type,
+        type: ASCII_FILTER_DEFINITION.type,
         enabled: true,
         opts: {
           blockSize,
@@ -87,7 +87,7 @@ export default function Asciify() {
     [blockSize, density, chars, font, fill],
   );
   const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
-  const { loadFile, exportResult } = useProcessMedia(
+  const { loadFile, exportResult, mediaError, webgpuSupported } = useProcessMedia(
     canvasRef,
     mediaConfig,
   );
@@ -97,6 +97,11 @@ export default function Asciify() {
       const file = e.target.files?.[0];
       if (!file) return;
       const url = await loadFile(file);
+      if (!url) {
+        e.target.value = "";
+        setCanExport(false);
+        return;
+      }
       setFileURL(url);
       setCanExport(true);
     },
@@ -131,29 +136,34 @@ export default function Asciify() {
                 </span>
               ))}
             </div>
-            <button
-              className={styles.button}
+            <XpButton
+              disabled={!webgpuSupported}
               onClick={() => fileInputRef.current.click()}
             >
               Choose File
-            </button>
+            </XpButton>
             <input
               type="file"
               accept="image/*"
               ref={fileInputRef}
               onChange={handleFileChange}
+              disabled={!webgpuSupported}
               className={styles.hiddenFileInput}
             />
+            {mediaError && (
+              <div role="alert" className={styles.formGroup}>
+                {mediaError}
+              </div>
+            )}
           </div>
 
           <div className={styles.formRight}>
-            <button
-              className={`${styles.button} ${styles.exportButton}`}
+            <XpButton
               onClick={handleExport}
               disabled={!canExport}
             >
               Export
-            </button>
+            </XpButton>
           </div>
         </div>
 
@@ -162,7 +172,6 @@ export default function Asciify() {
             <label>Characters:</label>
             <input
               type="text"
-              className={styles.field}
               value={chars}
               onChange={(e) => setChars(e.target.value)}
             />
@@ -171,7 +180,6 @@ export default function Asciify() {
           <div className={styles.formGroup}>
             <label>Font:</label>
             <select
-              className={styles.field}
               value={font}
               onChange={(e) => setFont(e.target.value)}
             >
@@ -207,7 +215,6 @@ export default function Asciify() {
             <label>Density:</label>
             <input
               type="range"
-              className={styles.field}
               min={0.25}
               max={5}
               step={0.25}
@@ -221,7 +228,6 @@ export default function Asciify() {
             <label>Block Size:</label>
             <input
               type="range"
-              className={styles.field}
               min={4}
               max={64}
               step={1}

@@ -22,22 +22,8 @@
   gap: 4px;
 }
 
-.button {
-}
-
-.exportButton {
-}
-
-.field {
-}
-
 .hiddenFileInput {
   display: none;
-}
-
-.exportButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .mainContainer {

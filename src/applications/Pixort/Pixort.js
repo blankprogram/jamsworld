@@ -1,9 +1,10 @@
 import React, { useRef, useState, useCallback, useMemo } from "react";
-import { PixelSortPass } from "../../utils/GL/passes";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
+import { PIXEL_SORT_FILTER_DEFINITION } from "../../utils/filterDefinitions";
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createPixortIcon } from "../../utils/appIconFactory";
+import XpButton from "../../components/XpButton/XpButton";
 import styles from "./Pixort.module.css";
 
 export const appManifest = createAppManifest({
@@ -44,9 +45,8 @@ export default function Pixort() {
 
   const defs = useMemo(
     () => ({
-      [PixelSortPass.def.type]: {
-        ...PixelSortPass.def,
-        Pass: PixelSortPass,
+      [PIXEL_SORT_FILTER_DEFINITION.type]: {
+        ...PIXEL_SORT_FILTER_DEFINITION,
       },
     }),
     [],
@@ -55,7 +55,7 @@ export default function Pixort() {
     () => [
       {
         id: "pixort-main",
-        type: PixelSortPass.def.type,
+        type: PIXEL_SORT_FILTER_DEFINITION.type,
         enabled: true,
         opts: { direction, sortBy, mode, low, high },
       },
@@ -63,7 +63,7 @@ export default function Pixort() {
     [direction, sortBy, mode, low, high],
   );
   const mediaConfig = useMemo(() => ({ defs, filters }), [defs, filters]);
-  const { loadFile, exportResult } = useProcessMedia(
+  const { loadFile, exportResult, mediaError, webgpuSupported } = useProcessMedia(
     canvasRef,
     mediaConfig,
   );
@@ -73,6 +73,11 @@ export default function Pixort() {
       const file = e.target.files?.[0];
       if (!file) return;
       const url = await loadFile(file);
+      if (!url) {
+        e.target.value = "";
+        setCanExport(false);
+        return;
+      }
       setFileURL(url);
       setCanExport(true);
     },
@@ -87,33 +92,37 @@ export default function Pixort() {
     <>
       <div className={styles.formContainer}>
         <div className={styles.formTop}>
-          <button
-            className={styles.button}
+          <XpButton
+            disabled={!webgpuSupported}
             onClick={() => fileInputRef.current.click()}
           >
             Choose File
-          </button>
+          </XpButton>
           <input
             type="file"
             accept="image/*,image/gif"
             ref={fileInputRef}
             className={styles.hiddenFileInput}
             onChange={handleFileChange}
+            disabled={!webgpuSupported}
           />
+          {mediaError && (
+            <div role="alert" className={styles.formGroup}>
+              {mediaError}
+            </div>
+          )}
 
-          <button
-            className={`${styles.button} ${styles.exportButton}`}
+          <XpButton
             onClick={handleExport}
             disabled={!canExport}
           >
             Export
-          </button>
+          </XpButton>
         </div>
         <div className={styles.formBottom}>
           <div className={styles.formGroup}>
             <label>Sort By:</label>
             <select
-              className={styles.field}
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
             >
@@ -127,7 +136,6 @@ export default function Pixort() {
           <div className={styles.formGroup}>
             <label>Direction:</label>
             <select
-              className={styles.field}
               value={direction}
               onChange={(e) => setDirection(e.target.value)}
             >
@@ -141,7 +149,6 @@ export default function Pixort() {
           <div className={styles.formGroup}>
             <label>Mode:</label>
             <select
-              className={styles.field}
               value={mode}
               onChange={(e) => setMode(e.target.value)}
             >

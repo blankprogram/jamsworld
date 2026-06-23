@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import "./Taskbar.css";
+import styles from "./Taskbar.module.css";
 import githubIcon from "../../assets/Icons/github.png";
 import linkedinIcon from "../../assets/Icons/linkedin.png";
 import riskIcon from "../../assets/Icons/risk.png";
+import { getWindowsInTaskbarOrder } from "../../desktop/windowOrdering";
 
 const Taskbar = ({
   windows,
@@ -37,15 +38,15 @@ const Taskbar = ({
     }
   };
 
-  const taskbarWindows = windows.filter((windowItem) => {
+  const taskbarWindows = getWindowsInTaskbarOrder(windows).filter((windowItem) => {
     const app = appsById[windowItem.appId];
     return app && app.showInTaskbar !== false;
   });
 
   return (
-    <div className="taskbar">
-      <div className="start-button"></div>
-      <div className="taskbar-items">
+    <div className={styles.taskbar}>
+      <div className={styles.startButton}></div>
+      <div className={styles.taskbarItems}>
         {taskbarWindows.map((windowItem) => {
           const app = appsById[windowItem.appId];
           if (!app) return null;
@@ -54,24 +55,24 @@ const Taskbar = ({
           return (
             <div
               key={windowItem.id}
-              className={`taskbar-item ${focusedWindowId === windowItem.id && !windowItem.minimized ? "focused-taskbar-item" : ""}`}
+              className={`${styles.taskbarItem} ${focusedWindowId === windowItem.id && !windowItem.minimized ? styles.focusedTaskbarItem : ""}`}
               onClick={() => handleTaskbarClick(windowItem)}
             >
-              <img src={icon} alt={title} className="taskbar-icon" />
-              <span>{title}</span>
+              <img src={icon} alt={title} className={styles.taskbarIcon} />
+              <span className={styles.taskbarLabel}>{title}</span>
             </div>
           );
         })}
       </div>
-      <div className="system-tray">
+      <div className={styles.systemTray}>
         <a href="https://github.com/blankprogram" target="_blank" rel="noopener noreferrer">
-          <img src={githubIcon} alt="Github" className="system-tray-icon" />
+          <img src={githubIcon} alt="Github" className={styles.systemTrayIcon} />
         </a>
         <a href="https://www.linkedin.com/in/jamal-elmir-485ab1261/" target="_blank" rel="noopener noreferrer">
-          <img src={linkedinIcon} alt="LinkedIn" className="system-tray-icon" />
+          <img src={linkedinIcon} alt="LinkedIn" className={styles.systemTrayIcon} />
         </a>
-        <img src={riskIcon} alt="Risk" className="system-tray-icon" />
-        <div className="system-tray-time">{time}</div>
+        <img src={riskIcon} alt="Risk" className={styles.systemTrayIcon} />
+        <div className={styles.systemTrayTime}>{time}</div>
       </div>
     </div>
   );

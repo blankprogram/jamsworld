@@ -35,22 +35,8 @@
   gap: 4px;
 }
 
-.button {
-}
-
-.exportButton {
-}
-
-.field {
-}
-
 .valueBox {
   min-width: 5ch;
-}
-
-.exportButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .rainbowTextContainer {

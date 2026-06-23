@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-import './Background.css';
+import styles from './Background.module.css';
+
+const DESKTOP_ICON_SELECTOR = '[data-desktop-icon="true"]';
 
 const Background = ({
   apps,
@@ -13,7 +15,7 @@ const Background = ({
   const visibleApps = apps.filter((app) => app.showOnDesktop !== false);
 
   const handleMouseDown = (e) => {
-    const icon = e.target.closest('.icon');
+    const icon = e.target.closest(DESKTOP_ICON_SELECTOR);
     const clientX = e.clientX;
     const clientY = e.clientY;
 
@@ -67,7 +69,7 @@ const Background = ({
 
   return (
     <div
-      className="background"
+      className={styles.background}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -76,17 +78,18 @@ const Background = ({
         <div
           key={app.id}
           id={`desktop-icon-${app.id}`}
+          data-desktop-icon="true"
           data-app-id={app.id}
-          className={`icon ${selectedAppIds.includes(app.id) ? 'selected' : ''}`}
+          className={`${styles.icon} ${selectedAppIds.includes(app.id) ? styles.selected : ''}`}
           onDoubleClick={() => handleIconDoubleClick(app.id)}
         >
-          <img src={app.icon} alt={app.title} className="app-icon" />
+          <img src={app.icon} alt={app.title} className={styles.appIcon} />
           <span>{app.title}</span>
         </div>
       ))}
       {box && (
         <div
-          className="selection-box"
+          className={styles.selectionBox}
           style={{
             left: `${box.left}px`,
             top: `${box.top}px`,

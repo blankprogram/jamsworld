@@ -13,31 +13,15 @@ import {
   dropTargetForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { useProcessMedia } from "../../hooks/useProcessMedia";
+import { FILTER_DEFINITIONS } from "../../utils/filterDefinitions";
 import {
-  InvertPass,
-  GrayscalePass,
-  GaussianBlurPass,
-  SharpenPass,
-  SobelPass,
-  PosterizePass,
-  AsciiPass,
-  DitherPass,
-  PalettePass,
-  EmbossPass,
-  ChromaticAberrationPass,
-  PixelSortPass,
-  BloomPass,
-  FilmGrainPass,
-  XDoGPass,
-  VHSPass,
-  CRTPass,
-  MinesweeperPass,
-  MinecraftPass,
-  ScalePass,
-} from "../../utils/GL/passes";
+  getQuadtreeMaskedArea,
+  shouldHideFilterOption,
+} from "../../utils/filterVisibility";
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createPixelPassIcon } from "../../utils/appIconFactory";
+import XpButton from "../../components/XpButton/XpButton";
 import MaskEditor from "./MaskEditor";
 
 export const appManifest = createAppManifest({
@@ -45,29 +29,6 @@ export const appManifest = createAppManifest({
   title: "PixelPass",
   icon: createPixelPassIcon() || startIcon,
 });
-
-const ALL_PASSES = [
-  InvertPass,
-  GrayscalePass,
-  GaussianBlurPass,
-  SharpenPass,
-  ScalePass,
-  SobelPass,
-  PosterizePass,
-  AsciiPass,
-  DitherPass,
-  PalettePass,
-  EmbossPass,
-  ChromaticAberrationPass,
-  PixelSortPass,
-  BloomPass,
-  FilmGrainPass,
-  XDoGPass,
-  VHSPass,
-  CRTPass,
-  MinesweeperPass,
-  MinecraftPass,
-];
 
 const DEFAULT_CUSTOM_COLORS = [
   "#FF0000",
@@ -286,53 +247,6 @@ function maskHistoryReducer(state, action) {
   }
 }
 
-function shouldHideOption(filter, optionName) {
-  if (
-    (filter.type === "PIXELSORT" ||
-      filter.type === "ASCII" ||
-      filter.type === "MINESWEEPER" ||
-      filter.type === "MINECRAFT") &&
-    (optionName === "low" || optionName === "high") &&
-    filter.opts.mode !== "Threshold"
-  ) {
-    return true;
-  }
-
-  if (
-    filter.type === "ASCII" &&
-    optionName === "textColor" &&
-    filter.opts.textColorMode !== "Custom"
-  ) {
-    return true;
-  }
-
-  if (
-    filter.type === "ASCII" &&
-    optionName === "fill" &&
-    filter.opts.fillMode === "Transparent"
-  ) {
-    return true;
-  }
-
-  if (
-    filter.type === "SCALE" &&
-    (optionName === "scaleX" || optionName === "scaleY") &&
-    filter.opts.uniform !== "No"
-  ) {
-    return true;
-  }
-
-  if (
-    filter.type === "SCALE" &&
-    optionName === "scale" &&
-    filter.opts.uniform !== "Yes"
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 function createFilterDefaults(def) {
   const opts = {};
   for (const option of def.options) {
@@ -530,8 +444,8 @@ function rasterizeMask(canvas, segments, includeSegment = () => true) {
 
 function getFilterDefs(fonts) {
   const defs = {};
-  for (const PassClass of ALL_PASSES) {
-    const def = { ...PassClass.def };
+  for (const filterDefinition of FILTER_DEFINITIONS) {
+    const def = { ...filterDefinition };
     if (def.type === "ASCII") {
       def.options = def.options.map((opt) =>
         opt.name === "font"
@@ -539,7 +453,7 @@ function getFilterDefs(fonts) {
           : opt,
       );
     }
-    defs[def.type] = { Pass: PassClass, ...def };
+    defs[def.type] = def;
   }
   return defs;
 }
@@ -623,6 +537,7 @@ const DropZone = React.memo(function DropZone({
 const FilterOptions = React.memo(function FilterOptions({
   filter,
   index,
+  open,
   defs,
   toggleFilter,
   handleOptionChange,
@@ -640,7 +555,7 @@ const FilterOptions = React.memo(function FilterOptions({
   const visibleOptions = useMemo(() => {
     if (!cfg) return [];
     return cfg.options.filter((opt) => {
-      if (shouldHideOption(filter, opt.name)) return false;
+      if (shouldHideFilterOption(filter, opt.name)) return false;
       if (
         filter.type === "PALETTE" &&
         opt.name === "customColors" &&
@@ -709,10 +624,7 @@ const FilterOptions = React.memo(function FilterOptions({
       ref={ref}
       className={`${styles.filterOptions} ${filter.enabled ? styles.enabled : ""} ${swapActive ? styles.swapActive : ""}`}
     >
-      <div
-        className={styles.filterHeader}
-        onClick={handleHeaderClick}
-      >
+      <div className={styles.filterHeader} onClick={handleHeaderClick}>
         <h4
           className={`${styles.filterTitle} ${!canToggleOpen ? styles.filterTitleDisabled : ""}`}
         >
@@ -736,7 +648,7 @@ const FilterOptions = React.memo(function FilterOptions({
         </div>
       </div>
 
-      {canToggleOpen && filter.open && (
+      {canToggleOpen && open && (
         <div className={styles.filterContent}>
           {visibleOptions.map((opt) => {
             if (filter.type === "PALETTE" && opt.name === "customColors") {
@@ -777,11 +689,16 @@ const FilterOptions = React.memo(function FilterOptions({
               );
             }
 
+            const value =
+              filter.type === "QUADTREE" && opt.name === "maskedArea"
+                ? getQuadtreeMaskedArea(filter.opts)
+                : (filter.opts[opt.name] ?? opt.defaultValue);
+
             return (
               <FilterControl
                 key={opt.name}
                 {...opt}
-                value={filter.opts[opt.name]}
+                value={value}
                 onChange={(e) =>
                   handleOptionChange(index, opt.name, e.target.value)
                 }
@@ -835,7 +752,7 @@ const MaskEyeIcon = React.memo(function MaskEyeIcon() {
   );
 });
 
-function useFilterStackState(defs, filters, setFilters) {
+function useFilterStackState(defs, filters, setFilters, setFilterUiById) {
   const [showAdd, setShowAdd] = useState(false);
   const [dropZoneActive, setDropZoneActive] = useState(INACTIVE_INDEX);
   const [swapIdx, setSwapIdx] = useState(INACTIVE_INDEX);
@@ -882,20 +799,21 @@ function useFilterStackState(defs, filters, setFilters) {
     (type) => {
       const def = defs[type];
       if (!def) return;
+      const id = makeId();
 
       setFilters((fs) => [
         ...fs,
         {
-          id: makeId(),
+          id,
           type,
           opts: createFilterDefaults(def),
-          open: false,
           enabled: true,
         },
       ]);
+      setFilterUiById((ui) => ({ ...ui, [id]: { open: false } }));
       setShowAdd(false);
     },
-    [defs, setFilters],
+    [defs, setFilterUiById, setFilters],
   );
 
   const handleOptionChange = useCallback(
@@ -949,18 +867,31 @@ function useFilterStackState(defs, filters, setFilters) {
 
   const removeFilter = useCallback(
     (i) => {
+      const removedId = filters[i]?.id;
       setFilters((fs) => fs.filter((_, j) => j !== i));
+      if (!removedId) return;
+
+      setFilterUiById((ui) => {
+        if (!ui[removedId]) return ui;
+        const next = { ...ui };
+        delete next[removedId];
+        return next;
+      });
     },
-    [setFilters],
+    [filters, setFilterUiById, setFilters],
   );
 
   const toggleFilter = useCallback(
     (i) => {
-      setFilters((fs) =>
-        fs.map((f, j) => (j === i ? { ...f, open: !f.open } : f)),
-      );
+      const id = filters[i]?.id;
+      if (!id) return;
+
+      setFilterUiById((ui) => ({
+        ...ui,
+        [id]: { ...ui[id], open: !ui[id]?.open },
+      }));
     },
-    [setFilters],
+    [filters, setFilterUiById],
   );
 
   const toggleEnabled = useCallback(
@@ -1366,9 +1297,9 @@ export default function PixelPass({ windowRuntime }) {
 
   const [fonts, setFonts] = useState([]);
   const [canExport, setCanExport] = useState(false);
-  const [fileURL, setFileURL] = useState(null);
   const [cameraOn, setCameraOn] = useState(false);
   const [globalFilters, setGlobalFilters] = useState([]);
+  const [filterUiById, setFilterUiById] = useState({});
 
   useEffect(() => {
     loadFonts().then(setFonts);
@@ -1587,7 +1518,36 @@ export default function PixelPass({ windowRuntime }) {
     removeFilter,
     toggleFilter,
     toggleEnabled,
-  } = useFilterStackState(defs, activeFilters, setActiveFilters);
+  } = useFilterStackState(
+    defs,
+    activeFilters,
+    setActiveFilters,
+    setFilterUiById,
+  );
+  useEffect(() => {
+    const liveIds = new Set();
+    globalFilters.forEach((filter) => {
+      if (filter?.id) liveIds.add(filter.id);
+    });
+    maskGroups.forEach((group) => {
+      (group.filters || []).forEach((filter) => {
+        if (filter?.id) liveIds.add(filter.id);
+      });
+    });
+
+    setFilterUiById((ui) => {
+      let changed = false;
+      const next = {};
+      for (const [id, state] of Object.entries(ui)) {
+        if (!liveIds.has(id)) {
+          changed = true;
+          continue;
+        }
+        next[id] = state;
+      }
+      return changed ? next : ui;
+    });
+  }, [globalFilters, maskGroups]);
   const maskGroupStrokeById = useMemo(
     () =>
       Object.fromEntries(
@@ -1701,10 +1661,11 @@ export default function PixelPass({ windowRuntime }) {
     maskConfig,
   ]);
 
-  const { loadFile, exportResult } = useProcessMedia(canvasRef, mediaConfig, {
-    cameraOn,
-    videoRef,
-  });
+  const { loadFile, exportResult, mediaError, webgpuSupported } =
+    useProcessMedia(canvasRef, mediaConfig, {
+      cameraOn,
+      videoRef,
+    });
   const requestRemoveGroup = useCallback(async () => {
     if (!maskEnabled || !removeGroupPlan || !selectedMaskGroupId) return;
     const groupId = selectedMaskGroupId;
@@ -1754,22 +1715,49 @@ export default function PixelPass({ windowRuntime }) {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (fileURL) URL.revokeObjectURL(fileURL);
-
       const url = await loadFile(file);
-      setFileURL(url);
+      if (!url) {
+        e.target.value = "";
+        setCanExport(false);
+        return;
+      }
+
       setCanExport(true);
       closeAddMenu();
     },
-    [loadFile, fileURL, closeAddMenu],
+    [loadFile, closeAddMenu],
   );
 
-  useEffect(
-    () => () => {
-      if (fileURL) URL.revokeObjectURL(fileURL);
-    },
-    [fileURL],
-  );
+  const handleTakePhoto = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video?.videoWidth || !video?.videoHeight) return;
+
+    const photoCanvas = document.createElement("canvas");
+    photoCanvas.width = video.videoWidth;
+    photoCanvas.height = video.videoHeight;
+
+    const ctx = photoCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
+
+    const blob = await new Promise((resolve) => {
+      photoCanvas.toBlob(resolve, "image/png");
+    });
+    if (!blob) return;
+
+    const file = new File([blob], `pixelpass-camera-${Date.now()}.png`, {
+      type: "image/png",
+    });
+    const url = await loadFile(file);
+    if (!url) {
+      setCanExport(false);
+      return;
+    }
+
+    setCameraOn(false);
+    setCanExport(true);
+  }, [loadFile]);
   useMaskMenuDismiss(showMaskSettings, setShowMaskSettings, maskMenuRef);
 
   useEffect(() => {
@@ -1837,12 +1825,15 @@ export default function PixelPass({ windowRuntime }) {
           ref={fileInputRef}
           onChange={handleFile}
           accept="image/*,video/*,.gif"
+          disabled={!webgpuSupported}
           className={styles.field}
         />
         <TopMenuAction
-          label="Choose File"
-          disabled={cameraOn}
-          onActivate={() => fileInputRef.current?.click()}
+          label={cameraOn ? "Take Photo" : "Choose File"}
+          disabled={!webgpuSupported}
+          onActivate={
+            cameraOn ? handleTakePhoto : () => fileInputRef.current?.click()
+          }
         />
         <TopMenuAction
           label="Export"
@@ -1851,8 +1842,12 @@ export default function PixelPass({ windowRuntime }) {
         />
         <TopMenuAction
           label={cameraOn ? "Stop Camera" : "Use Camera"}
+          disabled={!webgpuSupported}
           onActivate={() => setCameraOn((v) => !v)}
         />
+        {mediaError && (
+          <span className={styles.topMenuStatus}>{mediaError}</span>
+        )}
 
         <div ref={maskMenuRef} className={styles.topMenuGroup}>
           <TopMenuAction
@@ -1877,63 +1872,57 @@ export default function PixelPass({ windowRuntime }) {
               <div className={styles.maskSection}>
                 <div className={styles.maskSectionLabel}>Context</div>
                 <div className={styles.maskButtonsRow}>
-                  <button
-                    type="button"
-                    className={`xpButton ${!perMaskEnabled ? styles.maskButtonActive : ""}`}
+                  <XpButton
+                    className={!perMaskEnabled ? styles.maskButtonActive : ""}
                     onClick={() => setPipelineMode(PIPELINE_MODE_GLOBAL)}
                   >
                     Global
-                  </button>
-                  <button
-                    type="button"
-                    className={`xpButton ${perMaskEnabled ? styles.maskButtonActive : ""}`}
+                  </XpButton>
+                  <XpButton
+                    className={perMaskEnabled ? styles.maskButtonActive : ""}
                     onClick={() => setPipelineMode(PIPELINE_MODE_PER_MASK)}
                   >
                     Per Group
-                  </button>
+                  </XpButton>
                 </div>
               </div>
 
               <div className={styles.maskSection}>
                 <div className={styles.maskSectionLabel}>State</div>
                 <div className={styles.maskButtonsRow}>
-                  <button
-                    type="button"
-                    className={`xpButton ${maskEnabled ? styles.maskButtonActive : ""}`}
+                  <XpButton
+                    className={maskEnabled ? styles.maskButtonActive : ""}
                     onClick={() => setMaskEnabled((v) => !v)}
                   >
                     Mask {maskEnabled ? "On" : "Off"}
-                  </button>
+                  </XpButton>
 
-                  <button
-                    type="button"
-                    className={`xpButton ${maskShowOutlines ? styles.maskButtonActive : ""}`}
+                  <XpButton
+                    className={maskShowOutlines ? styles.maskButtonActive : ""}
                     disabled={!maskEnabled}
                     onClick={() => setMaskShowOutlines((v) => !v)}
                   >
                     Outlines {maskShowOutlines ? "On" : "Off"}
-                  </button>
+                  </XpButton>
 
                   {!perMaskEnabled && (
-                    <button
-                      type="button"
-                      className={`xpButton ${maskInvert ? styles.maskButtonActive : ""}`}
+                    <XpButton
+                      className={maskInvert ? styles.maskButtonActive : ""}
                       disabled={!maskEnabled}
                       onClick={() => setMaskInvert((v) => !v)}
                     >
                       Invert {maskInvert ? "On" : "Off"}
-                    </button>
+                    </XpButton>
                   )}
 
                   {perMaskEnabled && (
-                    <button
-                      type="button"
-                      className={`xpButton ${allMaskGroupsInverted ? styles.maskButtonActive : ""}`}
+                    <XpButton
+                      className={allMaskGroupsInverted ? styles.maskButtonActive : ""}
                       disabled={!maskEnabled || maskGroups.length === 0}
                       onClick={invertAllMaskGroups}
                     >
                       Invert All Groups
-                    </button>
+                    </XpButton>
                   )}
                 </div>
               </div>
@@ -1942,15 +1931,14 @@ export default function PixelPass({ windowRuntime }) {
                 <div className={styles.maskSectionLabel}>Draw</div>
                 <div className={styles.maskTools}>
                   {MASK_TOOL_OPTIONS.map((toolDef) => (
-                    <button
+                    <XpButton
                       key={toolDef.id}
-                      type="button"
-                      className={`xpButton ${maskTool === toolDef.id ? styles.maskToolActive : ""}`}
+                      className={maskTool === toolDef.id ? styles.maskToolActive : ""}
                       disabled={!maskEnabled}
                       onClick={() => setMaskTool(toolDef.id)}
                     >
                       {toolDef.label}
-                    </button>
+                    </XpButton>
                   ))}
                 </div>
 
@@ -1987,29 +1975,26 @@ export default function PixelPass({ windowRuntime }) {
                       ))}
                     </select>
 
-                    <button
-                      type="button"
-                      className={`xpButton ${styles.maskIconButton}`}
+                    <XpButton
+                      className={styles.maskIconButton}
                       disabled={!maskEnabled}
                       onClick={addMaskGroup}
                       title="Add Group"
                       aria-label="Add Group"
                     >
                       +
-                    </button>
-                    <button
-                      type="button"
-                      className={`xpButton ${styles.maskIconButton}`}
+                    </XpButton>
+                    <XpButton
+                      className={styles.maskIconButton}
                       disabled={!maskEnabled || maskGroupMeta.length <= 1}
                       onClick={requestRemoveGroup}
                       title="Remove Group"
                       aria-label="Remove Group"
                     >
                       −
-                    </button>
-                    <button
-                      type="button"
-                      className={`xpButton ${styles.maskIconButton} ${activeMaskGroup?.enabled ? styles.maskButtonActive : ""}`}
+                    </XpButton>
+                    <XpButton
+                      className={`${styles.maskIconButton} ${activeMaskGroup?.enabled ? styles.maskButtonActive : ""}`}
                       disabled={!maskEnabled || !activeMaskGroup}
                       onClick={() =>
                         toggleMaskGroupEnabled(activeMaskGroup?.id)
@@ -2024,28 +2009,26 @@ export default function PixelPass({ windowRuntime }) {
                       }
                     >
                       <MaskEyeIcon />
-                    </button>
-                    <button
-                      type="button"
-                      className={`xpButton ${styles.maskIconButton} ${activeMaskGroup?.invert ? styles.maskButtonActive : ""}`}
+                    </XpButton>
+                    <XpButton
+                      className={`${styles.maskIconButton} ${activeMaskGroup?.invert ? styles.maskButtonActive : ""}`}
                       disabled={!maskEnabled || !activeMaskGroup}
                       onClick={() => toggleMaskGroupInvert(activeMaskGroup?.id)}
                       title="Group Invert"
                       aria-label="Group Invert"
                     >
                       Inv
-                    </button>
+                    </XpButton>
                   </div>
 
                   {canMoveSelectedToActiveGroup && (
-                    <button
-                      type="button"
-                      className={`xpButton ${styles.maskInlineAction}`}
+                    <XpButton
+                      className={styles.maskInlineAction}
                       disabled={!maskEnabled}
                       onClick={assignSelectedSegmentToActiveGroup}
                     >
                       Move Selected Here
-                    </button>
+                    </XpButton>
                   )}
                 </div>
               )}
@@ -2053,30 +2036,24 @@ export default function PixelPass({ windowRuntime }) {
               <div className={styles.maskSection}>
                 <div className={styles.maskSectionLabel}>History / Reset</div>
                 <div className={styles.maskButtonsRow}>
-                  <button
-                    type="button"
-                    className="xpButton"
+                  <XpButton
                     disabled={!maskEnabled || !canUndoMask}
                     onClick={undoMask}
                   >
                     Undo
-                  </button>
-                  <button
-                    type="button"
-                    className="xpButton"
+                  </XpButton>
+                  <XpButton
                     disabled={!maskEnabled || !canRedoMask}
                     onClick={redoMask}
                   >
                     Redo
-                  </button>
-                  <button
-                    type="button"
-                    className="xpButton"
+                  </XpButton>
+                  <XpButton
                     disabled={!maskEnabled || maskSegments.length === 0}
                     onClick={clearMask}
                   >
                     Clear Mask
-                  </button>
+                  </XpButton>
                 </div>
               </div>
 
@@ -2084,14 +2061,12 @@ export default function PixelPass({ windowRuntime }) {
                 <div className={styles.maskSection}>
                   <div className={styles.maskSectionLabel}>More</div>
                   <div className={styles.maskButtonsRow}>
-                    <button
-                      type="button"
-                      className="xpButton"
+                    <XpButton
                       disabled={!maskEnabled}
                       onClick={removeSelectedMaskSegment}
                     >
                       Delete Selected
-                    </button>
+                    </XpButton>
                   </div>
                 </div>
               )}
@@ -2121,6 +2096,7 @@ export default function PixelPass({ windowRuntime }) {
                   <FilterOptions
                     filter={f}
                     index={i}
+                    open={!!filterUiById[f.id]?.open}
                     defs={defs}
                     toggleFilter={toggleFilter}
                     handleOptionChange={handleOptionChange}
@@ -2145,26 +2121,22 @@ export default function PixelPass({ windowRuntime }) {
               ) : null,
             )}
 
-            <button
-              type="button"
-              className="xpButton"
+            <XpButton
               disabled={perMaskEnabled && !activeMaskGroup}
               onClick={toggleShowAdd}
             >
               + Add Filter
-            </button>
+            </XpButton>
 
             {showAdd && (
               <div className={styles.filterSelection}>
                 {availableFilterEntries.map(([type, def]) => (
-                  <button
-                    type="button"
+                  <XpButton
                     key={type}
-                    className="xpButton"
                     onClick={() => addFilter(type)}
                   >
                     {def.title}
-                  </button>
+                  </XpButton>
                 ))}
               </div>
             )}

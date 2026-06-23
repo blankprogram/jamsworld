@@ -3,10 +3,16 @@ import { useResizableAndDraggable } from "../../hooks/useDraggable";
 import {
   StyledWindow,
   StyledHeader,
+  HeaderButton,
+  HeaderButtonGroup,
+  HeaderIcon,
+  HeaderTitle,
   StyledWindowBody,
   ResizeHandle,
-  StyledHeaderButtons,
 } from "./Styles";
+
+const HEADER_CONTROL_SELECTOR = "[data-window-header-control]";
+const MAXIMIZED_HEIGHT = "calc(100vh - var(--xp-taskbar-height))";
 
 const HeaderButtons = ({
   buttons,
@@ -16,48 +22,60 @@ const HeaderButtons = ({
   maximized,
   resizable,
   minimizable,
-  isFocus,
+  isFocused,
 }) => {
   const buttonElements = {
     minimize: (
-      <button
+      <HeaderButton
         key="minimize"
-        className={`header__button header__button--minimize ${!isFocus ? "header__button--unfocused" : ""} ${
-          minimizable ? "" : "header__button--disable"
-        }`}
+        type="button"
+        aria-label="Minimize"
+        data-window-header-control="true"
+        $variant="minimize"
         disabled={!minimizable}
         onMouseUp={minimizable ? onMinimize : undefined}
       />
     ),
     maximize: (
-      <button
+      <HeaderButton
         key="maximize"
-        className={`header__button ${
-          maximized ? "header__button--maximized" : "header__button--maximize"
-        } ${!isFocus ? "header__button--unfocused" : ""} ${
-          resizable ? "" : "header__button--disable"
-        }`}
+        type="button"
+        aria-label={maximized ? "Restore" : "Maximize"}
+        data-window-header-control="true"
+        $variant={maximized ? "restore" : "maximize"}
         disabled={!resizable}
         onMouseUp={resizable ? onMaximize : undefined}
       />
     ),
     close: (
-      <button
+      <HeaderButton
         key="close"
-        className={`header__button header__button--close ${!isFocus ? "header__button--unfocused" : ""}`}
+        type="button"
+        aria-label="Close"
+        data-window-header-control="true"
+        $variant="close"
         onMouseUp={onClose}
       />
     ),
   };
 
   return (
-    <StyledHeaderButtons isFocus={isFocus}>
+    <HeaderButtonGroup $isFocused={isFocused}>
       {buttons ? buttons.map((b) => buttonElements[b]) : Object.values(buttonElements)}
-    </StyledHeaderButtons>
+    </HeaderButtonGroup>
   );
 };
 
-const TASKBAR_HEIGHT = 30;
+const RESIZE_HANDLES = [
+  ["topLeft", "top left"],
+  ["topRight", "top right"],
+  ["bottomLeft", "bottom left"],
+  ["bottomRight", "bottom right"],
+  ["top", "top"],
+  ["right", "right"],
+  ["bottom", "bottom"],
+  ["left", "left"],
+];
 
 const Window = memo(
   ({
@@ -73,6 +91,7 @@ const Window = memo(
     isMinimized,
     maximized,
     useStyledWindow = true,
+    clickThroughWindow = false,
     buttons,
     rect,
     minWidth = 600,
@@ -95,7 +114,17 @@ const Window = memo(
       if (!isFocused) onFocus();
     };
 
-    const handleDoubleClick = () => {
+    const isHeaderControlEvent = (event) =>
+      event.target instanceof Element &&
+      event.target.closest(HEADER_CONTROL_SELECTOR);
+
+    const handleHeaderMouseDown = (event) => {
+      if (isHeaderControlEvent(event)) return;
+      startDrag(event);
+    };
+
+    const handleDoubleClick = (event) => {
+      if (isHeaderControlEvent(event)) return;
       if (onToggleMaximize && resizable) onToggleMaximize();
     };
 
@@ -106,31 +135,46 @@ const Window = memo(
           top: 0,
           left: 0,
           width: "100vw",
-          height: `calc(100vh - ${TASKBAR_HEIGHT}px)`,
+          height: MAXIMIZED_HEIGHT,
           maxWidth: "100vw",
-          maxHeight: `calc(100vh - ${TASKBAR_HEIGHT}px)`,
+          maxHeight: MAXIMIZED_HEIGHT,
+          transform: "none",
         }
-      : {
-          zIndex,
-          top: `${rect?.y ?? 0}px`,
-          left: `${rect?.x ?? 0}px`,
-          width: `${rect?.width ?? 1200}px`,
-          height: `${rect?.height ?? 700}px`,
-        };
+      : useStyledWindow
+        ? {
+            zIndex,
+            top: `${rect?.y ?? 0}px`,
+            left: `${rect?.x ?? 0}px`,
+            width: `${rect?.width ?? 1200}px`,
+            height: `${rect?.height ?? 700}px`,
+          }
+        : {
+            zIndex,
+            position: "absolute",
+            top: `${rect?.y ?? 0}px`,
+            left: `${rect?.x ?? 0}px`,
+            width: `${rect?.width ?? 1200}px`,
+            height: `${rect?.height ?? 700}px`,
+          };
 
     const containerProps = {
       ref: windowRef,
+      "data-window-root": "true",
       onMouseDown: handleFocus,
       style: {
         ...containerStyle,
-        pointerEvents: interactionLocked ? "none" : undefined,
+        pointerEvents:
+          interactionLocked || clickThroughWindow ? "none" : undefined,
       },
     };
 
     if (!useStyledWindow) {
       return (
         <div {...containerProps}>
-          {React.cloneElement(children, { isFocused, onFocus: handleFocus })}
+          {React.cloneElement(children, {
+            isFocused,
+            onFocus: handleFocus,
+          })}
         </div>
       );
     }
@@ -138,70 +182,47 @@ const Window = memo(
     return (
       <StyledWindow
         {...containerProps}
-        isFocused={isFocused}
-        isMinimized={isMinimized}
-        isMaximized={maximized}
+        $isFocused={isFocused}
+        $isMinimized={isMinimized}
+        $isMaximized={maximized}
       >
         <StyledHeader
-          onMouseDown={startDrag}
+          onMouseDown={handleHeaderMouseDown}
           onDoubleClick={handleDoubleClick}
-          isFocused={isFocused}
+          $isFocused={isFocused}
         >
-          <img
+          <HeaderIcon
             src={icon}
             alt={title}
-            className="app__header__icon"
             draggable={false}
           />
-          <div className="app__header__title">{title}</div>
+          <HeaderTitle>{title}</HeaderTitle>
           <HeaderButtons
             buttons={buttons}
             onMinimize={onMinimize}
             onMaximize={onToggleMaximize}
             onClose={onClose}
-            isFocus={isFocused}
+            isFocused={isFocused}
             maximized={maximized}
             resizable={resizable}
             minimizable={minimizable}
           />
         </StyledHeader>
         <StyledWindowBody>
-          {React.cloneElement(children, { isFocused, onFocus: handleFocus })}
+          {React.cloneElement(children, {
+            isFocused,
+            onFocus: handleFocus,
+          })}
         </StyledWindowBody>
         {resizable && !maximized && (
           <>
-            <ResizeHandle
-              className="top-left"
-              onMouseDown={(e) => startResize(e, "top left")}
-            />
-            <ResizeHandle
-              className="top-right"
-              onMouseDown={(e) => startResize(e, "top right")}
-            />
-            <ResizeHandle
-              className="bottom-left"
-              onMouseDown={(e) => startResize(e, "bottom left")}
-            />
-            <ResizeHandle
-              className="bottom-right"
-              onMouseDown={(e) => startResize(e, "bottom right")}
-            />
-            <ResizeHandle
-              className="top"
-              onMouseDown={(e) => startResize(e, "top")}
-            />
-            <ResizeHandle
-              className="right"
-              onMouseDown={(e) => startResize(e, "right")}
-            />
-            <ResizeHandle
-              className="bottom"
-              onMouseDown={(e) => startResize(e, "bottom")}
-            />
-            <ResizeHandle
-              className="left"
-              onMouseDown={(e) => startResize(e, "left")}
-            />
+            {RESIZE_HANDLES.map(([edge, direction]) => (
+              <ResizeHandle
+                key={edge}
+                $edge={edge}
+                onMouseDown={(e) => startResize(e, direction)}
+              />
+            ))}
           </>
         )}
       </StyledWindow>

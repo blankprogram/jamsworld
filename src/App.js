@@ -1,4 +1,3 @@
-import "./App.css";
 import "./styles/tokens.css";
 import "xp.css";
 
@@ -15,12 +14,19 @@ import Window from "./components/Window/Window";
 import { APP_REGISTRY, APPS_BY_ID } from "./desktop/appRegistry";
 import { INTERNAL_APPS_BY_ID } from "./desktop/internalApps";
 import { useDesktopSession } from "./desktop/useDesktopSession";
+import {
+  createWindowZIndexMap,
+  getWindowsInTaskbarOrder,
+} from "./desktop/windowOrdering";
+import styles from "./App.module.css";
 
 const SCREEN_STATE = {
   LOADING: "LOADING",
   WELCOME: "WELCOME",
   MAIN: "MAIN",
 };
+
+const WINDOW_ROOT_SELECTOR = '[data-window-root="true"]';
 
 function App() {
   const ALL_APPS_BY_ID = useMemo(
@@ -46,6 +52,7 @@ function App() {
     restoreApplication,
     toggleMaximizeApplication,
     focusWindow,
+    clearFocusedWindow,
     updateWindowRect,
     setSelectedDesktopApps,
   } = useDesktopSession(ALL_APPS_BY_ID);
@@ -71,9 +78,32 @@ function App() {
     return locked;
   }, [desktopState.windows]);
 
+  const windowZIndexes = useMemo(
+    () => createWindowZIndexMap(desktopState.windows),
+    [desktopState.windows],
+  );
+
+  const renderedWindows = useMemo(
+    () => getWindowsInTaskbarOrder(desktopState.windows),
+    [desktopState.windows],
+  );
+
   const handleLoadingScreenClick = () => {
     setScreenState(SCREEN_STATE.WELCOME);
   };
+
+  const handleDesktopMouseDownCapture = useCallback(
+    (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(WINDOW_ROOT_SELECTOR)
+      ) {
+        return;
+      }
+      clearFocusedWindow();
+    },
+    [clearFocusedWindow],
+  );
 
   useEffect(() => {
     if (screenState !== SCREEN_STATE.WELCOME) return undefined;
@@ -151,7 +181,8 @@ function App() {
     default:
       return (
         <div
-          className="App"
+          className={styles.app}
+          onMouseDownCapture={handleDesktopMouseDownCapture}
           style={{
             backgroundImage: `url(${background})`,
             backgroundSize: "cover",
@@ -172,7 +203,7 @@ function App() {
             minimizeApplication={minimizeApplication}
             focusedWindowId={desktopState.focusedWindowId}
           />
-          {desktopState.windows.map((windowItem, index) => {
+          {renderedWindows.map((windowItem) => {
             const app = ALL_APPS_BY_ID[windowItem.appId];
             if (!app) return null;
             const windowTitle = windowItem.titleOverride || app.title;
@@ -192,6 +223,7 @@ function App() {
                 isFocused={desktopState.focusedWindowId === windowItem.id}
                 isMinimized={windowItem.minimized}
                 useStyledWindow={app.useStyledWindow}
+                clickThroughWindow={app.clickThroughWindow}
                 buttons={windowItem.modal ? ["close"] : undefined}
                 rect={windowItem.rect}
                 minWidth={windowItem.minWidth}
@@ -199,7 +231,7 @@ function App() {
                 resizable={windowItem.resizable}
                 minimizable={!windowItem.modal}
                 interactionLocked={interactionLockedWindowIds.has(windowItem.id)}
-                zIndex={index + 1}
+                zIndex={windowZIndexes.get(windowItem.id) || 1}
               >
                 {renderApplication(windowItem)}
               </Window>

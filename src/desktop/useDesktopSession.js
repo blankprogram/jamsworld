@@ -116,6 +116,12 @@ export function useDesktopSession(appsById) {
     });
   }, []);
 
+  const clearFocusedWindow = useCallback(() => {
+    dispatch({
+      type: DESKTOP_ACTIONS.CLEAR_FOCUS,
+    });
+  }, []);
+
   const updateWindowRect = useCallback((windowId, rect) => {
     dispatch({
       type: DESKTOP_ACTIONS.UPDATE_WINDOW_RECT,
@@ -168,6 +174,7 @@ export function useDesktopSession(appsById) {
     restoreApplication,
     toggleMaximizeApplication,
     focusWindow,
+    clearFocusedWindow,
     updateWindowRect,
     setSelectedDesktopApps,
   };

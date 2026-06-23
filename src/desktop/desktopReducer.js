@@ -1,3 +1,6 @@
+import { centerWindowRect, clampWindowRect } from "./windowGeometry";
+import { ensureTaskbarOrders, getNextTaskbarOrder } from "./windowOrdering";
+
 export const DESKTOP_ACTIONS = Object.freeze({
   OPEN_APP: "OPEN_APP",
   OPEN_WINDOW_INSTANCE: "OPEN_WINDOW_INSTANCE",
@@ -6,59 +9,10 @@ export const DESKTOP_ACTIONS = Object.freeze({
   RESTORE_WINDOW: "RESTORE_WINDOW",
   TOGGLE_MAXIMIZE_WINDOW: "TOGGLE_MAXIMIZE_WINDOW",
   FOCUS_WINDOW: "FOCUS_WINDOW",
+  CLEAR_FOCUS: "CLEAR_FOCUS",
   UPDATE_WINDOW_RECT: "UPDATE_WINDOW_RECT",
   SET_SELECTED_DESKTOP_APPS: "SET_SELECTED_DESKTOP_APPS",
 });
-
-const TASKBAR_HEIGHT = 30;
-const WINDOW_STAGGER_OFFSET = 24;
-const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
-
-const getViewport = () => {
-  if (typeof window === "undefined") return DEFAULT_VIEWPORT;
-  return {
-    width: window.innerWidth || DEFAULT_VIEWPORT.width,
-    height: window.innerHeight || DEFAULT_VIEWPORT.height,
-  };
-};
-
-const clampWindowRect = (rect, minWidth, minHeight) => {
-  const viewport = getViewport();
-  const maxHeight = Math.max(120, viewport.height - TASKBAR_HEIGHT);
-
-  const width = Math.min(
-    Math.max(rect.width, minWidth),
-    Math.max(minWidth, viewport.width),
-  );
-  const height = Math.min(
-    Math.max(rect.height, minHeight),
-    Math.max(minHeight, maxHeight),
-  );
-
-  const x = Math.min(Math.max(0, rect.x), Math.max(0, viewport.width - width));
-  const y = Math.min(Math.max(0, rect.y), Math.max(0, maxHeight - height));
-
-  return { x, y, width, height };
-};
-
-const centerWindowRect = (windowDefaults, index) => {
-  const viewport = getViewport();
-  const maxHeight = Math.max(120, viewport.height - TASKBAR_HEIGHT);
-  const width = Math.min(windowDefaults.width, viewport.width);
-  const height = Math.min(windowDefaults.height, maxHeight);
-
-  const stagger = WINDOW_STAGGER_OFFSET * (index % 8);
-  return clampWindowRect(
-    {
-      x: Math.floor((viewport.width - width) / 2) + stagger,
-      y: Math.floor((maxHeight - height) / 2) + stagger,
-      width,
-      height,
-    },
-    windowDefaults.minWidth,
-    windowDefaults.minHeight,
-  );
-};
 
 const createWindowId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -77,6 +31,9 @@ const createWindowInstance = (app, index, options = {}) => {
   return {
     id: options.windowId || createWindowId(),
     appId: app.id,
+    taskbarOrder: Number.isFinite(options.taskbarOrder)
+      ? options.taskbarOrder
+      : index,
     minimized: false,
     maximized: false,
     rect,
@@ -184,15 +141,21 @@ export const createInitialDesktopState = (appsById, startupAppIds = []) => {
 };
 
 export const desktopReducer = (state, action) => {
+  const orderedWindows = ensureTaskbarOrders(state.windows);
+  const currentState =
+    orderedWindows === state.windows ? state : { ...state, windows: orderedWindows };
+
   switch (action.type) {
     case DESKTOP_ACTIONS.OPEN_APP: {
       const { app } = action.payload;
-      if (!app) return state;
+      if (!app) return currentState;
 
-      const windowItem = createWindowInstance(app, state.windows.length);
+      const windowItem = createWindowInstance(app, currentState.windows.length, {
+        taskbarOrder: getNextTaskbarOrder(currentState.windows),
+      });
       return {
-        ...state,
-        windows: [...state.windows, windowItem],
+        ...currentState,
+        windows: [...currentState.windows, windowItem],
         focusedWindowId: windowItem.id,
         selectedDesktopAppIds: [],
       };
@@ -200,16 +163,21 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.OPEN_WINDOW_INSTANCE: {
       const { app, options } = action.payload;
-      if (!app) return state;
+      if (!app) return currentState;
 
       const windowItem = createWindowInstance(
         app,
-        state.windows.length,
-        options || {},
+        currentState.windows.length,
+        {
+          ...(options || {}),
+          taskbarOrder: Number.isFinite(options?.taskbarOrder)
+            ? options.taskbarOrder
+            : getNextTaskbarOrder(currentState.windows),
+        },
       );
       return {
-        ...state,
-        windows: [...state.windows, windowItem],
+        ...currentState,
+        windows: [...currentState.windows, windowItem],
         focusedWindowId: windowItem.id,
         selectedDesktopAppIds: [],
       };
@@ -217,36 +185,36 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.CLOSE_WINDOW: {
       const { windowId } = action.payload;
-      const closureSet = collectWindowClosureSet(state.windows, windowId);
-      const nextWindows = state.windows.filter(
+      const closureSet = collectWindowClosureSet(currentState.windows, windowId);
+      const nextWindows = currentState.windows.filter(
         (windowItem) => !closureSet.has(windowItem.id),
       );
       const focusedWindowId =
-        closureSet.has(state.focusedWindowId)
+        closureSet.has(currentState.focusedWindowId)
           ? getTopVisibleWindowId(nextWindows)
-          : state.focusedWindowId;
-      return { ...state, windows: nextWindows, focusedWindowId };
+          : currentState.focusedWindowId;
+      return { ...currentState, windows: nextWindows, focusedWindowId };
     }
 
     case DESKTOP_ACTIONS.MINIMIZE_WINDOW: {
       const { windowId } = action.payload;
-      const closureSet = collectWindowClosureSet(state.windows, windowId);
-      const nextWindows = state.windows.map((windowItem) =>
+      const closureSet = collectWindowClosureSet(currentState.windows, windowId);
+      const nextWindows = currentState.windows.map((windowItem) =>
         closureSet.has(windowItem.id)
           ? { ...windowItem, minimized: true }
           : windowItem,
       );
       const focusedWindowId =
-        closureSet.has(state.focusedWindowId)
+        closureSet.has(currentState.focusedWindowId)
           ? getTopVisibleWindowId(nextWindows)
-          : state.focusedWindowId;
-      return { ...state, windows: nextWindows, focusedWindowId };
+          : currentState.focusedWindowId;
+      return { ...currentState, windows: nextWindows, focusedWindowId };
     }
 
     case DESKTOP_ACTIONS.RESTORE_WINDOW: {
       const { windowId } = action.payload;
-      const closureSet = collectWindowClosureSet(state.windows, windowId);
-      const restoredWindows = state.windows.map((windowItem) =>
+      const closureSet = collectWindowClosureSet(currentState.windows, windowId);
+      const restoredWindows = currentState.windows.map((windowItem) =>
         closureSet.has(windowItem.id)
           ? { ...windowItem, minimized: false }
           : windowItem,
@@ -255,7 +223,7 @@ export const desktopReducer = (state, action) => {
       const focusedWindowId =
         getTopVisibleModalDescendantId(nextWindows, windowId) || windowId;
       return {
-        ...state,
+        ...currentState,
         windows: nextWindows,
         focusedWindowId,
       };
@@ -263,11 +231,11 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.TOGGLE_MAXIMIZE_WINDOW: {
       const { windowId } = action.payload;
-      const targetWindow = state.windows.find(
+      const targetWindow = currentState.windows.find(
         (windowItem) => windowItem.id === windowId,
       );
-      if (!targetWindow || !targetWindow.resizable) return state;
-      const toggledWindows = state.windows.map((windowItem) =>
+      if (!targetWindow || !targetWindow.resizable) return currentState;
+      const toggledWindows = currentState.windows.map((windowItem) =>
         windowItem.id === windowId
           ? {
               ...windowItem,
@@ -278,7 +246,7 @@ export const desktopReducer = (state, action) => {
       );
       const nextWindows = moveWindowToFront(toggledWindows, windowId);
       return {
-        ...state,
+        ...currentState,
         windows: nextWindows,
         focusedWindowId: windowId,
       };
@@ -286,29 +254,35 @@ export const desktopReducer = (state, action) => {
 
     case DESKTOP_ACTIONS.FOCUS_WINDOW: {
       const { windowId } = action.payload;
-      const targetWindow = state.windows.find(
+      const targetWindow = currentState.windows.find(
         (windowItem) => windowItem.id === windowId,
       );
-      if (!targetWindow || targetWindow.minimized) return state;
+      if (!targetWindow || targetWindow.minimized) return currentState;
 
-      const familyRootId = getFamilyRootId(state.windows, windowId);
-      const familySet = collectWindowClosureSet(state.windows, familyRootId);
+      const familyRootId = getFamilyRootId(currentState.windows, windowId);
+      const familySet = collectWindowClosureSet(currentState.windows, familyRootId);
       const blockingModalId =
-        getTopVisibleModalDescendantId(state.windows, familyRootId);
+        getTopVisibleModalDescendantId(currentState.windows, familyRootId);
       const focusTargetId = blockingModalId || windowId;
-      const focusTarget = getWindowById(state.windows, focusTargetId);
-      if (!focusTarget || focusTarget.minimized) return state;
+      const focusTarget = getWindowById(currentState.windows, focusTargetId);
+      if (!focusTarget || focusTarget.minimized) return currentState;
 
       return {
-        ...state,
-        windows: moveWindowSetToFront(state.windows, familySet),
+        ...currentState,
+        windows: moveWindowSetToFront(currentState.windows, familySet),
         focusedWindowId: focusTargetId,
       };
     }
 
+    case DESKTOP_ACTIONS.CLEAR_FOCUS:
+      return {
+        ...currentState,
+        focusedWindowId: null,
+      };
+
     case DESKTOP_ACTIONS.UPDATE_WINDOW_RECT: {
       const { windowId, rect } = action.payload;
-      const nextWindows = state.windows.map((windowItem) => {
+      const nextWindows = currentState.windows.map((windowItem) => {
         if (windowItem.id !== windowId || windowItem.maximized || !rect) {
           return windowItem;
         }
@@ -332,7 +306,7 @@ export const desktopReducer = (state, action) => {
         };
       });
 
-      return { ...state, windows: nextWindows };
+      return { ...currentState, windows: nextWindows };
     }
 
     case DESKTOP_ACTIONS.SET_SELECTED_DESKTOP_APPS: {
@@ -340,7 +314,7 @@ export const desktopReducer = (state, action) => {
         ? action.payload.appIds
         : [];
       return {
-        ...state,
+        ...currentState,
         selectedDesktopAppIds: appIds,
       };
     }

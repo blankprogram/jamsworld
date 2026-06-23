@@ -35,6 +35,7 @@ export function createAppManifest({
   title,
   icon,
   useStyledWindow = true,
+  clickThroughWindow = false,
   windowDefaults,
 }) {
   return {
@@ -42,6 +43,7 @@ export function createAppManifest({
     title,
     icon,
     useStyledWindow,
+    clickThroughWindow,
     windowDefaults: normalizeWindowDefaults(windowDefaults),
   };
 }

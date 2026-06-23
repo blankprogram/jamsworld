@@ -1,14 +1,5 @@
 import { useRef } from "react";
-
-const getViewport = () => {
-  if (typeof window === "undefined") return { width: 1440, height: 900 };
-  return {
-    width: window.innerWidth || 1440,
-    height: window.innerHeight || 900,
-  };
-};
-
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+import { clampValue, getDesktopBounds } from "../desktop/windowGeometry";
 
 export const useResizableAndDraggable = ({
   rect,
@@ -51,18 +42,19 @@ export const useResizableAndDraggable = ({
     const startRect = { ...rect };
 
     const handleDrag = (event) => {
-      const viewport = getViewport();
-      const nextX = clamp(
+      const bounds = getDesktopBounds();
+      const nextX = clampValue(
         startRect.x + event.clientX - startX,
-        0,
-        Math.max(0, viewport.width - startRect.width),
+        bounds.x,
+        Math.max(bounds.x, bounds.x + bounds.width - startRect.width),
       );
-      const nextY = clamp(
+      const nextY = clampValue(
         startRect.y + event.clientY - startY,
-        0,
-        Math.max(0, viewport.height - startRect.height),
+        bounds.y,
+        Math.max(bounds.y, bounds.y + bounds.height - startRect.height),
       );
-      onRectChange?.({ ...startRect, x: nextX, y: nextY });
+      const nextRect = { ...startRect, x: nextX, y: nextY };
+      onRectChange?.(nextRect);
     };
 
     const stopDrag = () => {
@@ -83,10 +75,9 @@ export const useResizableAndDraggable = ({
     const startRect = { ...rect };
 
     const updateSizeAndPosition = (event) => {
-      const viewport = getViewport();
+      const bounds = getDesktopBounds();
       const deltaX = event.clientX - startX;
       const deltaY = event.clientY - startY;
-      const maxHeight = viewport.height;
 
       let next = {
         x: startRect.x,
@@ -96,17 +87,17 @@ export const useResizableAndDraggable = ({
       };
 
       if (direction.includes("right")) {
-        next.width = clamp(
+        next.width = clampValue(
           startRect.width + deltaX,
           minWidth,
-          Math.max(minWidth, viewport.width - startRect.x),
+          Math.max(minWidth, bounds.x + bounds.width - startRect.x),
         );
       }
 
       if (direction.includes("left")) {
-        const nextX = clamp(
+        const nextX = clampValue(
           startRect.x + deltaX,
-          0,
+          bounds.x,
           startRect.x + startRect.width - minWidth,
         );
         next.x = nextX;
@@ -114,25 +105,33 @@ export const useResizableAndDraggable = ({
       }
 
       if (direction.includes("bottom")) {
-        next.height = clamp(
+        next.height = clampValue(
           startRect.height + deltaY,
           minHeight,
-          Math.max(minHeight, maxHeight - startRect.y),
+          Math.max(minHeight, bounds.y + bounds.height - startRect.y),
         );
       }
 
       if (direction.includes("top")) {
-        const nextY = clamp(
+        const nextY = clampValue(
           startRect.y + deltaY,
-          0,
+          bounds.y,
           startRect.y + startRect.height - minHeight,
         );
         next.y = nextY;
         next.height = startRect.height - (nextY - startRect.y);
       }
 
-      next.x = clamp(next.x, 0, Math.max(0, viewport.width - next.width));
-      next.y = clamp(next.y, 0, Math.max(0, maxHeight - next.height));
+      next.x = clampValue(
+        next.x,
+        bounds.x,
+        Math.max(bounds.x, bounds.x + bounds.width - next.width),
+      );
+      next.y = clampValue(
+        next.y,
+        bounds.y,
+        Math.max(bounds.y, bounds.y + bounds.height - next.height),
+      );
 
       onRectChange?.(next);
     };

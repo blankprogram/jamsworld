@@ -1,13 +1,6 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto:100,300,700');
-
-body {
-  background: #000;
-  font-family: 'Roboto', sans-serif;
-
-}
-
 .loadingScreenContainer {
   color: #fff;
+  font-family: 'Roboto', 'Tahoma', sans-serif;
   position: absolute;
   top: 0;
   left: 0;

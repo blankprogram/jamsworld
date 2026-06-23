@@ -1,22 +1,32 @@
-import styled from "styled-components";
+import styled, { css } from "styled-components";
+
+const focusedHeaderGradient =
+  "var(--xp-window-header-focused-gradient, linear-gradient(to bottom,#0058ee 0%,#3593ff 4%,#288eff 6%,#127dff 8%,#036ffc 10%,#0262ee 14%,#0057e5 20%,#0054e3 24%,#0055eb 56%,#005bf5 66%,#026afe 76%,#0062ef 86%,#0052d6 92%,#0040ab 94%,#003092 100%))";
+
+const unfocusedHeaderGradient =
+  "var(--xp-window-header-unfocused-gradient, linear-gradient(to bottom, #7697e7 0%,#7e9ee3 3%,#94afe8 6%,#97b4e9 8%,#82a5e4 14%,#7c9fe2 17%,#7996de 25%,#7b99e1 56%,#82a9e9 81%,#80a5e7 89%,#7b96e1 94%,#7a93df 97%,#abbae3 100%))";
+
+const headerGradient = ({ $isFocused }) =>
+  $isFocused ? focusedHeaderGradient : unfocusedHeaderGradient;
+
+const WINDOW_FRAME_SIZE = 3;
+const WINDOW_TOP_FRAME_SIZE = WINDOW_FRAME_SIZE;
 
 export const StyledWindow = styled.div`
   box-sizing: border-box;
-  display: ${({ isMinimized }) => (isMinimized ? "none" : "flex")};
+  display: ${({ $isMinimized }) => ($isMinimized ? "none" : "flex")};
   position: absolute;
-  padding: ${({ isMaximized, header }) =>
-    isMaximized ? 0 : header?.invisible ? 0 : 3}px;
-  background-color: ${({ isFocused }) =>
-    isFocused
+  padding: ${({ $isMaximized }) =>
+    $isMaximized
+      ? 0
+      : `${WINDOW_TOP_FRAME_SIZE}px ${WINDOW_FRAME_SIZE}px ${WINDOW_FRAME_SIZE}px`};
+  background-color: ${({ $isFocused }) =>
+    $isFocused
       ? "var(--xp-window-frame-focused, #0831d9)"
       : "var(--xp-window-frame-unfocused, #6582f5)"};
   flex-direction: column;
-  border-top-left-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
-  border-top-right-radius: ${({ isMaximized }) => (isMaximized ? 0 : 8)}px;
-  width: ${({ width, isMaximized }) =>
-    isMaximized ? "100vw" : width || "1200px"};
-  height: ${({ height, isMaximized }) =>
-    isMaximized ? "calc(100vh - 30px)" : height || "700px"};
+  border-top-left-radius: ${({ $isMaximized }) => ($isMaximized ? 0 : 8)}px;
+  border-top-right-radius: ${({ $isMaximized }) => ($isMaximized ? 0 : 8)}px;
   max-width: 100vw;
   max-height: 100vh;
   overflow: hidden;
@@ -33,33 +43,29 @@ export const StyledHeader = styled.header`
   position: relative;
   padding: 0 3px;
   align-items: center;
-  background: ${({ isFocused }) =>
-    isFocused
-      ? "var(--xp-window-header-focused-gradient, linear-gradient(to bottom,#0058ee 0%,#3593ff 4%,#288eff 6%,#127dff 8%,#036ffc 10%,#0262ee 14%,#0057e5 20%,#0054e3 24%,#0055eb 56%,#005bf5 66%,#026afe 76%,#0062ef 86%,#0052d6 92%,#0040ab 94%,#003092 100%))"
-      : "var(--xp-window-header-unfocused-gradient, linear-gradient(to bottom, #7697e7 0%,#7e9ee3 3%,#94afe8 6%,#97b4e9 8%,#82a5e4 14%,#7c9fe2 17%,#7996de 25%,#7b99e1 56%,#82a9e9 81%,#80a5e7 89%,#7b96e1 94%,#7a93df 97%,#abbae3 100%))"};
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  overflow: hidden;
+  background: ${headerGradient};
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  overflow: visible;
   cursor: grab;
 
   &:active {
     cursor: grabbing;
   }
+`;
 
-  .app__header__icon {
-    width: 15px;
-    height: 15px;
+export const HeaderIcon = styled.img`
+  width: 15px;
+  height: 15px;
+  margin-right: 3px;
+`;
 
-    margin-right: 3px;
-  }
-
-  .app__header__title {
-    flex: 1;
-    padding-right: 5px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
+export const HeaderTitle = styled.div`
+  flex: 1;
+  padding-right: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 `;
 
 export const StyledWindowBody = styled.div`
@@ -71,238 +77,236 @@ export const StyledWindowBody = styled.div`
   overflow: hidden;
 `;
 
+const resizeHandleEdgeStyles = ({ $edge }) => {
+  switch ($edge) {
+    case "topLeft":
+      return css`
+        top: 0;
+        left: 0;
+        width: 16px;
+        height: 16px;
+        cursor: nwse-resize;
+      `;
+    case "topRight":
+      return css`
+        top: 0;
+        right: 0;
+        width: 16px;
+        height: 16px;
+        cursor: nesw-resize;
+      `;
+    case "bottomLeft":
+      return css`
+        bottom: 0;
+        left: 0;
+        width: 16px;
+        height: 16px;
+        cursor: nesw-resize;
+      `;
+    case "bottomRight":
+      return css`
+        bottom: 0;
+        right: 0;
+        width: 16px;
+        height: 16px;
+        cursor: nwse-resize;
+      `;
+    case "top":
+      return css`
+        top: 0;
+        left: 16px;
+        width: calc(100% - 32px);
+        height: 5px;
+        cursor: ns-resize;
+      `;
+    case "right":
+      return css`
+        top: 16px;
+        right: 0;
+        width: 10px;
+        height: calc(100% - 32px);
+        cursor: ew-resize;
+      `;
+    case "bottom":
+      return css`
+        bottom: 0;
+        left: 16px;
+        width: calc(100% - 32px);
+        height: 10px;
+        cursor: ns-resize;
+      `;
+    case "left":
+      return css`
+        top: 16px;
+        left: 0;
+        width: 10px;
+        height: calc(100% - 32px);
+        cursor: ew-resize;
+      `;
+    default:
+      return css`
+        display: none;
+      `;
+  }
+};
+
 export const ResizeHandle = styled.div`
   position: absolute;
   background-color: transparent;
   z-index: 3;
-
-  &.top-left,
-  &.top-right,
-  &.bottom-left,
-  &.bottom-right {
-    width: 15px;
-    height: 15px;
-  }
-
-  &.top-left {
-    top: 0;
-    left: 0;
-    cursor: nwse-resize;
-  }
-
-  &.top-right {
-    top: 0;
-    right: 0;
-    cursor: nesw-resize;
-  }
-
-  &.bottom-left {
-    bottom: 0;
-    left: 0;
-    cursor: nesw-resize;
-  }
-
-  &.bottom-right {
-    bottom: 0;
-    right: 0;
-    cursor: nwse-resize;
-  }
-
-  &.top,
-  &.bottom {
-    width: calc(100% - 30px);
-    height: 10px;
-    left: 15px;
-    cursor: ns-resize;
-  }
-
-  &.top {
-    top: 0;
-  }
-
-  &.bottom {
-    bottom: 0;
-  }
-
-  &.left,
-  &.right {
-    height: calc(100% - 30px);
-    width: 10px;
-    top: 15px;
-    cursor: ew-resize;
-  }
-
-  &.left {
-    left: 0;
-  }
-
-  &.right {
-    right: 0;
-  }
+  ${resizeHandleEdgeStyles}
 `;
 
-export const StyledHeaderButtons = styled.div`
-  opacity: ${({ isFocus }) => (isFocus ? 1 : 0.6)};
+export const HeaderButtonGroup = styled.div`
+  position: relative;
+  z-index: 4;
+  opacity: ${({ $isFocused }) => ($isFocused ? 1 : 0.6)};
   height: 22px;
   display: flex;
   align-items: center;
   margin-top: -1px;
   margin-right: 1px;
+`;
 
-  .header__button {
-    margin-right: 1px;
-    position: relative;
-    width: 22px;
-    height: 22px;
-    border: 1px solid var(--xp-color-white, #fff);
-    border-radius: 3px;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    &:hover {
-      filter: brightness(120%);
-    }
-    &:hover:active {
-      filter: brightness(90%);
-    }
+const primaryHeaderButtonStyles = css`
+  box-shadow: inset 0 -1px 2px 1px
+    var(--xp-window-button-primary-shadow, #4646ff);
+  background-image: var(
+    --xp-window-button-primary-gradient,
+    radial-gradient(
+      circle at 90% 90%,
+      #0054e9 0%,
+      #2263d5 55%,
+      #4479e4 70%,
+      #a3bbec 90%,
+      white 100%
+    )
+  );
+`;
+
+const headerButtonVariantStyles = ({ $variant }) => {
+  switch ($variant) {
+    case "minimize":
+      return css`
+        ${primaryHeaderButtonStyles}
+
+        &:before {
+          content: "";
+          position: absolute;
+          left: 4px;
+          top: 13px;
+          height: 3px;
+          width: 8px;
+          background-color: white;
+        }
+      `;
+    case "maximize":
+      return css`
+        ${primaryHeaderButtonStyles}
+
+        &:before {
+          content: "";
+          position: absolute;
+          display: block;
+          left: 4px;
+          top: 4px;
+          box-shadow:
+            inset 0 3px white,
+            inset 0 0 0 1px white;
+          height: 12px;
+          width: 12px;
+        }
+      `;
+    case "restore":
+      return css`
+        ${primaryHeaderButtonStyles}
+
+        &:before {
+          content: "";
+          position: absolute;
+          display: block;
+          left: 7px;
+          top: 4px;
+          box-shadow:
+            inset 0 2px white,
+            inset 0 0 0 1px white;
+          height: 8px;
+          width: 8px;
+        }
+
+        &:after {
+          content: "";
+          position: absolute;
+          display: block;
+          left: 4px;
+          top: 7px;
+          box-shadow:
+            inset 0 2px white,
+            inset 0 0 0 1px white,
+            1px -1px var(--xp-window-button-maximized-bg, #136dff);
+          height: 8px;
+          width: 8px;
+          background-color: var(--xp-window-button-maximized-bg, #136dff);
+        }
+      `;
+    case "close":
+      return css`
+        box-shadow: inset 0 -1px 2px 1px
+          var(--xp-window-button-close-shadow, #da4600);
+        background-image: var(
+          --xp-window-button-close-gradient,
+          radial-gradient(
+            circle at 90% 90%,
+            #cc4600 0%,
+            #dc6527 55%,
+            #cd7546 70%,
+            #ffccb2 90%,
+            white 100%
+          )
+        );
+
+        &:before,
+        &:after {
+          content: "";
+          position: absolute;
+          left: 9px;
+          top: 2px;
+          height: 16px;
+          width: 2px;
+          background-color: white;
+        }
+
+        &:before {
+          transform: rotate(45deg);
+        }
+
+        &:after {
+          transform: rotate(-45deg);
+        }
+      `;
+    default:
+      return primaryHeaderButtonStyles;
+  }
+};
+
+export const HeaderButton = styled.button`
+  margin-right: 1px;
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--xp-color-white, #fff);
+  border-radius: 3px;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  opacity: ${({ disabled }) => (disabled ? 0.5 : 1)};
+  ${headerButtonVariantStyles}
+
+  &:hover {
+    filter: ${({ disabled }) => (disabled ? "brightness(100%)" : "brightness(120%)")};
   }
 
-  .header__button--minimize {
-    box-shadow: inset 0 -1px 2px 1px
-      var(--xp-window-button-primary-shadow, #4646ff);
-    background-image: var(
-      --xp-window-button-primary-gradient,
-      radial-gradient(
-        circle at 90% 90%,
-        #0054e9 0%,
-        #2263d5 55%,
-        #4479e4 70%,
-        #a3bbec 90%,
-        white 100%
-      )
-    );
-    &:before {
-      content: "";
-      position: absolute;
-      left: 4px;
-      top: 13px;
-      height: 3px;
-      width: 8px;
-      background-color: white;
-    }
-  }
-
-  .header__button--maximize {
-    box-shadow: inset 0 -1px 2px 1px
-      var(--xp-window-button-primary-shadow, #4646ff);
-    background-image: var(
-      --xp-window-button-primary-gradient,
-      radial-gradient(
-        circle at 90% 90%,
-        #0054e9 0%,
-        #2263d5 55%,
-        #4479e4 70%,
-        #a3bbec 90%,
-        white 100%
-      )
-    );
-    &:before {
-      content: "";
-      position: absolute;
-      display: block;
-      left: 4px;
-      top: 4px;
-      box-shadow:
-        inset 0 3px white,
-        inset 0 0 0 1px white;
-      height: 12px;
-      width: 12px;
-    }
-  }
-
-  .header__button--maximized {
-    box-shadow: inset 0 -1px 2px 1px
-      var(--xp-window-button-primary-shadow, #4646ff);
-    background-image: var(
-      --xp-window-button-primary-gradient,
-      radial-gradient(
-        circle at 90% 90%,
-        #0054e9 0%,
-        #2263d5 55%,
-        #4479e4 70%,
-        #a3bbec 90%,
-        white 100%
-      )
-    );
-    &:before {
-      content: "";
-      position: absolute;
-      display: block;
-      left: 7px;
-      top: 4px;
-      box-shadow:
-        inset 0 2px white,
-        inset 0 0 0 1px white;
-      height: 8px;
-      width: 8px;
-    }
-    &:after {
-      content: "";
-      position: absolute;
-      display: block;
-      left: 4px;
-      top: 7px;
-      box-shadow:
-        inset 0 2px white,
-        inset 0 0 0 1px white,
-        1px -1px var(--xp-window-button-maximized-bg, #136dff);
-      height: 8px;
-      width: 8px;
-      background-color: var(--xp-window-button-maximized-bg, #136dff);
-    }
-  }
-
-  .header__button--close {
-    box-shadow: inset 0 -1px 2px 1px
-      var(--xp-window-button-close-shadow, #da4600);
-    background-image: var(
-      --xp-window-button-close-gradient,
-      radial-gradient(
-        circle at 90% 90%,
-        #cc4600 0%,
-        #dc6527 55%,
-        #cd7546 70%,
-        #ffccb2 90%,
-        white 100%
-      )
-    );
-    &:before {
-      content: "";
-      position: absolute;
-      left: 9px;
-      top: 2px;
-      transform: rotate(45deg);
-      height: 16px;
-      width: 2px;
-      background-color: white;
-    }
-    &:after {
-      content: "";
-      position: absolute;
-      left: 9px;
-      top: 2px;
-      transform: rotate(-45deg);
-      height: 16px;
-      width: 2px;
-      background-color: white;
-    }
-  }
-
-  .header__button--disable {
-    outline: none;
-    opacity: 0.5;
-    &:hover {
-      filter: brightness(100%);
-    }
+  &:hover:active {
+    filter: ${({ disabled }) => (disabled ? "brightness(100%)" : "brightness(90%)")};
   }
 `;

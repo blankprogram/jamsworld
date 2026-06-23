@@ -1,0 +1,124 @@
+.taskbar {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: var(--xp-taskbar-height, 30px);
+  background: linear-gradient(
+    to bottom,
+    #1f2f86 0,
+    #3165c4 3%,
+    #3682e5 6%,
+    #4490e6 10%,
+    #3883e5 12%,
+    #2b71e0 15%,
+    #2663da 18%,
+    #235bd6 20%,
+    #2258d5 23%,
+    #2157d6 38%,
+    #245ddb 54%,
+    #2562df 86%,
+    #245fdc 89%,
+    #2158d4 92%,
+    #1d4ec0 95%,
+    #1941a5 98%
+  );
+  display: flex;
+  z-index: 100;
+  box-sizing: border-box;
+}
+
+.startButton {
+  background: url("../../assets/Icons/start.png");
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-size: 100% 100%;
+  width: 100px;
+  height: 100%;
+  cursor: pointer;
+  margin: 0;
+}
+
+.taskbarItems {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.taskbarItem {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  margin-left: 10px;
+  cursor: pointer;
+  background-color: #3c81f3;
+  border-radius: 3px;
+  height: 22px;
+  width: 150px;
+  box-sizing: border-box;
+  font-size: 11px;
+  font-family: "Tahoma", sans-serif;
+  box-shadow:
+    inset -1px 0 rgba(0, 0, 0, 0.3),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.taskbarItem:hover {
+  background-color: #53a3ff;
+  box-shadow:
+    inset -1px 0 rgba(0, 0, 0, 0.3),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.2),
+    0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.taskbarItem.focusedTaskbarItem {
+  background-color: #1e52b7;
+}
+
+.taskbarIcon {
+  width: 15px;
+  height: 15px;
+  padding-right: 5px;
+  padding-left: 5px;
+}
+
+.taskbarLabel {
+  font-size: 11px;
+  color: white;
+  text-align: center;
+}
+
+.systemTray {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background-color: #0b77e9;
+  background: linear-gradient(
+    to bottom,
+    #0c59b9 1%,
+    #139ee9 6%,
+    #18b5f2 10%,
+    #139beb 14%,
+    #1290e8 19%,
+    #0d8dea 63%,
+    #0d9ff1 81%,
+    #0f9eed 88%,
+    #119be9 91%,
+    #1392e2 94%,
+    #137ed7 97%,
+    #095bc9 100%
+  );
+  border-left: 1px solid #1042af;
+  box-shadow: inset 1px 0 1px #18bbff;
+}
+
+.systemTrayIcon {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+}
+
+.systemTrayTime {
+  color: #fff;
+  font-size: 11px;
+  font-weight: lighter;
+}
