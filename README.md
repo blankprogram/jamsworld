@@ -14,17 +14,25 @@ specialises in image processing.
 
 ## Demo
 
-![Demo](docs/examples/example.gif)
+<img src="docs/examples/example.gif" width="100%" />
 
 ## Examples
 
-![Example 1](docs/examples/ds3processed.png)
+### Dithering with palette
 
-![Example 2](docs/examples/lady.png)
+<img src="docs/examples/ds3processed.png" width="100%" />
 
-![Example 3](docs/examples/anorlondo.png)
+### Ascii pass with thresholding
 
-![Example 4](docs/examples/butterfly.png)
+<img src="docs/examples/lady.png" width="100%" />
+
+### Multiple Masks with independent pipelines
+
+<img src="docs/examples/anorlondo.png" width="100%" />
+
+### Quadtree pass using square fill
+
+<img src="docs/examples/butterfly.png" width="100%" />
 
 ## Installation
 
