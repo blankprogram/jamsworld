@@ -7,13 +7,66 @@ const UNIFORM_STRIDE_FLOATS = UNIFORM_STRIDE / 4;
 const BITONIC_MAX_REQUESTED_LINE_LENGTH = 8192;
 const BITONIC_SORT_ITEM_BYTES = 8;
 
-const PIXEL_SORT_SHADER = `
+const SORT_BY = {
+  Luminance: 0,
+  Hue: 1,
+  Saturation: 2,
+  "RGB Average": 3,
+  Red: 4,
+  Green: 5,
+  Blue: 6,
+};
+
+const DIRECTIONS = {
+  Down: {
+    code: 0,
+    reverse: 0,
+    orientation: "vertical",
+  },
+  Up: {
+    code: 1,
+    reverse: 1,
+    orientation: "vertical",
+  },
+  Right: {
+    code: 2,
+    reverse: 0,
+    orientation: "horizontal",
+  },
+  Left: {
+    code: 3,
+    reverse: 1,
+    orientation: "horizontal",
+  },
+  "Down Right": {
+    code: 4,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Up Left": {
+    code: 5,
+    reverse: 1,
+    orientation: "diagonal",
+  },
+  "Down Left": {
+    code: 6,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Up Right": {
+    code: 7,
+    reverse: 1,
+    orientation: "diagonal",
+  },
+};
+
+const makeParamsShader = (thirdFieldName) => `
 struct Params {
   width: f32,
   height: f32,
-  passIndex: f32,
+  ${thirdFieldName}: f32,
   reverse: f32,
-  vertical: f32,
+  direction: f32,
   mode: f32,
   sortBy: f32,
   low: f32,
@@ -26,7 +79,12 @@ struct Params {
 @group(0) @binding(0) var srcTex: texture_2d<f32>;
 @group(0) @binding(1) var dstTex: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(2) var<uniform> params: Params;
+`;
 
+const SORT_PARAMS_SHADER = makeParamsShader("passIndex");
+const BITONIC_PARAMS_SHADER = makeParamsShader("sortSize");
+
+const KEY_SHADER = `
 fn keyLuminance(c: vec3<f32>) -> f32 {
   let maxC = max(c.r, max(c.g, c.b));
   let minC = min(c.r, min(c.g, c.b));
@@ -90,7 +148,9 @@ fn getKey(c: vec3<f32>) -> f32 {
   }
   return keyLuminance(c);
 }
+`;
 
+const THRESHOLD_SHADER = `
 fn inSpan(key: f32) -> bool {
   if (u32(params.mode) != 1u) {
     return true;
@@ -103,40 +163,117 @@ fn inSpan(key: f32) -> bool {
   }
   return true;
 }
+`;
 
-fn coordFromAxes(axis: i32, perp: i32, vertical: bool) -> vec2<i32> {
-  if (vertical) {
-    return vec2<i32>(perp, axis);
-  }
-  return vec2<i32>(axis, perp);
+const LINE_GEOMETRY_SHADER = `
+const DIRECTION_DOWN: u32 = 0u;
+const DIRECTION_UP: u32 = 1u;
+const DIRECTION_RIGHT: u32 = 2u;
+const DIRECTION_LEFT: u32 = 3u;
+const DIRECTION_DOWN_RIGHT: u32 = 4u;
+const DIRECTION_UP_LEFT: u32 = 5u;
+const DIRECTION_DOWN_LEFT: u32 = 6u;
+const DIRECTION_UP_RIGHT: u32 = 7u;
+
+fn isVerticalDirection(direction: u32) -> bool {
+  return direction == DIRECTION_DOWN || direction == DIRECTION_UP;
 }
+
+fn isDiagonalDownRightDirection(direction: u32) -> bool {
+  return direction == DIRECTION_DOWN_RIGHT || direction == DIRECTION_UP_LEFT;
+}
+
+fn isDiagonalDownLeftDirection(direction: u32) -> bool {
+  return direction == DIRECTION_DOWN_LEFT || direction == DIRECTION_UP_RIGHT;
+}
+
+fn isDiagonalDirection(direction: u32) -> bool {
+  return isDiagonalDownRightDirection(direction) ||
+    isDiagonalDownLeftDirection(direction);
+}
+
+fn lineCountForDirection(width: u32, height: u32, direction: u32) -> u32 {
+  if (isDiagonalDirection(direction)) {
+    return width + height - 1u;
+  }
+  if (isVerticalDirection(direction)) {
+    return width;
+  }
+  return height;
+}
+
+fn lineLengthForDirection(lineIndex: u32, width: u32, height: u32, direction: u32) -> u32 {
+  if (isDiagonalDownRightDirection(direction)) {
+    if (lineIndex < width) {
+      return min(width - lineIndex, height);
+    }
+    return min(width, height - (lineIndex - width + 1u));
+  }
+  if (isDiagonalDownLeftDirection(direction)) {
+    if (lineIndex < width) {
+      return min(lineIndex + 1u, height);
+    }
+    return min(width, height - (lineIndex - width + 1u));
+  }
+  if (isVerticalDirection(direction)) {
+    return height;
+  }
+  return width;
+}
+
+fn coordFromLineAxis(axis: u32, lineIndex: u32, width: u32, height: u32, direction: u32) -> vec2<i32> {
+  if (isDiagonalDownRightDirection(direction)) {
+    var startX = lineIndex;
+    var startY = 0u;
+    if (lineIndex >= width) {
+      startX = 0u;
+      startY = lineIndex - width + 1u;
+    }
+    return vec2<i32>(i32(startX + axis), i32(startY + axis));
+  }
+
+  if (isDiagonalDownLeftDirection(direction)) {
+    var startX = lineIndex;
+    var startY = 0u;
+    if (lineIndex >= width) {
+      startX = width - 1u;
+      startY = lineIndex - width + 1u;
+    }
+    return vec2<i32>(i32(startX - axis), i32(startY + axis));
+  }
+
+  if (isVerticalDirection(direction)) {
+    return vec2<i32>(i32(lineIndex), i32(axis));
+  }
+
+  return vec2<i32>(i32(axis), i32(lineIndex));
+}
+`;
+
+const PIXEL_SORT_SHADER = `
+${SORT_PARAMS_SHADER}
+${KEY_SHADER}
+${THRESHOLD_SHADER}
+${LINE_GEOMETRY_SHADER}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let width = u32(params.width);
   let height = u32(params.height);
-
-  let vertical = u32(params.vertical) == 1u;
-  var spanLength: i32 = i32(width);
-  var pairIndex: i32 = i32(gid.x);
-  var perp: i32 = i32(gid.y);
-  if (vertical) {
-    spanLength = i32(height);
-    perp = i32(gid.x);
-    pairIndex = i32(gid.y);
-    if (gid.x >= width) {
-      return;
-    }
-  } else if (gid.y >= height) {
+  let direction = u32(params.direction);
+  let lineIndex = gid.y;
+  let lineCount = lineCountForDirection(width, height, direction);
+  if (lineIndex >= lineCount) {
     return;
   }
 
-  let parity = i32(params.passIndex) % 2;
-  let axisA = parity + pairIndex * 2;
+  let spanLength = lineLengthForDirection(lineIndex, width, height, direction);
+  let parity = u32(params.passIndex) % 2u;
+  let axisA = parity + gid.x * 2u;
   let axisB = axisA + 1;
 
-  if (parity == 1 && pairIndex == 0) {
-    let edgeCoord = coordFromAxes(0, perp, vertical);
+  if (parity == 1u && gid.x == 0u) {
+    let edgeCoord = coordFromLineAxis(0u, lineIndex, width, height, direction);
     let edgeColor = textureLoad(srcTex, edgeCoord, 0);
     textureStore(dstTex, edgeCoord, edgeColor);
   }
@@ -145,7 +282,18 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let coordA = coordFromAxes(axisA, perp, vertical);
+  let coordA = coordFromLineAxis(axisA, lineIndex, width, height, direction);
+
+  if (u32(params.passIndex) >= spanLength) {
+    let colorA = textureLoad(srcTex, coordA, 0);
+    textureStore(dstTex, coordA, colorA);
+    if (axisB < spanLength) {
+      let coordB = coordFromLineAxis(axisB, lineIndex, width, height, direction);
+      let colorB = textureLoad(srcTex, coordB, 0);
+      textureStore(dstTex, coordB, colorB);
+    }
+    return;
+  }
 
   if (axisB >= spanLength) {
     let edgeColor = textureLoad(srcTex, coordA, 0);
@@ -153,7 +301,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let coordB = coordFromAxes(axisB, perp, vertical);
+  let coordB = coordFromLineAxis(axisB, lineIndex, width, height, direction);
   let colorA = textureLoad(srcTex, coordA, 0);
   let colorB = textureLoad(srcTex, coordB, 0);
   let keyA = getKey(colorA.rgb);
@@ -194,24 +342,7 @@ const makePixelSortBitonicShader = (maxLineLength) => {
   const maxKeyPart = 2 ** (32 - indexBits) - 1;
 
   return `
-struct Params {
-  width: f32,
-  height: f32,
-  sortSize: f32,
-  reverse: f32,
-  vertical: f32,
-  mode: f32,
-  sortBy: f32,
-  low: f32,
-  high: f32,
-  pad0: f32,
-  pad1: f32,
-  pad2: f32,
-};
-
-@group(0) @binding(0) var srcTex: texture_2d<f32>;
-@group(0) @binding(1) var dstTex: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(2) var<uniform> params: Params;
+${BITONIC_PARAMS_SHADER}
 
 const MAX_LINE_LENGTH: u32 = ${maxLineLength}u;
 const INDEX_BITS: u32 = ${indexBits}u;
@@ -224,76 +355,8 @@ fn maxU32() -> u32 {
   return (MAX_KEY_PART << INDEX_BITS) | INDEX_MASK;
 }
 
-fn keyLuminance(c: vec3<f32>) -> f32 {
-  let maxC = max(c.r, max(c.g, c.b));
-  let minC = min(c.r, min(c.g, c.b));
-  return 0.5 * (maxC + minC);
-}
-
-fn keyHue(c: vec3<f32>) -> f32 {
-  let maxC = max(c.r, max(c.g, c.b));
-  let minC = min(c.r, min(c.g, c.b));
-  let delta = maxC - minC;
-  var h: f32 = 0.0;
-
-  if (delta > 0.0) {
-    if (maxC == c.r) {
-      let raw = (c.g - c.b) / delta;
-      h = raw - 6.0 * floor(raw / 6.0);
-    } else if (maxC == c.g) {
-      h = (c.b - c.r) / delta + 2.0;
-    } else {
-      h = (c.r - c.g) / delta + 4.0;
-    }
-    h = h / 6.0;
-    if (h < 0.0) {
-      h = h + 1.0;
-    }
-  }
-
-  return h;
-}
-
-fn keySaturation(c: vec3<f32>) -> f32 {
-  let maxC = max(c.r, max(c.g, c.b));
-  let minC = min(c.r, min(c.g, c.b));
-  let delta = maxC - minC;
-  let l = 0.5 * (maxC + minC);
-  if (delta == 0.0) {
-    return 0.0;
-  }
-  return delta / (1.0 - abs(2.0 * l - 1.0));
-}
-
-fn getKey(c: vec3<f32>) -> f32 {
-  let sortBy = u32(params.sortBy);
-  if (sortBy == 1u) {
-    return keyHue(c);
-  }
-  if (sortBy == 2u) {
-    return keySaturation(c);
-  }
-  if (sortBy == 3u) {
-    return (c.r + c.g + c.b) / 3.0;
-  }
-  if (sortBy == 4u) {
-    return c.r;
-  }
-  if (sortBy == 5u) {
-    return c.g;
-  }
-  if (sortBy == 6u) {
-    return c.b;
-  }
-  return keyLuminance(c);
-}
-
-fn coordFromAxes(axis: u32, perp: u32, vertical: bool) -> vec2<i32> {
-  if (vertical) {
-    return vec2<i32>(i32(perp), i32(axis));
-  }
-  return vec2<i32>(i32(axis), i32(perp));
-}
+${KEY_SHADER}
+${LINE_GEOMETRY_SHADER}
 
 fn thresholdContains(key: f32) -> bool {
   if (key < params.low) {
@@ -305,11 +368,18 @@ fn thresholdContains(key: f32) -> bool {
   return true;
 }
 
-fn pixelInSpan(axis: u32, lineIndex: u32, vertical: bool, lineLength: u32) -> bool {
+fn pixelInSpan(axis: u32, lineIndex: u32, lineLength: u32) -> bool {
   if (axis >= lineLength) {
     return false;
   }
-  let color = textureLoad(srcTex, coordFromAxes(axis, lineIndex, vertical), 0);
+  let direction = u32(params.direction);
+  let width = u32(params.width);
+  let height = u32(params.height);
+  let color = textureLoad(
+    srcTex,
+    coordFromLineAxis(axis, lineIndex, width, height, direction),
+    0
+  );
   return thresholdContains(getKey(color.rgb));
 }
 
@@ -360,13 +430,17 @@ fn main(
 ) {
   let width = u32(params.width);
   let height = u32(params.height);
-  let vertical = u32(params.vertical) == 1u;
+  let direction = u32(params.direction);
   let thresholdMode = u32(params.mode) == 1u;
-  let lineLength = select(width, height, vertical);
-  let lineCount = select(height, width, vertical);
+  let lineCount = lineCountForDirection(width, height, direction);
   let lineIndex = workgroupId.x;
 
-  if (lineIndex >= lineCount || lineLength == 0u || lineLength > MAX_LINE_LENGTH) {
+  if (lineIndex >= lineCount) {
+    return;
+  }
+
+  let lineLength = lineLengthForDirection(lineIndex, width, height, direction);
+  if (lineLength == 0u || lineLength > MAX_LINE_LENGTH) {
     return;
   }
 
@@ -383,7 +457,7 @@ fn main(
         if (spanStart >= lineLength) {
           break;
         }
-        if (pixelInSpan(spanStart, lineIndex, vertical, lineLength)) {
+        if (pixelInSpan(spanStart, lineIndex, lineLength)) {
           break;
         }
         spanStart = spanStart + 1u;
@@ -394,7 +468,7 @@ fn main(
         if (spanEnd >= lineLength) {
           break;
         }
-        if (!pixelInSpan(spanEnd, lineIndex, vertical, lineLength)) {
+        if (!pixelInSpan(spanEnd, lineIndex, lineLength)) {
           break;
         }
         spanEnd = spanEnd + 1u;
@@ -414,7 +488,11 @@ fn main(
     for (var axis = localId.x; axis < sortSize; axis = axis + 256u) {
       if (axis < spanLength) {
         let sourceAxis = spanStart + axis;
-        let color = textureLoad(srcTex, coordFromAxes(sourceAxis, lineIndex, vertical), 0);
+        let color = textureLoad(
+          srcTex,
+          coordFromLineAxis(sourceAxis, lineIndex, width, height, direction),
+          0
+        );
         sortItems[axis] = makeSortItem(getKey(color.rgb), axis, reverse);
       } else {
         sortItems[axis] = sentinelSortItem();
@@ -462,8 +540,16 @@ fn main(
 
     for (var axis = localId.x; axis < spanLength; axis = axis + 256u) {
       let sourceAxis = spanStart + (sortItems[axis].y & INDEX_MASK);
-      let color = textureLoad(srcTex, coordFromAxes(sourceAxis, lineIndex, vertical), 0);
-      textureStore(dstTex, coordFromAxes(spanStart + axis, lineIndex, vertical), color);
+      let color = textureLoad(
+        srcTex,
+        coordFromLineAxis(sourceAxis, lineIndex, width, height, direction),
+        0
+      );
+      textureStore(
+        dstTex,
+        coordFromLineAxis(spanStart + axis, lineIndex, width, height, direction),
+        color
+      );
     }
     workgroupBarrier();
 
@@ -474,23 +560,6 @@ fn main(
   }
 }
 `;
-};
-
-const SORT_BY = {
-  Luminance: 0,
-  Hue: 1,
-  Saturation: 2,
-  "RGB Average": 3,
-  Red: 4,
-  Green: 5,
-  Blue: 6,
-};
-
-const DIRECTIONS = {
-  Up: { vertical: 1, reverse: 1 },
-  Down: { vertical: 1, reverse: 0 },
-  Left: { vertical: 0, reverse: 1 },
-  Right: { vertical: 0, reverse: 0 },
 };
 
 export default class WebGPUPixelSortPass {
@@ -659,7 +728,7 @@ export default class WebGPUPixelSortPass {
     this.uniformUpload[offset + 1] = height;
     this.uniformUpload[offset + 2] = passIndex;
     this.uniformUpload[offset + 3] = dir.reverse;
-    this.uniformUpload[offset + 4] = dir.vertical;
+    this.uniformUpload[offset + 4] = dir.code;
     this.uniformUpload[offset + 5] = this.mode === "Threshold" ? 1 : 0;
     this.uniformUpload[offset + 6] = SORT_BY[this.sortBy] ?? 0;
     this.uniformUpload[offset + 7] = this.low;
@@ -735,7 +804,7 @@ export default class WebGPUPixelSortPass {
     this.bitonicUniformUpload[1] = height;
     this.bitonicUniformUpload[2] = sortSize;
     this.bitonicUniformUpload[3] = dir.reverse;
-    this.bitonicUniformUpload[4] = dir.vertical;
+    this.bitonicUniformUpload[4] = dir.code;
     this.bitonicUniformUpload[5] = this.mode === "Threshold" ? 1 : 0;
     this.bitonicUniformUpload[6] = SORT_BY[this.sortBy] ?? 0;
     this.bitonicUniformUpload[7] = this.low;
@@ -758,7 +827,19 @@ export default class WebGPUPixelSortPass {
     return spanLength <= this.maxBitonicLineLength;
   }
 
-  _renderBitonic(encoder, state, pool, dir, spanLength) {
+  _getLineCount(width, height, dir) {
+    if (dir.orientation === "diagonal") return width + height - 1;
+    if (dir.orientation === "vertical") return width;
+    return height;
+  }
+
+  _getMaxSpanLength(width, height, dir) {
+    if (dir.orientation === "diagonal") return Math.min(width, height);
+    if (dir.orientation === "vertical") return height;
+    return width;
+  }
+
+  _renderBitonic(encoder, state, pool, dir, spanLength, lineCount) {
     const sortSize = this._nextPowerOfTwo(spanLength);
     this._syncBitonicUniformBuffer(state.width, state.height, sortSize);
 
@@ -794,7 +875,7 @@ export default class WebGPUPixelSortPass {
     const pass = encoder.beginComputePass();
     pass.setPipeline(this._getBitonicPipeline(sortSize));
     pass.setBindGroup(0, bindGroup);
-    pass.dispatchWorkgroups(dir.vertical ? state.width : state.height);
+    pass.dispatchWorkgroups(lineCount);
     pass.end();
 
     return {
@@ -804,7 +885,7 @@ export default class WebGPUPixelSortPass {
     };
   }
 
-  _renderOddEven(encoder, state, pool, dir, spanLength) {
+  _renderOddEven(encoder, state, pool, spanLength, lineCount) {
     this._syncUniformBuffers(state.width, state.height, spanLength);
 
     const texA = pool.getTemp(state.width, state.height, state.texture);
@@ -823,12 +904,8 @@ export default class WebGPUPixelSortPass {
     };
     let srcTexture = state.texture;
     let dstTexture = texA;
-    const workgroupsX = dir.vertical
-      ? Math.ceil(state.width / 8)
-      : Math.ceil(Math.ceil(spanLength / 2) / 8);
-    const workgroupsY = dir.vertical
-      ? Math.ceil(Math.ceil(spanLength / 2) / 8)
-      : Math.ceil(state.height / 8);
+    const workgroupsX = Math.ceil(Math.ceil(spanLength / 2) / 8);
+    const workgroupsY = Math.ceil(lineCount / 8);
     const createSortBindGroup = (src, dst) =>
       this.device.createBindGroup({
         layout: this.bindGroupLayout,
@@ -875,15 +952,23 @@ export default class WebGPUPixelSortPass {
 
   render(encoder, state, pool) {
     const dir = DIRECTIONS[this.direction] || DIRECTIONS.Down;
-    const spanLength = dir.vertical ? state.height : state.width;
+    const spanLength = this._getMaxSpanLength(state.width, state.height, dir);
+    const lineCount = this._getLineCount(state.width, state.height, dir);
     if (spanLength <= 1) return state;
     if (this.mode === "Threshold" && this.low >= this.high) return state;
 
     if (this._canUseBitonic(spanLength)) {
-      return this._renderBitonic(encoder, state, pool, dir, spanLength);
+      return this._renderBitonic(
+        encoder,
+        state,
+        pool,
+        dir,
+        spanLength,
+        lineCount,
+      );
     }
 
-    return this._renderOddEven(encoder, state, pool, dir, spanLength);
+    return this._renderOddEven(encoder, state, pool, spanLength, lineCount);
   }
 
   destroy() {
