@@ -49,6 +49,8 @@ function alignTo(value, alignment) {
   return Math.ceil(value / alignment) * alignment;
 }
 
+const MAX_REQUESTED_WORKGROUP_STORAGE_SIZE = 65536;
+
 export default class WebGPUPipeline {
   static isSupported() {
     return assertWebGPUAvailable();
@@ -62,7 +64,19 @@ export default class WebGPUPipeline {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error("No WebGPU adapter available");
 
-    const device = await adapter.requestDevice();
+    const requiredLimits = {};
+    const requestedWorkgroupStorageSize = Math.min(
+      adapter.limits.maxComputeWorkgroupStorageSize,
+      MAX_REQUESTED_WORKGROUP_STORAGE_SIZE,
+    );
+    if (requestedWorkgroupStorageSize > 16384) {
+      requiredLimits.maxComputeWorkgroupStorageSize =
+        requestedWorkgroupStorageSize;
+    }
+
+    const device = await adapter.requestDevice(
+      Object.keys(requiredLimits).length ? { requiredLimits } : undefined,
+    );
     return new WebGPUPipeline(canvas, device);
   }
 
