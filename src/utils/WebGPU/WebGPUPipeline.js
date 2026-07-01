@@ -74,8 +74,13 @@ export default class WebGPUPipeline {
         requestedWorkgroupStorageSize;
     }
 
+    const deviceDescriptor = {};
+    if (Object.keys(requiredLimits).length) {
+      deviceDescriptor.requiredLimits = requiredLimits;
+    }
+
     const device = await adapter.requestDevice(
-      Object.keys(requiredLimits).length ? { requiredLimits } : undefined,
+      Object.keys(deviceDescriptor).length ? deviceDescriptor : undefined,
     );
     return new WebGPUPipeline(canvas, device);
   }

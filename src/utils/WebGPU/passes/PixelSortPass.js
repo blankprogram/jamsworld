@@ -4,8 +4,8 @@ const SHADER_STAGE_COMPUTE = 4;
 const UNIFORM_BYTE_SIZE = 48;
 const UNIFORM_STRIDE = 256;
 const UNIFORM_STRIDE_FLOATS = UNIFORM_STRIDE / 4;
-const BITONIC_MAX_REQUESTED_LINE_LENGTH = 8192;
-const BITONIC_SORT_ITEM_BYTES = 8;
+const BITONIC_MAX_REQUESTED_LINE_LENGTH = 16384;
+const BITONIC_SORT_ITEM_BYTES = 4;
 
 const SORT_BY = {
   Luminance: 0,
@@ -58,7 +58,106 @@ const DIRECTIONS = {
     reverse: 1,
     orientation: "diagonal",
   },
+  "Horizontal Center Out": {
+    code: 8,
+    reverse: 0,
+    orientation: "horizontal",
+  },
+  "Horizontal Edges In": {
+    code: 9,
+    reverse: 0,
+    orientation: "horizontal",
+  },
+  "Vertical Center Out": {
+    code: 10,
+    reverse: 0,
+    orientation: "vertical",
+  },
+  "Vertical Edges In": {
+    code: 11,
+    reverse: 0,
+    orientation: "vertical",
+  },
+  "Horizontal Snake": {
+    code: 12,
+    reverse: 0,
+    orientation: "horizontal",
+  },
+  "Vertical Snake": {
+    code: 13,
+    reverse: 0,
+    orientation: "vertical",
+  },
+  "Down Right Snake": {
+    code: 14,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Down Left Snake": {
+    code: 15,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Down Right Center Out": {
+    code: 16,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Down Right Edges In": {
+    code: 17,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Down Left Center Out": {
+    code: 18,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Down Left Edges In": {
+    code: 19,
+    reverse: 0,
+    orientation: "diagonal",
+  },
+  "Horizontal Split": {
+    code: 20,
+    reverse: 0,
+    orientation: "horizontal-split",
+  },
+  "Vertical Split": {
+    code: 21,
+    reverse: 0,
+    orientation: "vertical-split",
+  },
+  "Rectangular Rings Clockwise": {
+    code: 22,
+    reverse: 0,
+    orientation: "rings",
+  },
+  "Rectangular Rings Counterclockwise": {
+    code: 23,
+    reverse: 0,
+    orientation: "rings",
+  },
 };
+
+Object.assign(DIRECTIONS, {
+  "Center Out ↔": DIRECTIONS["Horizontal Center Out"],
+  "Edges In ↔": DIRECTIONS["Horizontal Edges In"],
+  "Center Out ↕": DIRECTIONS["Vertical Center Out"],
+  "Edges In ↕": DIRECTIONS["Vertical Edges In"],
+  "Snake ↔": DIRECTIONS["Horizontal Snake"],
+  "Snake ↕": DIRECTIONS["Vertical Snake"],
+  "Snake ⤡": DIRECTIONS["Down Right Snake"],
+  "Snake ⤢": DIRECTIONS["Down Left Snake"],
+  "Center Out ⤡": DIRECTIONS["Down Right Center Out"],
+  "Edges In ⤡": DIRECTIONS["Down Right Edges In"],
+  "Center Out ⤢": DIRECTIONS["Down Left Center Out"],
+  "Edges In ⤢": DIRECTIONS["Down Left Edges In"],
+  "Split ↔": DIRECTIONS["Horizontal Split"],
+  "Split ↕": DIRECTIONS["Vertical Split"],
+  "Rings ↻": DIRECTIONS["Rectangular Rings Clockwise"],
+  "Rings ↺": DIRECTIONS["Rectangular Rings Counterclockwise"],
+});
 
 const makeParamsShader = (thirdFieldName) => `
 struct Params {
@@ -174,17 +273,45 @@ const DIRECTION_DOWN_RIGHT: u32 = 4u;
 const DIRECTION_UP_LEFT: u32 = 5u;
 const DIRECTION_DOWN_LEFT: u32 = 6u;
 const DIRECTION_UP_RIGHT: u32 = 7u;
+const DIRECTION_HORIZONTAL_CENTER_OUT: u32 = 8u;
+const DIRECTION_HORIZONTAL_EDGES_IN: u32 = 9u;
+const DIRECTION_VERTICAL_CENTER_OUT: u32 = 10u;
+const DIRECTION_VERTICAL_EDGES_IN: u32 = 11u;
+const DIRECTION_HORIZONTAL_SNAKE: u32 = 12u;
+const DIRECTION_VERTICAL_SNAKE: u32 = 13u;
+const DIRECTION_DOWN_RIGHT_SNAKE: u32 = 14u;
+const DIRECTION_DOWN_LEFT_SNAKE: u32 = 15u;
+const DIRECTION_DOWN_RIGHT_CENTER_OUT: u32 = 16u;
+const DIRECTION_DOWN_RIGHT_EDGES_IN: u32 = 17u;
+const DIRECTION_DOWN_LEFT_CENTER_OUT: u32 = 18u;
+const DIRECTION_DOWN_LEFT_EDGES_IN: u32 = 19u;
+const DIRECTION_HORIZONTAL_SPLIT: u32 = 20u;
+const DIRECTION_VERTICAL_SPLIT: u32 = 21u;
+const DIRECTION_RINGS_CLOCKWISE: u32 = 22u;
+const DIRECTION_RINGS_COUNTERCLOCKWISE: u32 = 23u;
 
 fn isVerticalDirection(direction: u32) -> bool {
-  return direction == DIRECTION_DOWN || direction == DIRECTION_UP;
+  return direction == DIRECTION_DOWN ||
+    direction == DIRECTION_UP ||
+    direction == DIRECTION_VERTICAL_CENTER_OUT ||
+    direction == DIRECTION_VERTICAL_EDGES_IN ||
+    direction == DIRECTION_VERTICAL_SNAKE;
 }
 
 fn isDiagonalDownRightDirection(direction: u32) -> bool {
-  return direction == DIRECTION_DOWN_RIGHT || direction == DIRECTION_UP_LEFT;
+  return direction == DIRECTION_DOWN_RIGHT ||
+    direction == DIRECTION_UP_LEFT ||
+    direction == DIRECTION_DOWN_RIGHT_SNAKE ||
+    direction == DIRECTION_DOWN_RIGHT_CENTER_OUT ||
+    direction == DIRECTION_DOWN_RIGHT_EDGES_IN;
 }
 
 fn isDiagonalDownLeftDirection(direction: u32) -> bool {
-  return direction == DIRECTION_DOWN_LEFT || direction == DIRECTION_UP_RIGHT;
+  return direction == DIRECTION_DOWN_LEFT ||
+    direction == DIRECTION_UP_RIGHT ||
+    direction == DIRECTION_DOWN_LEFT_SNAKE ||
+    direction == DIRECTION_DOWN_LEFT_CENTER_OUT ||
+    direction == DIRECTION_DOWN_LEFT_EDGES_IN;
 }
 
 fn isDiagonalDirection(direction: u32) -> bool {
@@ -192,9 +319,203 @@ fn isDiagonalDirection(direction: u32) -> bool {
     isDiagonalDownLeftDirection(direction);
 }
 
+fn isCenterOutDirection(direction: u32) -> bool {
+  return direction == DIRECTION_HORIZONTAL_CENTER_OUT ||
+    direction == DIRECTION_VERTICAL_CENTER_OUT ||
+    direction == DIRECTION_DOWN_RIGHT_CENTER_OUT ||
+    direction == DIRECTION_DOWN_LEFT_CENTER_OUT;
+}
+
+fn isEdgesInDirection(direction: u32) -> bool {
+  return direction == DIRECTION_HORIZONTAL_EDGES_IN ||
+    direction == DIRECTION_VERTICAL_EDGES_IN ||
+    direction == DIRECTION_DOWN_RIGHT_EDGES_IN ||
+    direction == DIRECTION_DOWN_LEFT_EDGES_IN;
+}
+
+fn isSnakeDirection(direction: u32) -> bool {
+  return direction == DIRECTION_HORIZONTAL_SNAKE ||
+    direction == DIRECTION_VERTICAL_SNAKE ||
+    direction == DIRECTION_DOWN_RIGHT_SNAKE ||
+    direction == DIRECTION_DOWN_LEFT_SNAKE;
+}
+
+fn isHorizontalSplitDirection(direction: u32) -> bool {
+  return direction == DIRECTION_HORIZONTAL_SPLIT;
+}
+
+fn isVerticalSplitDirection(direction: u32) -> bool {
+  return direction == DIRECTION_VERTICAL_SPLIT;
+}
+
+fn isRingDirection(direction: u32) -> bool {
+  return direction == DIRECTION_RINGS_CLOCKWISE ||
+    direction == DIRECTION_RINGS_COUNTERCLOCKWISE;
+}
+
+fn ringCountForDimensions(width: u32, height: u32) -> u32 {
+  return (min(width, height) + 1u) / 2u;
+}
+
+fn ringLengthForIndex(lineIndex: u32, width: u32, height: u32) -> u32 {
+  let inset = lineIndex * 2u;
+  let ringWidth = width - inset;
+  let ringHeight = height - inset;
+  if (ringWidth == 1u) {
+    return ringHeight;
+  }
+  if (ringHeight == 1u) {
+    return ringWidth;
+  }
+  return (ringWidth * 2u) + (ringHeight * 2u) - 4u;
+}
+
+fn remapCenterOutAxis(axis: u32, lineLength: u32, center: u32) -> u32 {
+  if (axis == 0u) {
+    return center;
+  }
+
+  let leftCount = center;
+  let rightCount = (lineLength - 1u) - center;
+  let pairedCount = min(leftCount, rightCount) * 2u;
+
+  if (axis <= pairedCount) {
+    if ((axis % 2u) == 1u) {
+      return center + ((axis + 1u) / 2u);
+    }
+    return center - (axis / 2u);
+  }
+
+  let remainingStep = axis - pairedCount;
+  let pairedSide = pairedCount / 2u;
+  if (rightCount > leftCount) {
+    return center + pairedSide + remainingStep;
+  }
+  return center - pairedSide - remainingStep;
+}
+
+fn remapEdgesInAxis(axis: u32, lineLength: u32) -> u32 {
+  let step = axis / 2u;
+  if ((axis % 2u) == 0u) {
+    return step;
+  }
+  return (lineLength - 1u) - step;
+}
+
+fn remapCenterInAxis(axis: u32, lineLength: u32, center: u32) -> u32 {
+  return remapCenterOutAxis((lineLength - 1u) - axis, lineLength, center);
+}
+
+fn remapAxisWithCenter(axis: u32, lineIndex: u32, lineLength: u32, lineCenter: u32, direction: u32) -> u32 {
+  if (isSnakeDirection(direction) && ((lineIndex % 2u) == 1u)) {
+    return (lineLength - 1u) - axis;
+  }
+
+  if (isCenterOutDirection(direction)) {
+    return remapCenterOutAxis(axis, lineLength, lineCenter);
+  }
+
+  if (isEdgesInDirection(direction)) {
+    return remapEdgesInAxis(axis, lineLength);
+  }
+
+  return axis;
+}
+
+fn clampAxisFromFloat(axis: f32, lineLength: u32) -> u32 {
+  return u32(clamp(round(axis), 0.0f, f32(lineLength - 1u)));
+}
+
+fn downRightAxisAtCornerSeam(startX: u32, startY: u32, lineLength: u32, width: u32, height: u32) -> u32 {
+  if (lineLength <= 1u || width <= 1u || height <= 1u) {
+    return 0u;
+  }
+
+  let maxX = f32(width - 1u);
+  let maxY = f32(height - 1u);
+  let lineOffset = f32(startY) - f32(startX);
+  let intersectionX = maxX * (maxY - lineOffset) / (maxX + maxY);
+  return clampAxisFromFloat(intersectionX - f32(startX), lineLength);
+}
+
+fn downLeftAxisAtCornerSeam(startX: u32, startY: u32, lineLength: u32, width: u32, height: u32) -> u32 {
+  if (lineLength <= 1u || width <= 1u || height <= 1u) {
+    return 0u;
+  }
+
+  let maxX = f32(width - 1u);
+  let maxY = f32(height - 1u);
+  let lineSum = f32(startX + startY);
+  let intersectionX = maxX * lineSum / (maxX + maxY);
+  return clampAxisFromFloat(f32(startX) - intersectionX, lineLength);
+}
+
+fn lineCenterForDirection(lineIndex: u32, lineLength: u32, width: u32, height: u32, direction: u32) -> u32 {
+  if (lineLength <= 1u) {
+    return 0u;
+  }
+
+  if (isDiagonalDirection(direction) && (isCenterOutDirection(direction) || isEdgesInDirection(direction))) {
+    if (isDiagonalDownRightDirection(direction)) {
+      var startX = lineIndex;
+      var startY = 0u;
+      if (lineIndex >= width) {
+        startX = 0u;
+        startY = lineIndex - width + 1u;
+      }
+      return downRightAxisAtCornerSeam(startX, startY, lineLength, width, height);
+    }
+
+    var startX = lineIndex;
+    var startY = 0u;
+    if (lineIndex >= width) {
+      startX = width - 1u;
+      startY = lineIndex - width + 1u;
+    }
+    return downLeftAxisAtCornerSeam(startX, startY, lineLength, width, height);
+  }
+
+  return (lineLength - 1u) / 2u;
+}
+
+fn diagonalSnakeLineOrdinal(lineIndex: u32, width: u32, direction: u32) -> u32 {
+  if (isDiagonalDownRightDirection(direction)) {
+    if (lineIndex < width) {
+      return (width - 1u) - lineIndex;
+    }
+    return lineIndex;
+  }
+  return lineIndex;
+}
+
+fn remapDiagonalAxis(axis: u32, lineIndex: u32, lineLength: u32, lineCenter: u32, width: u32, direction: u32) -> u32 {
+  let snakeLineOrdinal = diagonalSnakeLineOrdinal(lineIndex, width, direction);
+  if (isSnakeDirection(direction) && ((snakeLineOrdinal % 2u) == 1u)) {
+    return (lineLength - 1u) - axis;
+  }
+
+  if (isCenterOutDirection(direction) || isEdgesInDirection(direction)) {
+    if (isCenterOutDirection(direction)) {
+      return remapCenterOutAxis(axis, lineLength, lineCenter);
+    }
+    return remapCenterInAxis(axis, lineLength, lineCenter);
+  }
+
+  return axis;
+}
+
 fn lineCountForDirection(width: u32, height: u32, direction: u32) -> u32 {
+  if (isRingDirection(direction)) {
+    return ringCountForDimensions(width, height);
+  }
   if (isDiagonalDirection(direction)) {
     return width + height - 1u;
+  }
+  if (isHorizontalSplitDirection(direction)) {
+    return height * 2u;
+  }
+  if (isVerticalSplitDirection(direction)) {
+    return width * 2u;
   }
   if (isVerticalDirection(direction)) {
     return width;
@@ -203,6 +524,9 @@ fn lineCountForDirection(width: u32, height: u32, direction: u32) -> u32 {
 }
 
 fn lineLengthForDirection(lineIndex: u32, width: u32, height: u32, direction: u32) -> u32 {
+  if (isRingDirection(direction)) {
+    return ringLengthForIndex(lineIndex, width, height);
+  }
   if (isDiagonalDownRightDirection(direction)) {
     if (lineIndex < width) {
       return min(width - lineIndex, height);
@@ -215,13 +539,68 @@ fn lineLengthForDirection(lineIndex: u32, width: u32, height: u32, direction: u3
     }
     return min(width, height - (lineIndex - width + 1u));
   }
+  if (isHorizontalSplitDirection(direction)) {
+    let leftLength = (width + 1u) / 2u;
+    if ((lineIndex % 2u) == 0u) {
+      return leftLength;
+    }
+    return width - leftLength;
+  }
+  if (isVerticalSplitDirection(direction)) {
+    let topLength = (height + 1u) / 2u;
+    if ((lineIndex % 2u) == 0u) {
+      return topLength;
+    }
+    return height - topLength;
+  }
   if (isVerticalDirection(direction)) {
     return height;
   }
   return width;
 }
 
-fn coordFromLineAxis(axis: u32, lineIndex: u32, width: u32, height: u32, direction: u32) -> vec2<i32> {
+fn coordFromRingAxis(axis: u32, lineIndex: u32, lineLength: u32, width: u32, height: u32, direction: u32) -> vec2<i32> {
+  let left = lineIndex;
+  let top = lineIndex;
+  let right = (width - 1u) - lineIndex;
+  let bottom = (height - 1u) - lineIndex;
+  let ringWidth = right - left + 1u;
+  let ringHeight = bottom - top + 1u;
+  let ringLength = lineLength;
+  let seamAxis = ringWidth / 2u;
+  var ringAxis = (axis + seamAxis) % ringLength;
+  if (direction == DIRECTION_RINGS_COUNTERCLOCKWISE) {
+    ringAxis = ((ringLength - (axis % ringLength)) + seamAxis) % ringLength;
+  }
+
+  if (ringHeight == 1u) {
+    return vec2<i32>(i32(left + ringAxis), i32(top));
+  }
+  if (ringWidth == 1u) {
+    return vec2<i32>(i32(left), i32(top + ringAxis));
+  }
+
+  if (ringAxis < ringWidth) {
+    return vec2<i32>(i32(left + ringAxis), i32(top));
+  }
+  var rest = ringAxis - ringWidth;
+  if (rest < (ringHeight - 1u)) {
+    return vec2<i32>(i32(right), i32(top + 1u + rest));
+  }
+  rest = rest - (ringHeight - 1u);
+  if (rest < (ringWidth - 1u)) {
+    return vec2<i32>(i32(right - 1u - rest), i32(bottom));
+  }
+  rest = rest - (ringWidth - 1u);
+  return vec2<i32>(i32(left), i32(bottom - 1u - rest));
+}
+
+// Normalizes each direction into logical 1D lines, then maps line/axis back to image coordinates.
+fn coordFromLineAxisWithLengthAndCenter(axis: u32, lineIndex: u32, lineLength: u32, lineCenter: u32, width: u32, height: u32, direction: u32) -> vec2<i32> {
+  if (isRingDirection(direction)) {
+    return coordFromRingAxis(axis, lineIndex, lineLength, width, height, direction);
+  }
+
   if (isDiagonalDownRightDirection(direction)) {
     var startX = lineIndex;
     var startY = 0u;
@@ -229,7 +608,8 @@ fn coordFromLineAxis(axis: u32, lineIndex: u32, width: u32, height: u32, directi
       startX = 0u;
       startY = lineIndex - width + 1u;
     }
-    return vec2<i32>(i32(startX + axis), i32(startY + axis));
+    let diagonalAxis = remapDiagonalAxis(axis, lineIndex, lineLength, lineCenter, width, direction);
+    return vec2<i32>(i32(startX + diagonalAxis), i32(startY + diagonalAxis));
   }
 
   if (isDiagonalDownLeftDirection(direction)) {
@@ -239,15 +619,37 @@ fn coordFromLineAxis(axis: u32, lineIndex: u32, width: u32, height: u32, directi
       startX = width - 1u;
       startY = lineIndex - width + 1u;
     }
-    return vec2<i32>(i32(startX - axis), i32(startY + axis));
+    let diagonalAxis = remapDiagonalAxis(axis, lineIndex, lineLength, lineCenter, width, direction);
+    return vec2<i32>(i32(startX - diagonalAxis), i32(startY + diagonalAxis));
   }
+
+  let mappedAxis = remapAxisWithCenter(axis, lineIndex, lineLength, lineCenter, direction);
 
   if (isVerticalDirection(direction)) {
-    return vec2<i32>(i32(lineIndex), i32(axis));
+    return vec2<i32>(i32(lineIndex), i32(mappedAxis));
   }
 
-  return vec2<i32>(i32(axis), i32(lineIndex));
+  if (isHorizontalSplitDirection(direction)) {
+    let row = lineIndex / 2u;
+    let leftLength = (width + 1u) / 2u;
+    if ((lineIndex % 2u) == 0u) {
+      return vec2<i32>(i32(mappedAxis), i32(row));
+    }
+    return vec2<i32>(i32(leftLength + mappedAxis), i32(row));
+  }
+
+  if (isVerticalSplitDirection(direction)) {
+    let column = lineIndex / 2u;
+    let topLength = (height + 1u) / 2u;
+    if ((lineIndex % 2u) == 0u) {
+      return vec2<i32>(i32(column), i32(mappedAxis));
+    }
+    return vec2<i32>(i32(column), i32(topLength + mappedAxis));
+  }
+
+  return vec2<i32>(i32(mappedAxis), i32(lineIndex));
 }
+
 `;
 
 const PIXEL_SORT_SHADER = `
@@ -268,12 +670,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
 
   let spanLength = lineLengthForDirection(lineIndex, width, height, direction);
+  let lineCenter = lineCenterForDirection(lineIndex, spanLength, width, height, direction);
   let parity = u32(params.passIndex) % 2u;
   let axisA = parity + gid.x * 2u;
   let axisB = axisA + 1;
 
   if (parity == 1u && gid.x == 0u) {
-    let edgeCoord = coordFromLineAxis(0u, lineIndex, width, height, direction);
+    let edgeCoord = coordFromLineAxisWithLengthAndCenter(
+      0u,
+      lineIndex,
+      spanLength,
+      lineCenter,
+      width,
+      height,
+      direction
+    );
     let edgeColor = textureLoad(srcTex, edgeCoord, 0);
     textureStore(dstTex, edgeCoord, edgeColor);
   }
@@ -282,13 +693,29 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let coordA = coordFromLineAxis(axisA, lineIndex, width, height, direction);
+  let coordA = coordFromLineAxisWithLengthAndCenter(
+    axisA,
+    lineIndex,
+    spanLength,
+    lineCenter,
+    width,
+    height,
+    direction
+  );
 
   if (u32(params.passIndex) >= spanLength) {
     let colorA = textureLoad(srcTex, coordA, 0);
     textureStore(dstTex, coordA, colorA);
     if (axisB < spanLength) {
-      let coordB = coordFromLineAxis(axisB, lineIndex, width, height, direction);
+      let coordB = coordFromLineAxisWithLengthAndCenter(
+        axisB,
+        lineIndex,
+        spanLength,
+        lineCenter,
+        width,
+        height,
+        direction
+      );
       let colorB = textureLoad(srcTex, coordB, 0);
       textureStore(dstTex, coordB, colorB);
     }
@@ -301,7 +728,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     return;
   }
 
-  let coordB = coordFromLineAxis(axisB, lineIndex, width, height, direction);
+  let coordB = coordFromLineAxisWithLengthAndCenter(
+    axisB,
+    lineIndex,
+    spanLength,
+    lineCenter,
+    width,
+    height,
+    direction
+  );
   let colorA = textureLoad(srcTex, coordA, 0);
   let colorB = textureLoad(srcTex, coordB, 0);
   let keyA = getKey(colorA.rgb);
@@ -309,22 +744,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let inSpanA = inSpan(keyA);
   let inSpanB = inSpan(keyB);
 
-  let doSwap = inSpanA && inSpanB;
-  let gt = keyA > keyB;
-  let lt = keyA < keyB;
   let reverse = i32(params.reverse) == 1;
-  var shouldSwap = false;
-  if (doSwap) {
-    if (reverse) {
-      if (lt) {
-        shouldSwap = true;
-      }
-    } else {
-      if (gt) {
-        shouldSwap = true;
-      }
-    }
-  }
+  let shouldSwap = inSpanA && inSpanB && select(keyA > keyB, keyA < keyB, reverse);
 
   if (shouldSwap) {
     textureStore(dstTex, coordA, colorB);
@@ -349,7 +770,7 @@ const INDEX_BITS: u32 = ${indexBits}u;
 const MAX_KEY_PART: u32 = ${maxKeyPart}u;
 const INDEX_MASK: u32 = ${indexMask}u;
 
-var<workgroup> sortItems: array<vec2u, ${maxLineLength}>;
+var<workgroup> sortItems: array<u32, ${maxLineLength}>;
 
 fn maxU32() -> u32 {
   return (MAX_KEY_PART << INDEX_BITS) | INDEX_MASK;
@@ -368,7 +789,7 @@ fn thresholdContains(key: f32) -> bool {
   return true;
 }
 
-fn pixelInSpan(axis: u32, lineIndex: u32, lineLength: u32) -> bool {
+fn pixelInSpan(axis: u32, lineIndex: u32, lineLength: u32, lineCenter: u32) -> bool {
   if (axis >= lineLength) {
     return false;
   }
@@ -377,40 +798,30 @@ fn pixelInSpan(axis: u32, lineIndex: u32, lineLength: u32) -> bool {
   let height = u32(params.height);
   let color = textureLoad(
     srcTex,
-    coordFromLineAxis(axis, lineIndex, width, height, direction),
+    coordFromLineAxisWithLengthAndCenter(axis, lineIndex, lineLength, lineCenter, width, height, direction),
     0
   );
   return thresholdContains(getKey(color.rgb));
 }
 
 fn transformedKey(key: f32, reverse: bool) -> u32 {
-  let keyBits = bitcast<u32>(clamp(key, 0.0, 1.0));
+  let keyBits = u32(round(clamp(key, 0.0, 1.0) * f32(MAX_KEY_PART)));
   if (reverse) {
-    return maxU32() - keyBits;
+    return MAX_KEY_PART - keyBits;
   }
   return keyBits;
 }
 
-fn makeSortItem(key: f32, relativeIndex: u32, reverse: bool) -> vec2u {
-  return vec2u(transformedKey(key, reverse), relativeIndex & INDEX_MASK);
+fn makeSortItem(key: f32, relativeIndex: u32, reverse: bool) -> u32 {
+  return (transformedKey(key, reverse) << INDEX_BITS) | (relativeIndex & INDEX_MASK);
 }
 
-fn sentinelSortItem() -> vec2u {
-  return vec2u(maxU32(), maxU32());
+fn sentinelSortItem() -> u32 {
+  return maxU32();
 }
 
-fn itemLess(a: vec2u, b: vec2u) -> bool {
-  if (a.x < b.x) {
-    return true;
-  }
-  if (a.x > b.x) {
-    return false;
-  }
-  return a.y < b.y;
-}
-
-fn itemGreater(a: vec2u, b: vec2u) -> bool {
-  return itemLess(b, a);
+fn itemIndex(item: u32) -> u32 {
+  return item & INDEX_MASK;
 }
 
 fn nextPowerOfTwo(value: u32) -> u32 {
@@ -444,6 +855,7 @@ fn main(
     return;
   }
 
+  let lineCenter = lineCenterForDirection(lineIndex, lineLength, width, height, direction);
   let reverse = u32(params.reverse) == 1u;
 
   var searchStart = 0u;
@@ -457,7 +869,7 @@ fn main(
         if (spanStart >= lineLength) {
           break;
         }
-        if (pixelInSpan(spanStart, lineIndex, lineLength)) {
+        if (pixelInSpan(spanStart, lineIndex, lineLength, lineCenter)) {
           break;
         }
         spanStart = spanStart + 1u;
@@ -468,7 +880,7 @@ fn main(
         if (spanEnd >= lineLength) {
           break;
         }
-        if (!pixelInSpan(spanEnd, lineIndex, lineLength)) {
+        if (!pixelInSpan(spanEnd, lineIndex, lineLength, lineCenter)) {
           break;
         }
         spanEnd = spanEnd + 1u;
@@ -480,17 +892,14 @@ fn main(
     }
 
     let spanLength = spanEnd - spanStart;
-    var sortSize = u32(params.sortSize);
-    if (thresholdMode) {
-      sortSize = nextPowerOfTwo(spanLength);
-    }
+    let sortSize = nextPowerOfTwo(spanLength);
 
     for (var axis = localId.x; axis < sortSize; axis = axis + 256u) {
       if (axis < spanLength) {
         let sourceAxis = spanStart + axis;
         let color = textureLoad(
           srcTex,
-          coordFromLineAxis(sourceAxis, lineIndex, width, height, direction),
+          coordFromLineAxisWithLengthAndCenter(sourceAxis, lineIndex, lineLength, lineCenter, width, height, direction),
           0
         );
         sortItems[axis] = makeSortItem(getKey(color.rgb), axis, reverse);
@@ -520,9 +929,9 @@ fn main(
             let b = sortItems[partner];
             var shouldSwap = false;
             if (ascending) {
-              shouldSwap = itemGreater(a, b);
+              shouldSwap = a > b;
             } else {
-              shouldSwap = itemLess(a, b);
+              shouldSwap = a < b;
             }
             if (shouldSwap) {
               sortItems[axis] = b;
@@ -539,15 +948,15 @@ fn main(
     }
 
     for (var axis = localId.x; axis < spanLength; axis = axis + 256u) {
-      let sourceAxis = spanStart + (sortItems[axis].y & INDEX_MASK);
+      let sourceAxis = spanStart + itemIndex(sortItems[axis]);
       let color = textureLoad(
         srcTex,
-        coordFromLineAxis(sourceAxis, lineIndex, width, height, direction),
+        coordFromLineAxisWithLengthAndCenter(sourceAxis, lineIndex, lineLength, lineCenter, width, height, direction),
         0
       );
       textureStore(
         dstTex,
-        coordFromLineAxis(spanStart + axis, lineIndex, width, height, direction),
+        coordFromLineAxisWithLengthAndCenter(spanStart + axis, lineIndex, lineLength, lineCenter, width, height, direction),
         color
       );
     }
@@ -685,7 +1094,7 @@ export default class WebGPUPixelSortPass {
   }
 
   _resolveMaxBitonicLineLength() {
-    // Each sort item is vec2u, so workgroup storage bytes / 8 gives capacity.
+    // Packed sort items keep long lines within WebGPU workgroup storage limits.
     const storageSize = Number(
       this.device.limits?.maxComputeWorkgroupStorageSize,
     ) || 16384;
@@ -828,18 +1237,30 @@ export default class WebGPUPixelSortPass {
   }
 
   _getLineCount(width, height, dir) {
+    if (dir.orientation === "rings") {
+      return Math.ceil(Math.min(width, height) / 2);
+    }
     if (dir.orientation === "diagonal") return width + height - 1;
+    if (dir.orientation === "horizontal-split") return height * 2;
+    if (dir.orientation === "vertical-split") return width * 2;
     if (dir.orientation === "vertical") return width;
     return height;
   }
 
   _getMaxSpanLength(width, height, dir) {
+    if (dir.orientation === "rings") {
+      if (width === 1) return height;
+      if (height === 1) return width;
+      return width * 2 + height * 2 - 4;
+    }
     if (dir.orientation === "diagonal") return Math.min(width, height);
+    if (dir.orientation === "horizontal-split") return Math.ceil(width / 2);
+    if (dir.orientation === "vertical-split") return Math.ceil(height / 2);
     if (dir.orientation === "vertical") return height;
     return width;
   }
 
-  _renderBitonic(encoder, state, pool, dir, spanLength, lineCount) {
+  _renderBitonic(encoder, state, pool, spanLength, lineCount) {
     const sortSize = this._nextPowerOfTwo(spanLength);
     this._syncBitonicUniformBuffer(state.width, state.height, sortSize);
 
@@ -962,7 +1383,6 @@ export default class WebGPUPixelSortPass {
         encoder,
         state,
         pool,
-        dir,
         spanLength,
         lineCount,
       );
