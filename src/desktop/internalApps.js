@@ -8,15 +8,14 @@ const SYSTEM_CONFIRM_DIALOG = {
     title: "Confirm",
     icon: noFileIcon,
     windowDefaults: {
-      width: 360,
-      height: 180,
-      minWidth: 340,
-      minHeight: 170,
+      width: 460,
+      height: 150,
+      minWidth: 440,
+      minHeight: 140,
       resizable: false,
     },
   }),
   component: SystemConfirmDialog,
-  showOnDesktop: false,
   showInTaskbar: false,
 };
 

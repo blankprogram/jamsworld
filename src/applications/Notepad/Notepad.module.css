@@ -10,24 +10,125 @@
 
 .notepadMenuBar {
   display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
   border-bottom: 1px solid var(--xp-color-menu-border, #96abff);
   background: var(--xp-color-menu-bg, #edead8);
   color: #000;
   font-size: 12px;
 }
 
-.notepadMenuBar span {
-  padding: 4px 8px;
-  cursor: pointer;
+.notepadMenuItems,
+.notepadActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.notepadMenuBar span:hover {
+.notepadMenuItems {
+  padding-left: 2px;
+}
+
+.notepadActions {
+  gap: 1px;
+  padding-right: 3px;
+}
+
+.notepadMenuItem,
+.notepadCommand {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  box-shadow: none;
+  appearance: none;
+  outline: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+  user-select: none;
+}
+
+.notepadMenuItem {
+  height: 22px;
+  padding: 0 8px;
+  line-height: 22px;
+}
+
+.notepadMenuItem:hover {
   background-color: var(--xp-color-menu-hover, #1660e8);
   color: var(--xp-color-white, #fff);
 }
 
+.notepadCommand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 21px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  line-height: 19px;
+}
+
+.notepadCommand:hover:not(.disabledCommand),
+.notepadCommand:focus:not(.disabledCommand) {
+  border-color: var(--xp-color-ie-toolbar-border, #bab8aa);
+  background: transparent;
+}
+
+.disabledCommand {
+  color: #777;
+  pointer-events: none;
+}
+
+.modeCommand {
+  width: 58px;
+}
+
+.fileName {
+  flex: 1;
+  min-width: 0;
+  margin-left: auto;
+  padding: 0 8px;
+  overflow: hidden;
+  color: #333;
+  cursor: default;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileName:hover {
+  background: transparent;
+  color: #333;
+}
+
 .notepadTextarea {
-  margin-left: 5px;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  resize: none;
+  border: 0;
+  outline: none;
+  box-sizing: border-box;
   overflow: auto;
+  background: var(--xp-color-white, #fff);
+  color: #000;
+  font-family: "Lucida Console", "Courier New", monospace;
   font-size: 14px;
+  line-height: 1.45;
+}
+
+.notepadPreview {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 14px;
+  overflow: auto;
+  background: var(--xp-color-white, #fff);
+  font-size: 14px;
+  line-height: 1.45;
 }

@@ -11,13 +11,15 @@ import LoadingScreen from "./components/LoadingScreen/LoadingScreen";
 import Taskbar from "./components/Taskbar/Taskbar";
 import WelcomeScreen from "./components/WelcomeScreen/WelcomeScreen";
 import Window from "./components/Window/Window";
-import { APP_REGISTRY, APPS_BY_ID } from "./desktop/appRegistry";
+import { APPS_BY_ID } from "./desktop/appRegistry";
 import { INTERNAL_APPS_BY_ID } from "./desktop/internalApps";
+import { useDesktopFileSystem } from "./desktop/useDesktopFileSystem";
 import { useDesktopSession } from "./desktop/useDesktopSession";
 import {
   createWindowZIndexMap,
   getWindowsInTaskbarOrder,
 } from "./desktop/windowOrdering";
+import { useFileSystem } from "./fileSystem/useFileSystem";
 import styles from "./App.module.css";
 
 const SCREEN_STATE = {
@@ -26,24 +28,21 @@ const SCREEN_STATE = {
   MAIN: "MAIN",
 };
 
-const WINDOW_ROOT_SELECTOR = '[data-window-root="true"]';
+const DESKTOP_FOCUS_PRESERVING_SELECTOR =
+  '[data-window-root="true"], [data-xp-context-menu="true"]';
+const ALL_APPS_BY_ID = Object.freeze({
+  ...APPS_BY_ID,
+  ...INTERNAL_APPS_BY_ID,
+});
 
 function App() {
-  const ALL_APPS_BY_ID = useMemo(
-    () => ({ ...APPS_BY_ID, ...INTERNAL_APPS_BY_ID }),
-    [],
-  );
-  const desktopApps = useMemo(
-    () => APP_REGISTRY.filter((app) => app.showOnDesktop !== false),
-    [],
-  );
   const [screenState, setScreenState] = useState(SCREEN_STATE.LOADING);
   const audioRef = useRef(null);
+  const fileSystemRuntime = useFileSystem();
 
   const {
     desktopState,
     focusedAppName,
-    openApplication,
     openWindow,
     openDialog,
     resolveDialog,
@@ -54,8 +53,22 @@ function App() {
     focusWindow,
     clearFocusedWindow,
     updateWindowRect,
-    setSelectedDesktopApps,
+    setSelectedDesktopPaths,
   } = useDesktopSession(ALL_APPS_BY_ID);
+
+  const {
+    createItem: createDesktopItem,
+    deleteItems: deleteDesktopItems,
+    items: desktopItems,
+    openItem: openDesktopItem,
+    renameItem: renameDesktopItem,
+    requestRenameItem: requestDesktopItemRename,
+  } = useDesktopFileSystem({
+    appsById: ALL_APPS_BY_ID,
+    fileSystemRuntime,
+    openDialog,
+    openWindow,
+  });
 
   const interactionLockedWindowIds = useMemo(() => {
     const windows = desktopState.windows || [];
@@ -78,6 +91,17 @@ function App() {
     return locked;
   }, [desktopState.windows]);
 
+  const desktopInteractionLocked = useMemo(
+    () =>
+      desktopState.windows.some(
+        (windowItem) =>
+          windowItem.modal &&
+          !windowItem.minimized &&
+          !windowItem.parentWindowId,
+      ),
+    [desktopState.windows],
+  );
+
   const windowZIndexes = useMemo(
     () => createWindowZIndexMap(desktopState.windows),
     [desktopState.windows],
@@ -92,11 +116,11 @@ function App() {
     setScreenState(SCREEN_STATE.WELCOME);
   };
 
-  const handleDesktopMouseDownCapture = useCallback(
+  const handleDesktopPointerDownCapture = useCallback(
     (event) => {
       if (
         event.target instanceof Element &&
-        event.target.closest(WINDOW_ROOT_SELECTOR)
+        event.target.closest(DESKTOP_FOCUS_PRESERVING_SELECTOR)
       ) {
         return;
       }
@@ -137,6 +161,7 @@ function App() {
         windowId: windowItem.id,
         appId: windowItem.appId,
         openWindow: (appId, options) => openWindow(appId, withParentWindow(options)),
+        openRootWindow: (appId, options) => openWindow(appId, options),
         openDialog: (appId, options) =>
           openDialog(appId, {
             ...withParentWindow(options),
@@ -154,17 +179,19 @@ function App() {
           isMinimized={windowItem.minimized}
           windowProps={windowItem.windowProps || {}}
           windowRuntime={windowRuntime}
+          fileSystemRuntime={fileSystemRuntime}
+          appsById={ALL_APPS_BY_ID}
         />
       );
     },
     [
-      ALL_APPS_BY_ID,
       closeApplication,
       minimizeApplication,
       focusWindow,
       openWindow,
       openDialog,
       resolveDialog,
+      fileSystemRuntime,
     ],
   );
 
@@ -182,7 +209,7 @@ function App() {
       return (
         <div
           className={styles.app}
-          onMouseDownCapture={handleDesktopMouseDownCapture}
+          onPointerDownCapture={handleDesktopPointerDownCapture}
           style={{
             backgroundImage: `url(${background})`,
             backgroundSize: "cover",
@@ -191,10 +218,15 @@ function App() {
         >
           <audio ref={audioRef} src={startupSound} />
           <Background
-            apps={desktopApps}
-            openApplication={openApplication}
-            selectedAppIds={desktopState.selectedDesktopAppIds}
-            setSelectedAppIds={setSelectedDesktopApps}
+            items={desktopItems}
+            interactionLocked={desktopInteractionLocked}
+            onCreateItem={createDesktopItem}
+            onDeleteItems={deleteDesktopItems}
+            onRenameItem={renameDesktopItem}
+            onRequestRenameItem={requestDesktopItemRename}
+            openDesktopItem={openDesktopItem}
+            selectedPaths={desktopState.selectedDesktopPaths}
+            setSelectedPaths={setSelectedDesktopPaths}
           />
           <Taskbar
             windows={desktopState.windows}

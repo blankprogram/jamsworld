@@ -36,6 +36,7 @@ export function createAppManifest({
   icon,
   useStyledWindow = true,
   clickThroughWindow = false,
+  showInTaskbar = true,
   windowDefaults,
 }) {
   return {
@@ -44,8 +45,7 @@ export function createAppManifest({
     icon,
     useStyledWindow,
     clickThroughWindow,
+    showInTaskbar,
     windowDefaults: normalizeWindowDefaults(windowDefaults),
   };
 }
-
-export { DEFAULT_WINDOW_DEFAULTS, normalizeWindowDefaults };

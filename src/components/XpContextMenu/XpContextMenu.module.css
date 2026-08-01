@@ -1,0 +1,71 @@
+.menu {
+  position: fixed;
+  z-index: var(--xp-z-context-menu, 2147483000);
+  min-width: 204px;
+  padding: 2px;
+  border: 1px solid var(--xp-color-border-mid, #808080);
+  background: var(--xp-color-white, #fff);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+  color: #000;
+  font: 12px Tahoma, sans-serif;
+}
+
+.action {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 21px;
+  padding: 3px 20px 3px 24px;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  line-height: 15px;
+  text-decoration: none;
+  user-select: none;
+}
+
+.action:not(.disabled):is(:hover, :focus-visible, :active) {
+  outline: none;
+  background: var(--xp-color-menu-hover, #1660e8);
+  color: var(--xp-color-white, #fff);
+}
+
+.disabled {
+  color: #888;
+}
+
+.separator {
+  height: 1px;
+  margin: 3px 1px;
+  background: var(--xp-color-border-light, #d6d6d6);
+}
+
+.submenuRoot {
+  position: relative;
+}
+
+.submenuTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.submenuArrow {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+}
+
+.submenu {
+  position: absolute;
+  top: -3px;
+  left: calc(100% - 2px);
+}
+
+.submenuLeft {
+  right: calc(100% - 2px);
+  left: auto;
+}

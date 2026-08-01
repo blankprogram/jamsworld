@@ -11,6 +11,9 @@
   --xp-color-border-soft: #9d9d9d;
   --xp-color-accent-primary: #1f4b9a;
   --xp-color-accent-danger: #a63b1c;
+  --xp-color-selection: #316ac5;
+  --xp-selection-icon-filter: brightness(0.52) sepia(1) hue-rotate(170deg)
+    saturate(8);
   --xp-color-menu-bg: #edead8;
   --xp-color-menu-border: #96abff;
   --xp-color-menu-hover: #1660e8;
@@ -76,4 +79,5 @@
     white 100%
   );
   --xp-window-button-maximized-bg: #136dff;
+  --xp-z-context-menu: 2147483000;
 }

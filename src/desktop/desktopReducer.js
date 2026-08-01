@@ -2,7 +2,6 @@ import { centerWindowRect, clampWindowRect } from "./windowGeometry";
 import { ensureTaskbarOrders, getNextTaskbarOrder } from "./windowOrdering";
 
 export const DESKTOP_ACTIONS = Object.freeze({
-  OPEN_APP: "OPEN_APP",
   OPEN_WINDOW_INSTANCE: "OPEN_WINDOW_INSTANCE",
   CLOSE_WINDOW: "CLOSE_WINDOW",
   MINIMIZE_WINDOW: "MINIMIZE_WINDOW",
@@ -11,10 +10,10 @@ export const DESKTOP_ACTIONS = Object.freeze({
   FOCUS_WINDOW: "FOCUS_WINDOW",
   CLEAR_FOCUS: "CLEAR_FOCUS",
   UPDATE_WINDOW_RECT: "UPDATE_WINDOW_RECT",
-  SET_SELECTED_DESKTOP_APPS: "SET_SELECTED_DESKTOP_APPS",
+  SET_SELECTED_DESKTOP_PATHS: "SET_SELECTED_DESKTOP_PATHS",
 });
 
-const createWindowId = () =>
+export const createWindowId = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -29,7 +28,7 @@ const createWindowInstance = (app, index, options = {}) => {
     : centerWindowRect(defaults, index);
 
   return {
-    id: options.windowId || createWindowId(),
+    id: options.windowId,
     appId: app.id,
     taskbarOrder: Number.isFinite(options.taskbarOrder)
       ? options.taskbarOrder
@@ -124,19 +123,25 @@ const getTopVisibleWindowId = (windows) => {
   return null;
 };
 
-export const createInitialDesktopState = (appsById, startupAppIds = []) => {
-  const startupWindows = startupAppIds
-    .map((appId, index) => {
+export const createInitialDesktopState = (appsById, startupEntries = []) => {
+  const startupWindows = startupEntries
+    .map((entry, index) => {
+      const appId = typeof entry === "string" ? entry : entry?.appId;
+      const options =
+        entry && typeof entry === "object" && entry.options ? entry.options : {};
       const app = appsById[appId];
       if (!app) return null;
-      return createWindowInstance(app, index);
+      return createWindowInstance(app, index, {
+        ...options,
+        windowId: options.windowId || createWindowId(),
+      });
     })
     .filter(Boolean);
 
   return {
     windows: startupWindows,
     focusedWindowId: startupWindows[startupWindows.length - 1]?.id ?? null,
-    selectedDesktopAppIds: [],
+    selectedDesktopPaths: [],
   };
 };
 
@@ -146,24 +151,9 @@ export const desktopReducer = (state, action) => {
     orderedWindows === state.windows ? state : { ...state, windows: orderedWindows };
 
   switch (action.type) {
-    case DESKTOP_ACTIONS.OPEN_APP: {
-      const { app } = action.payload;
-      if (!app) return currentState;
-
-      const windowItem = createWindowInstance(app, currentState.windows.length, {
-        taskbarOrder: getNextTaskbarOrder(currentState.windows),
-      });
-      return {
-        ...currentState,
-        windows: [...currentState.windows, windowItem],
-        focusedWindowId: windowItem.id,
-        selectedDesktopAppIds: [],
-      };
-    }
-
     case DESKTOP_ACTIONS.OPEN_WINDOW_INSTANCE: {
       const { app, options } = action.payload;
-      if (!app) return currentState;
+      if (!app || !options?.windowId) return currentState;
 
       const windowItem = createWindowInstance(
         app,
@@ -179,7 +169,7 @@ export const desktopReducer = (state, action) => {
         ...currentState,
         windows: [...currentState.windows, windowItem],
         focusedWindowId: windowItem.id,
-        selectedDesktopAppIds: [],
+        selectedDesktopPaths: [],
       };
     }
 
@@ -309,13 +299,13 @@ export const desktopReducer = (state, action) => {
       return { ...currentState, windows: nextWindows };
     }
 
-    case DESKTOP_ACTIONS.SET_SELECTED_DESKTOP_APPS: {
-      const appIds = Array.isArray(action.payload.appIds)
-        ? action.payload.appIds
+    case DESKTOP_ACTIONS.SET_SELECTED_DESKTOP_PATHS: {
+      const paths = Array.isArray(action.payload.paths)
+        ? action.payload.paths
         : [];
       return {
         ...currentState,
-        selectedDesktopAppIds: appIds,
+        selectedDesktopPaths: paths,
       };
     }
 

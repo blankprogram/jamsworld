@@ -1,22 +1,31 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   createInitialDesktopState,
+  createWindowId,
   DESKTOP_ACTIONS,
   desktopReducer,
 } from "./desktopReducer";
+import { DESKTOP_PATH, joinPath } from "../fileSystem/pathUtils";
 
-const STARTUP_APP_IDS = ["notepad", "winamp"];
-const createWindowId = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
+const STARTUP_WINDOWS = [
+  {
+    appId: "notepad",
+    options: {
+      titleOverride: "Welcome.md",
+      windowProps: {
+        filePath: joinPath(DESKTOP_PATH, "Welcome.md"),
+        defaultMode: "preview",
+      },
+    },
+  },
+  "winamp",
+];
 export function useDesktopSession(appsById) {
   const dialogResolversRef = useRef(new Map());
   const [desktopState, dispatch] = useReducer(
     desktopReducer,
     undefined,
-    () => createInitialDesktopState(appsById, STARTUP_APP_IDS),
+    () => createInitialDesktopState(appsById, STARTUP_WINDOWS),
   );
 
   const openWindow = useCallback(
@@ -40,8 +49,6 @@ export function useDesktopSession(appsById) {
     },
     [appsById],
   );
-
-  const openApplication = useCallback((appId) => openWindow(appId), [openWindow]);
 
   const closeApplication = useCallback((windowId) => {
     dispatch({
@@ -129,10 +136,10 @@ export function useDesktopSession(appsById) {
     });
   }, []);
 
-  const setSelectedDesktopApps = useCallback((appIds) => {
+  const setSelectedDesktopPaths = useCallback((paths) => {
     dispatch({
-      type: DESKTOP_ACTIONS.SET_SELECTED_DESKTOP_APPS,
-      payload: { appIds },
+      type: DESKTOP_ACTIONS.SET_SELECTED_DESKTOP_PATHS,
+      payload: { paths },
     });
   }, []);
 
@@ -165,7 +172,6 @@ export function useDesktopSession(appsById) {
   return {
     desktopState,
     focusedAppName,
-    openApplication,
     openWindow,
     openDialog,
     resolveDialog,
@@ -176,6 +182,6 @@ export function useDesktopSession(appsById) {
     focusWindow,
     clearFocusedWindow,
     updateWindowRect,
-    setSelectedDesktopApps,
+    setSelectedDesktopPaths,
   };
 }

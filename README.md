@@ -9,6 +9,7 @@ specialises in image processing.
 - Applications z index is properly managed across applications
 - Startup XP animation
 - Some cool applications
+- A filesystem with some persistence?
 - Image processing using webGPU (cool processing passes)
 - Image/Gif/Video/Camera Processing Pipelines
 
@@ -81,4 +82,3 @@ The **PixelPass** app allows you to apply multiple filters to an image in sequen
 - [clippyjs](https://github.com/pithings/clippy)
 - [webamp](https://github.com/captbaritone/webamp)
 - [Acerola](https://www.youtube.com/@Acerola_t) -- Inspiring me to take on graphics!
-

@@ -160,7 +160,9 @@ const Window = memo(
     const containerProps = {
       ref: windowRef,
       "data-window-root": "true",
-      onMouseDown: handleFocus,
+      "aria-hidden": interactionLocked || undefined,
+      inert: interactionLocked ? "" : undefined,
+      onPointerDownCapture: handleFocus,
       style: {
         ...containerStyle,
         pointerEvents:

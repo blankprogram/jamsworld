@@ -11,6 +11,10 @@
   box-sizing: border-box;
 }
 
+.background:focus {
+  outline: none;
+}
+
 .icon {
   display: flex;
   flex-direction: column;
@@ -25,6 +29,7 @@
   color: white;
   position: relative;
   text-shadow: 1px 1px 2px black;
+  user-select: none;
 }
 
 .appIcon {
@@ -34,19 +39,37 @@
 }
 
 .icon.selected .appIcon {
-  mix-blend-mode: multiply;
-  filter: brightness(0.9) sepia(1) hue-rotate(170deg) saturate(10) opacity(1);
+  filter: var(
+    --xp-selection-icon-filter,
+    brightness(0.52) sepia(1) hue-rotate(170deg) saturate(8)
+  );
 }
 
 .icon.selected span {
-  background-color: #0b61ff;
-  opacity: 0.5;
-  padding-right: 1px;
-  padding-left: 1px;
+  padding-inline: 1px;
+  background-color: var(--xp-color-selection, #316ac5);
+  color: var(--xp-color-white, #fff);
+  text-shadow: none;
 }
 
 .selectionBox {
   position: absolute;
   border: 1px dashed grey;
   pointer-events: none;
+}
+
+.renameInput {
+  box-sizing: border-box;
+  width: 78px;
+  height: 18px;
+  padding: 1px 2px;
+  border: 1px solid #000;
+  outline: none;
+  background: var(--xp-color-white, #fff);
+  color: #000;
+  font: 10px Tahoma, sans-serif;
+  line-height: 14px;
+  text-align: left;
+  text-shadow: none;
+  user-select: text;
 }

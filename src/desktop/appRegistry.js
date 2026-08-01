@@ -8,22 +8,20 @@ const toKebabCase = (value) =>
     .replace(/\s+/g, "-");
 
 const loadAppModules = () => {
-  try {
-    const appsContext = require.context("../applications", true, /\.js$/);
-    return appsContext.keys().map((key) => {
-      const segments = key.split("/");
-      const folderName = segments[segments.length - 2];
-      const fileName = segments[segments.length - 1].replace(".js", "");
-      if (fileName !== folderName) return null;
-      return { key, folderName, fileName, module: appsContext(key) };
-    });
-  } catch {
-    return [];
-  }
+  // Application entry points follow the FolderName/FolderName.js convention.
+  const appsContext = require.context(
+    "../applications",
+    true,
+    /^\.\/([^/]+)\/\1\.js$/,
+  );
+  return appsContext.keys().map((key) => {
+    const segments = key.split("/");
+    const fileName = segments[segments.length - 1].replace(".js", "");
+    return { fileName, module: appsContext(key) };
+  });
 };
 
 export const APP_REGISTRY = loadAppModules()
-  .filter(Boolean)
   .map(({ fileName, module: loadedModule }) => {
     const component = loadedModule.default;
     if (!component) return null;

@@ -1,101 +1,248 @@
-import React, { useState, useRef } from 'react';
-import styles from './Background.module.css';
+import React, { useRef, useState } from "react";
 
-const DESKTOP_ICON_SELECTOR = '[data-desktop-icon="true"]';
+import FileNameEditor from "../FileNameEditor/FileNameEditor";
+import {
+  FileItemContextMenu,
+  FolderBackgroundContextMenu,
+} from "../FileSystemContextMenu/FileSystemContextMenu";
+import { useXpContextMenu } from "../XpContextMenu/XpContextMenu";
+import useMarqueeSelection from "../../hooks/useMarqueeSelection";
+import {
+  isAdditiveSelection,
+  SELECTION_CONTROL_SELECTOR,
+  SELECTION_ITEM_SELECTOR,
+  updateSelection,
+} from "../../utils/selection";
+import styles from "./Background.module.css";
 
 const Background = ({
-  apps,
-  openApplication,
-  selectedAppIds = [],
-  setSelectedAppIds,
+  items = [],
+  interactionLocked = false,
+  onCreateItem,
+  onDeleteItems,
+  onRenameItem,
+  onRequestRenameItem,
+  openDesktopItem,
+  selectedPaths = [],
+  setSelectedPaths,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [box, setBox] = useState(null);
-  const startPoint = useRef(null);
-  const visibleApps = apps.filter((app) => app.showOnDesktop !== false);
+  const backgroundRef = useRef(null);
+  const { contextMenu, openContextMenu, closeContextMenu } =
+    useXpContextMenu();
+  const [editingPath, setEditingPath] = useState(null);
+  const selectedPathSet = new Set(selectedPaths);
+  const selectedItems = items.filter((item) =>
+    selectedPathSet.has(item.path),
+  );
+  const contextItem = contextMenu?.kind === "items" && contextMenu.itemPath
+    ? items.find((item) => item.path === contextMenu.itemPath) || null
+    : null;
 
-  const handleMouseDown = (e) => {
-    const icon = e.target.closest(DESKTOP_ICON_SELECTOR);
-    const clientX = e.clientX;
-    const clientY = e.clientY;
+  const replaceSelection = (paths) => {
+    setSelectedPaths?.([...(paths || [])]);
+  };
 
-    if (icon) {
-      const appId = icon.getAttribute('data-app-id');
-      setSelectedAppIds(appId ? [appId] : []);
-    } else {
-      setSelectedAppIds([]);
-      startPoint.current = { x: clientX, y: clientY };
-      setIsDragging(true);
+  const {
+    marquee: selectionBox,
+    ...marqueePointerHandlers
+  } = useMarqueeSelection({
+    containerRef: backgroundRef,
+    selectedKeys: selectedPathSet,
+    onSelectionChange: replaceSelection,
+    onStart: () => {
+      closeContextMenu();
+      setEditingPath(null);
+    },
+  });
+
+  const handleContextMenu = (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest(SELECTION_CONTROL_SELECTOR)) return;
+
+    event.preventDefault();
+    backgroundRef.current?.focus();
+    setEditingPath(null);
+
+    const itemElement = target?.closest(SELECTION_ITEM_SELECTOR);
+    const itemPath = itemElement?.dataset.selectionKey || null;
+    if (itemPath && !selectedPathSet.has(itemPath)) {
+      replaceSelection([itemPath]);
+    } else if (!itemPath) {
+      replaceSelection([]);
+    }
+
+    openContextMenu({
+      kind: itemPath ? "items" : "folder",
+      x: event.clientX,
+      y: event.clientY,
+      itemPath,
+    });
+  };
+
+  const createItem = (type) => {
+    const path = onCreateItem?.(type);
+    if (!path) return;
+    replaceSelection([path]);
+    setEditingPath(path);
+  };
+
+  const requestRename = (item) => {
+    if (!item || onRequestRenameItem?.(item) === false) return;
+    replaceSelection([item.path]);
+    setEditingPath(item.path);
+  };
+
+  const commitRename = (item, nextName) => {
+    setEditingPath(null);
+    replaceSelection([]);
+    onRenameItem?.(item, nextName);
+  };
+
+  const deleteSelectedItems = async () => {
+    if (!selectedItems.length) return;
+    const deleted = await onDeleteItems?.(selectedItems);
+    if (!deleted) return;
+    setEditingPath(null);
+    replaceSelection([]);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.target.closest("input, textarea, select")) return;
+
+    if (event.key === "Delete") {
+      event.preventDefault();
+      void deleteSelectedItems();
+      return;
+    }
+    if (event.key === "F2" && selectedItems.length === 1) {
+      event.preventDefault();
+      requestRename(selectedItems[0]);
+      return;
+    }
+    if (event.key === "Enter" && selectedItems.length === 1) {
+      event.preventDefault();
+      openDesktopItem?.(selectedItems[0]);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setEditingPath(null);
+      closeContextMenu();
+      replaceSelection([]);
     }
   };
 
-  const handleMouseMove = (e) => {
-    if (isDragging) {
-      const newBox = {
-        left: Math.min(e.clientX, startPoint.current.x),
-        top: Math.min(e.clientY, startPoint.current.y),
-        width: Math.abs(e.clientX - startPoint.current.x),
-        height: Math.abs(e.clientY - startPoint.current.y),
-      };
-      setBox(newBox);
-
-      const selected = visibleApps
-        .filter((app) => {
-          const appElement = document.getElementById(`desktop-icon-${app.id}`);
-          if (!appElement) return false;
-          const appRect = appElement.getBoundingClientRect();
-          return !(
-            appRect.right < newBox.left ||
-            appRect.left > newBox.left + newBox.width ||
-            appRect.bottom < newBox.top ||
-            appRect.top > newBox.top + newBox.height
-          );
-        })
-        .map((app) => app.id);
-
-      setSelectedAppIds(selected);
-    }
+  const handleIconDoubleClick = (item) => {
+    replaceSelection([]);
+    openDesktopItem?.(item);
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setBox(null);
-  };
-
-  const handleIconDoubleClick = (appId) => {
-    setSelectedAppIds([]);
-    openApplication(appId);
+  const refreshDesktop = () => {
+    setEditingPath(null);
+    replaceSelection([]);
   };
 
   return (
     <div
+      ref={backgroundRef}
+      role="listbox"
+      aria-label="Desktop"
+      aria-multiselectable="true"
+      aria-hidden={interactionLocked || undefined}
+      inert={interactionLocked ? "" : undefined}
+      tabIndex={0}
       className={styles.background}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      onContextMenu={handleContextMenu}
+      onKeyDown={handleKeyDown}
+      {...marqueePointerHandlers}
     >
-      {visibleApps.map((app) => (
-        <div
-          key={app.id}
-          id={`desktop-icon-${app.id}`}
-          data-desktop-icon="true"
-          data-app-id={app.id}
-          className={`${styles.icon} ${selectedAppIds.includes(app.id) ? styles.selected : ''}`}
-          onDoubleClick={() => handleIconDoubleClick(app.id)}
-        >
-          <img src={app.icon} alt={app.title} className={styles.appIcon} />
-          <span>{app.title}</span>
-        </div>
-      ))}
-      {box && (
+      {items.map((item) => {
+        const selected = selectedPathSet.has(item.path);
+        const editing = editingPath === item.path;
+
+        return (
+          <div
+            key={item.path}
+            role="option"
+            aria-selected={selected}
+            data-selection-item="true"
+            data-selection-key={item.path}
+            className={`${styles.icon} ${selected ? styles.selected : ""}`}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.stopPropagation();
+              backgroundRef.current?.focus();
+              closeContextMenu();
+              setEditingPath(null);
+              replaceSelection(
+                updateSelection(
+                  selectedPathSet,
+                  item.path,
+                  isAdditiveSelection(event),
+                ),
+              );
+            }}
+            onDoubleClick={() => {
+              if (!editing) handleIconDoubleClick(item);
+            }}
+          >
+            <img
+              src={item.icon}
+              alt=""
+              className={styles.appIcon}
+              draggable={false}
+            />
+            {editing ? (
+              <FileNameEditor
+                name={item.title}
+                type={item.type}
+                className={styles.renameInput}
+                onCancel={() => setEditingPath(null)}
+                onCommit={(nextName) => commitRename(item, nextName)}
+              />
+            ) : (
+              <span>{item.title}</span>
+            )}
+          </div>
+        );
+      })}
+
+      {selectionBox && (
         <div
           className={styles.selectionBox}
           style={{
-            left: `${box.left}px`,
-            top: `${box.top}px`,
-            width: `${box.width}px`,
-            height: `${box.height}px`,
+            left: `${selectionBox.left}px`,
+            top: `${selectionBox.top}px`,
+            width: `${selectionBox.width}px`,
+            height: `${selectionBox.height}px`,
           }}
+        />
+      )}
+
+      {contextMenu?.kind === "folder" && (
+        <FolderBackgroundContextMenu
+          actions={{
+            createFolder: () => createItem("folder"),
+            createMarkdownFile: () => createItem("markdown"),
+            createTextFile: () => createItem("text"),
+            refresh: refreshDesktop,
+          }}
+          menu={contextMenu}
+          onClose={closeContextMenu}
+        />
+      )}
+      {contextMenu?.kind === "items" && (
+        <FileItemContextMenu
+          actions={{
+            delete: () => void deleteSelectedItems(),
+            open: () => openDesktopItem?.(contextItem),
+            rename: () => requestRename(contextItem),
+          }}
+          canDelete={selectedItems.length > 0}
+          canRename={selectedItems.length === 1}
+          itemCount={selectedItems.length}
+          menu={contextMenu}
+          onClose={closeContextMenu}
         />
       )}
     </div>
