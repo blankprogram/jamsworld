@@ -1,0 +1,195 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  gap: 6px;
+  padding: 8px;
+  background: #edebda;
+  color: #000;
+  font: 12px Tahoma, sans-serif;
+}
+
+.locationRow,
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.locationRow label,
+.optionRow label {
+  flex: 0 0 66px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.location,
+.optionRow input,
+.optionRow select {
+  min-width: 0;
+  flex: 1;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 2px 4px;
+  border: 1px solid #7f9db9;
+  background: #fff;
+  color: #000;
+  font: inherit;
+}
+
+.iconButton {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled),
+.iconButton:focus-visible:not(:disabled) {
+  border-color: #316ac5;
+  background: #dbe8fa;
+  outline: none;
+}
+
+.iconButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.iconButton img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.browser {
+  display: flex;
+  flex: 1;
+  min-height: 180px;
+  border: 1px solid #7f9db9;
+  background: #fff;
+}
+
+.quickPlaces {
+  display: flex;
+  flex: 0 0 118px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-right: 1px solid #c4c0b0;
+  background: #f5f3e8;
+}
+
+.quickPlace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 96px;
+  min-height: 52px;
+  padding: 3px 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #000;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.quickPlace:hover,
+.quickPlace:focus-visible {
+  border-color: #316ac5;
+  background: #dbe8fa;
+  outline: none;
+}
+
+.quickPlace img,
+.entry img {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.quickPlace img {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.quickPlace span,
+.entry span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileArea {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.fileList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: auto;
+  padding: 3px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 25px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #000;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry:hover,
+.selected {
+  border-color: #316ac5;
+  background: #316ac5;
+  color: #fff;
+}
+
+.empty {
+  padding: 12px 8px;
+  color: #555;
+}
+
+.fileOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 6px;
+  border-top: 1px solid #c4c0b0;
+  background: #edebda;
+}
+
+.optionRow input,
+.optionRow select {
+  flex: 1;
+}
+
+.optionRow button {
+  flex: 0 0 64px;
+}

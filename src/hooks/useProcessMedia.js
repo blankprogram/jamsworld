@@ -182,15 +182,33 @@ export function useProcessMedia(canvasRef, config, camera) {
         url = URL.createObjectURL(file);
 
         if (file.type === "image/gif") {
-          return await loadGifFile(file, url);
+          const result = await loadGifFile(file, url);
+          setSource((current) => ({
+            ...current,
+            name: file.name || null,
+            mimeType: file.type || null,
+          }));
+          return result;
         }
 
         if (file.type.startsWith("video/")) {
-          return await loadVideoFile(url);
+          const result = await loadVideoFile(url);
+          setSource((current) => ({
+            ...current,
+            name: file.name || null,
+            mimeType: file.type || null,
+          }));
+          return result;
         }
 
         if (file.type.startsWith("image/")) {
-          return await loadImageFile(url);
+          const result = await loadImageFile(url);
+          setSource((current) => ({
+            ...current,
+            name: file.name || null,
+            mimeType: file.type || null,
+          }));
+          return result;
         }
 
         throw new Error(`Unsupported file type: ${file.type}`);
@@ -214,6 +232,7 @@ export function useProcessMedia(canvasRef, config, camera) {
       loadVideoFile,
       resetForNewFile,
       setMediaError,
+      setSource,
       sourceRef,
     ],
   );
@@ -271,6 +290,7 @@ export function useProcessMedia(canvasRef, config, camera) {
   return {
     loadFile,
     exportResult,
+    source,
     frames: source.frames,
     mediaError,
     webgpuSupported,

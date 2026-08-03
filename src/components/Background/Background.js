@@ -6,6 +6,7 @@ import {
   FolderBackgroundContextMenu,
 } from "../FileSystemContextMenu/FileSystemContextMenu";
 import { useXpContextMenu } from "../XpContextMenu/XpContextMenu";
+import SelectionMarquee from "../SelectionMarquee/SelectionMarquee";
 import useMarqueeSelection from "../../hooks/useMarqueeSelection";
 import {
   isAdditiveSelection,
@@ -14,6 +15,8 @@ import {
   updateSelection,
 } from "../../utils/selection";
 import styles from "./Background.module.css";
+
+const RIGHT_CLICK_EVENT_DEDUPE_MS = 500;
 
 const Background = ({
   items = [],
@@ -27,6 +30,7 @@ const Background = ({
   setSelectedPaths,
 }) => {
   const backgroundRef = useRef(null);
+  const lastRightPointerTimeRef = useRef(0);
   const { contextMenu, openContextMenu, closeContextMenu } =
     useXpContextMenu();
   const [editingPath, setEditingPath] = useState(null);
@@ -55,11 +59,12 @@ const Background = ({
     },
   });
 
-  const handleContextMenu = (event) => {
+  const openContextMenuForEvent = (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest(SELECTION_CONTROL_SELECTOR)) return;
 
     event.preventDefault();
+    event.stopPropagation();
     backgroundRef.current?.focus();
     setEditingPath(null);
 
@@ -77,6 +82,28 @@ const Background = ({
       y: event.clientY,
       itemPath,
     });
+  };
+
+  const handleContextMenu = (event) => {
+    const lastRightPointerTime = lastRightPointerTimeRef.current;
+    const isDuplicatePointerEvent =
+      lastRightPointerTime > 0 &&
+      Date.now() - lastRightPointerTime < RIGHT_CLICK_EVENT_DEDUPE_MS;
+
+    if (isDuplicatePointerEvent) {
+      lastRightPointerTimeRef.current = 0;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    openContextMenuForEvent(event);
+  };
+
+  const handleRightPointerDown = (event) => {
+    if (event.button !== 2) return;
+    lastRightPointerTimeRef.current = Date.now();
+    openContextMenuForEvent(event);
   };
 
   const createItem = (type) => {
@@ -152,7 +179,8 @@ const Background = ({
       inert={interactionLocked ? "" : undefined}
       tabIndex={0}
       className={styles.background}
-      onContextMenu={handleContextMenu}
+      onContextMenuCapture={handleContextMenu}
+      onPointerDownCapture={handleRightPointerDown}
       onKeyDown={handleKeyDown}
       {...marqueePointerHandlers}
     >
@@ -201,23 +229,13 @@ const Background = ({
                 onCommit={(nextName) => commitRename(item, nextName)}
               />
             ) : (
-              <span>{item.title}</span>
+              <span className={styles.label}>{item.title}</span>
             )}
           </div>
         );
       })}
 
-      {selectionBox && (
-        <div
-          className={styles.selectionBox}
-          style={{
-            left: `${selectionBox.left}px`,
-            top: `${selectionBox.top}px`,
-            width: `${selectionBox.width}px`,
-            height: `${selectionBox.height}px`,
-          }}
-        />
-      )}
+      <SelectionMarquee marquee={selectionBox} />
 
       {contextMenu?.kind === "folder" && (
         <FolderBackgroundContextMenu

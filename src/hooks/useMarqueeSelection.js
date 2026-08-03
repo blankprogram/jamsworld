@@ -7,6 +7,7 @@ import {
   SELECTION_CONTROL_SELECTOR,
   SELECTION_ITEM_SELECTOR,
 } from "../utils/selection";
+import { isXpContextMenuTarget } from "../utils/contextMenu";
 
 export default function useMarqueeSelection({
   containerRef,
@@ -22,7 +23,8 @@ export default function useMarqueeSelection({
     if (
       event.button !== 0 ||
       target?.closest(SELECTION_ITEM_SELECTOR) ||
-      target?.closest(SELECTION_CONTROL_SELECTOR)
+      target?.closest(SELECTION_CONTROL_SELECTOR) ||
+      isXpContextMenuTarget(target)
     ) {
       return;
     }

@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import Background from "../../components/Background/Background";
 import { DESKTOP_PATH, joinPath } from "../../fileSystem/pathUtils";
 
@@ -171,6 +172,99 @@ test("desktop background and item menus expose distinct shared commands", () => 
   expect(
     screen.queryByRole("menuitem", { name: "New" }),
   ).not.toBeInTheDocument();
+});
+
+test("desktop context menus execute create and delete commands", async () => {
+  const item = makeItem("Alpha.txt");
+  const { onCreateItem, onDeleteItems } = mountDesktop({
+    initialItems: [item],
+  });
+
+  fireEvent.contextMenu(screen.getByRole("listbox", { name: "Desktop" }), {
+    clientX: 40,
+    clientY: 60,
+  });
+  fireEvent.mouseEnter(screen.getByRole("menuitem", { name: "New" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Folder" }));
+  expect(onCreateItem).toHaveBeenCalledWith("folder");
+
+  fireEvent.contextMenu(screen.getByRole("option", { name: "Alpha.txt" }), {
+    clientX: 80,
+    clientY: 100,
+  });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+  await waitFor(() => {
+    expect(onDeleteItems).toHaveBeenCalledWith([item]);
+  });
+});
+
+test("desktop right-button pointer input opens the context menu", () => {
+  mountDesktop();
+
+  fireEvent.pointerDown(screen.getByRole("listbox", { name: "Desktop" }), {
+    button: 2,
+    clientX: 40,
+    clientY: 60,
+  });
+
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+});
+
+test("desktop submenu commands remain clickable with real pointer interaction", async () => {
+  mountDesktop();
+  const user = userEvent.setup();
+
+  fireEvent.contextMenu(screen.getByRole("listbox", { name: "Desktop" }), {
+    clientX: 40,
+    clientY: 60,
+  });
+  await user.hover(screen.getByRole("menuitem", { name: "New" }));
+  await user.click(screen.getByRole("menuitem", { name: "Folder" }));
+
+  expect(
+    screen.getByRole("textbox", { name: "Rename New Folder" }),
+  ).toBeInTheDocument();
+});
+
+test("right-clicking a selected desktop item preserves selection for rename", async () => {
+  const item = makeItem("Alpha.txt");
+  const { onRequestRenameItem } = mountDesktop({ initialItems: [item] });
+  const user = userEvent.setup();
+  const option = screen.getByRole("option", { name: "Alpha.txt" });
+
+  await user.click(option);
+  await user.pointer({ keys: "[MouseRight]", target: option });
+  await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+  expect(onRequestRenameItem).toHaveBeenCalledWith(item);
+  expect(screen.getByRole("textbox", { name: "Rename Alpha.txt" })).toBeInTheDocument();
+});
+
+test("the pointer fallback and native context event do not clear item selection", () => {
+  const item = makeItem("Alpha.txt");
+  const { onRequestRenameItem } = mountDesktop({ initialItems: [item] });
+  const option = screen.getByRole("option", { name: "Alpha.txt" });
+
+  fireEvent.pointerDown(option, { button: 0 });
+  fireEvent.pointerDown(option, { button: 2, clientX: 40, clientY: 60 });
+  fireEvent.contextMenu(option, { clientX: 40, clientY: 60 });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+  expect(onRequestRenameItem).toHaveBeenCalledWith(item);
+});
+
+test("a native context event with a different target keeps the pointer menu", () => {
+  const item = makeItem("Alpha.txt");
+  const { onRequestRenameItem } = mountDesktop({ initialItems: [item] });
+  const option = screen.getByRole("option", { name: "Alpha.txt" });
+  const desktop = screen.getByRole("listbox", { name: "Desktop" });
+
+  fireEvent.pointerDown(option, { button: 2, clientX: 40, clientY: 60 });
+  fireEvent.contextMenu(desktop, { clientX: 40, clientY: 60 });
+  fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+  expect(onRequestRenameItem).toHaveBeenCalledWith(item);
 });
 
 test("desktop background submenus expose arrange and creation commands", () => {

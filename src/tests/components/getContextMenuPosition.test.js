@@ -1,4 +1,6 @@
-import getContextMenuPosition from "../../components/XpContextMenu/getContextMenuPosition";
+import getContextMenuPosition, {
+  getSubmenuPosition,
+} from "../../components/XpContextMenu/getContextMenuPosition";
 
 const getPosition = (overrides = {}) =>
   getContextMenuPosition({
@@ -39,4 +41,28 @@ test("keeps an oversized menu against the viewport padding", () => {
       menuWidth: 1100,
     }),
   ).toEqual({ left: 2, top: 2 });
+});
+
+test("places a submenu to the right when it fits", () => {
+  expect(
+    getSubmenuPosition({
+      triggerRect: { left: 100, right: 300, top: 200 },
+      submenuWidth: 200,
+      submenuHeight: 120,
+      viewportHeight: 800,
+      viewportWidth: 1000,
+    }),
+  ).toEqual({ left: 298, top: 197 });
+});
+
+test("places a submenu to the left near the right edge", () => {
+  expect(
+    getSubmenuPosition({
+      triggerRect: { left: 700, right: 900, top: 700 },
+      submenuWidth: 200,
+      submenuHeight: 120,
+      viewportHeight: 800,
+      viewportWidth: 1000,
+    }),
+  ).toEqual({ left: 502, top: 678 });
 });

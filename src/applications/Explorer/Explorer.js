@@ -28,6 +28,7 @@ import {
   getRecycleBinConfirmationMessage,
 } from "../../fileSystem/fileSystemSelectors";
 import FileNameEditor from "../../components/FileNameEditor/FileNameEditor";
+import SelectionMarquee from "../../components/SelectionMarquee/SelectionMarquee";
 import {
   FileItemContextMenu,
   FolderBackgroundContextMenu,
@@ -541,18 +542,7 @@ function ExplorerDirectory({
         );
       })}
 
-      {marquee && (
-        <div
-          className={styles.selectionMarquee}
-          data-testid="selection-marquee"
-          style={{
-            left: marquee.left,
-            top: marquee.top,
-            width: marquee.width,
-            height: marquee.height,
-          }}
-        />
-      )}
+      <SelectionMarquee marquee={marquee} testId="selection-marquee" />
     </main>
   );
 }

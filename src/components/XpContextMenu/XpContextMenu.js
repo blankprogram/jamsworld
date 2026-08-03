@@ -7,7 +7,10 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import getContextMenuPosition from "./getContextMenuPosition";
+import getContextMenuPosition, {
+  getSubmenuPosition,
+} from "./getContextMenuPosition";
+import { isXpContextMenuTarget } from "../../utils/contextMenu";
 import styles from "./XpContextMenu.module.css";
 
 let activeContextMenuCloser = null;
@@ -47,14 +50,19 @@ export function useXpContextMenu() {
   useEffect(() => {
     if (!isOpen) return undefined;
 
+    const handleWindowClick = (event) => {
+      if (isXpContextMenuTarget(event.target)) return;
+      closeContextMenu();
+    };
+
     const handleKeyDown = (event) => {
       if (event.key === "Escape") closeContextMenu();
     };
 
-    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("click", handleWindowClick);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("click", handleWindowClick);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [closeContextMenu, isOpen]);
@@ -101,25 +109,38 @@ export function XpContextMenuSubmenu({
   const submenuRef = useRef(null);
   const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
-  const [placement, setPlacement] = useState({
-    opensLeft: false,
-    offsetY: 0,
-  });
+  const [placement, setPlacement] = useState({ left: 0, top: 0 });
 
   useLayoutEffect(() => {
     const submenu = submenuRef.current;
-    if (!open || !submenu) return;
+    const trigger = triggerRef.current;
+    if (!open || !submenu || !trigger) return;
 
-    const rect = submenu.getBoundingClientRect();
-    const viewportPadding = 2;
-    const opensLeft = rect.right > window.innerWidth - viewportPadding;
-    const offsetY = Math.min(
-      0,
-      window.innerHeight - viewportPadding - rect.bottom,
+    setPlacement(
+      getSubmenuPosition({
+        triggerRect: trigger.getBoundingClientRect(),
+        submenuWidth: submenu.getBoundingClientRect().width,
+        submenuHeight: submenu.getBoundingClientRect().height,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      }),
     );
-
-    setPlacement({ opensLeft, offsetY });
   }, [open]);
+
+  const openSubmenu = () => {
+    if (disabled) return;
+    setOpen(true);
+  };
+
+  const closeWhenPointerOrFocusLeaves = (event) => {
+    const nextTarget = event.relatedTarget;
+    if (
+      nextTarget instanceof Node &&
+      !event.currentTarget.contains(nextTarget)
+    ) {
+      setOpen(false);
+    }
+  };
 
   const openAndFocusFirstItem = () => {
     if (disabled) return;
@@ -134,13 +155,9 @@ export function XpContextMenuSubmenu({
   return (
     <div
       className={styles.submenuRoot}
-      onMouseEnter={() => {
-        if (!disabled) setOpen(true);
-      }}
-      onMouseLeave={() => setOpen(false)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
+      onMouseEnter={openSubmenu}
+      onMouseLeave={closeWhenPointerOrFocusLeaves}
+      onBlur={closeWhenPointerOrFocusLeaves}
       onKeyDown={(event) => {
         if (event.key === "ArrowRight") {
           event.preventDefault();
@@ -183,10 +200,8 @@ export function XpContextMenuSubmenu({
           ref={submenuRef}
           role="menu"
           aria-label={label}
-          className={`${styles.menu} ${styles.submenu} ${
-            placement.opensLeft ? styles.submenuLeft : ""
-          }`}
-          style={{ transform: `translateY(${placement.offsetY}px)` }}
+          className={`${styles.menu} ${styles.submenu}`}
+          style={placement}
         >
           {children}
         </div>

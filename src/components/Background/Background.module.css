@@ -20,8 +20,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  margin-bottom: 20px;
+  width: 76px;
+  height: 74px;
+  box-sizing: border-box;
   text-align: center;
   cursor: pointer;
   font-family: 'Tahoma', sans-serif;
@@ -36,6 +37,16 @@
   width: 30px;
   display: block;
   margin-bottom: 8px;
+  flex: 0 0 auto;
+}
+
+.label {
+  display: inline-block;
+  max-width: 100%;
+  height: 24px;
+  overflow: hidden;
+  line-height: 12px;
+  overflow-wrap: anywhere;
 }
 
 .icon.selected .appIcon {
@@ -45,17 +56,11 @@
   );
 }
 
-.icon.selected span {
+.icon.selected .label {
   padding-inline: 1px;
   background-color: var(--xp-color-selection, #316ac5);
   color: var(--xp-color-white, #fff);
   text-shadow: none;
-}
-
-.selectionBox {
-  position: absolute;
-  border: 1px dashed grey;
-  pointer-events: none;
 }
 
 .renameInput {

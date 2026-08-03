@@ -60,12 +60,5 @@
 }
 
 .submenu {
-  position: absolute;
-  top: -3px;
-  left: calc(100% - 2px);
-}
-
-.submenuLeft {
-  right: calc(100% - 2px);
-  left: auto;
+  position: fixed;
 }

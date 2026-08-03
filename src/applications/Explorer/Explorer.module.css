@@ -320,15 +320,6 @@
   outline: none;
 }
 
-.selectionMarquee {
-  position: absolute;
-  z-index: 2;
-  box-sizing: border-box;
-  border: 1px solid var(--xp-color-selection, #316ac5);
-  background: rgb(49 106 197 / 16%);
-  pointer-events: none;
-}
-
 .item {
   box-sizing: border-box;
   min-width: 0;

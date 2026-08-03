@@ -21,8 +21,14 @@ import {
 import startIcon from "../../assets/Icons/start.png";
 import { createAppManifest } from "../createAppManifest";
 import { createPixelPassIcon } from "../../utils/appIconFactory";
+import { joinPath } from "../../fileSystem/pathUtils";
 import XpButton from "../../components/XpButton/XpButton";
 import MaskEditor from "./MaskEditor";
+import {
+  createPixelPassConfig,
+  parsePixelPassConfig,
+  stringifyPixelPassConfig,
+} from "./pixelPassConfig";
 
 export const appManifest = createAppManifest({
   id: "pixelpass",
@@ -218,6 +224,14 @@ function maskHistoryReducer(state, action) {
         interactionBase: null,
       };
     }
+
+    case "replace":
+      return {
+        segments: Array.isArray(action.segments) ? action.segments : [],
+        past: [],
+        future: [],
+        interactionBase: null,
+      };
 
     case "undo": {
       if (!state.past.length) return state;
@@ -950,6 +964,10 @@ function useMaskState() {
     (next) => dispatchMaskHistory({ type: "set", next }),
     [],
   );
+  const replaceMaskSegments = useCallback(
+    (segments) => dispatchMaskHistory({ type: "replace", segments }),
+    [],
+  );
   const [selectedMaskSegmentId, setSelectedMaskSegmentId] = useState(null);
   const [maskVersion, setMaskVersion] = useState(0);
   const canUndoMask = maskHistory.past.length > 0;
@@ -1108,6 +1126,7 @@ function useMaskState() {
     setMaskBrushSize,
     maskSegments,
     setMaskSegments,
+    replaceMaskSegments,
     selectedMaskSegmentId,
     setSelectedMaskSegmentId,
     maskVersion,
@@ -1286,7 +1305,9 @@ function useMaskRasterization(
   ]);
 }
 
-export default function PixelPass({ windowRuntime }) {
+const PIXELPASS_CONFIG_FOLDER = "C:/My Pictures";
+
+export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const videoRef = useRef(null);
@@ -1300,6 +1321,7 @@ export default function PixelPass({ windowRuntime }) {
   const [cameraOn, setCameraOn] = useState(false);
   const [globalFilters, setGlobalFilters] = useState([]);
   const [filterUiById, setFilterUiById] = useState({});
+  const [showConfigMenu, setShowConfigMenu] = useState(false);
 
   useEffect(() => {
     loadFonts().then(setFonts);
@@ -1332,6 +1354,7 @@ export default function PixelPass({ windowRuntime }) {
     setMaskBrushSize,
     maskSegments,
     setMaskSegments,
+    replaceMaskSegments,
     selectedMaskSegmentId,
     setSelectedMaskSegmentId,
     maskVersion,
@@ -1661,7 +1684,7 @@ export default function PixelPass({ windowRuntime }) {
     maskConfig,
   ]);
 
-  const { loadFile, exportResult, mediaError, webgpuSupported } =
+  const { loadFile, exportResult, source, mediaError, webgpuSupported } =
     useProcessMedia(canvasRef, mediaConfig, {
       cameraOn,
       videoRef,
@@ -1817,6 +1840,143 @@ export default function PixelPass({ windowRuntime }) {
     [exportResult],
   );
 
+  const pixelPassConfig = useMemo(
+    () =>
+      createPixelPassConfig({
+        globalFilters,
+        maskEnabled,
+        maskInvert,
+        pipelineMode,
+        maskGroups,
+        maskSegments,
+      }),
+    [
+      globalFilters,
+      maskEnabled,
+      maskInvert,
+      pipelineMode,
+      maskGroups,
+      maskSegments,
+    ],
+  );
+
+  const applyPixelPassConfig = useCallback(
+    (config) => {
+      setGlobalFilters(config.filters);
+      setMaskEnabled(config.mask.enabled);
+      setMaskInvert(config.mask.invert);
+      setPipelineMode(config.mask.pipelineMode);
+      setMaskGroups(config.mask.groups);
+      replaceMaskSegments(config.mask.segments);
+      setSelectedMaskGroupId(config.mask.groups[0]?.id || null);
+      setSelectedMaskSegmentId(null);
+      setFilterUiById({});
+      setCanExport(Boolean(source?.ready));
+      setShowConfigMenu(false);
+    },
+    [
+      replaceMaskSegments,
+      setMaskEnabled,
+      setMaskGroups,
+      setMaskInvert,
+      setPipelineMode,
+      setSelectedMaskGroupId,
+      setSelectedMaskSegmentId,
+      source?.ready,
+    ],
+  );
+
+  const saveToPixelPassFileSystem = useCallback(async () => {
+    if (!windowRuntime?.openDialog || !fileSystemRuntime) return;
+    setShowConfigMenu(false);
+    const result = await windowRuntime.openDialog("file-browser-dialog", {
+      titleOverride: "Save As",
+      windowDefaultsOverride: {
+        width: 560,
+        height: 360,
+        minWidth: 500,
+        minHeight: 300,
+        resizable: false,
+      },
+      windowProps: {
+        mode: "save",
+        defaultPath: PIXELPASS_CONFIG_FOLDER,
+        fileName: "pixelpass.json",
+        fileExtension: ".json",
+        fileTypeLabel: "PixelPass Configuration (JSON)",
+      },
+    });
+    if (!result || result.action !== "save") return;
+
+    const existingPath = joinPath(result.parentPath, result.name);
+    const existingNode = fileSystemRuntime.getNode(existingPath);
+    if (existingNode) {
+      if (!fileSystemRuntime.canEditNode(existingNode)) {
+        return;
+      }
+      fileSystemRuntime.writeFile(existingPath, stringifyPixelPassConfig(pixelPassConfig));
+    } else {
+      fileSystemRuntime.createFile(result.parentPath, {
+        name: result.name,
+        fileType: "text",
+        content: stringifyPixelPassConfig(pixelPassConfig),
+      });
+    }
+  }, [fileSystemRuntime, pixelPassConfig, windowRuntime]);
+
+  const loadFromPixelPassFileSystem = useCallback(async () => {
+    if (!windowRuntime?.openDialog || !fileSystemRuntime) return;
+    setShowConfigMenu(false);
+    const result = await windowRuntime.openDialog("file-browser-dialog", {
+      titleOverride: "Open",
+      windowDefaultsOverride: {
+        width: 560,
+        height: 360,
+        minWidth: 500,
+        minHeight: 300,
+        resizable: false,
+      },
+      windowProps: {
+        mode: "load",
+        defaultPath: PIXELPASS_CONFIG_FOLDER,
+        fileExtension: ".json",
+        fileTypeLabel: "PixelPass Configuration (JSON)",
+      },
+    });
+    if (!result || result.action !== "load") return;
+
+    const node = fileSystemRuntime.getNode(result.path);
+    if (!node) return;
+    try {
+      applyPixelPassConfig(parsePixelPassConfig(node.content));
+    } catch {}
+  }, [applyPixelPassConfig, fileSystemRuntime, windowRuntime]);
+
+  const copyPixelPassConfig = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(stringifyPixelPassConfig(pixelPassConfig));
+      setShowConfigMenu(false);
+    } catch {}
+  }, [pixelPassConfig]);
+
+  const pastePixelPassConfig = useCallback(async () => {
+    try {
+      const config = parsePixelPassConfig(await navigator.clipboard.readText());
+      applyPixelPassConfig(config);
+    } catch {}
+  }, [applyPixelPassConfig]);
+
+  useEffect(() => {
+    if (!showConfigMenu) return undefined;
+    const handlePointerDown = (event) => {
+      if (!event.target.closest(`.${styles.configMenu}`)) {
+        setShowConfigMenu(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [showConfigMenu]);
+
   return (
     <div className={styles.mainContainer}>
       <div className={styles.topMenuBar}>
@@ -1840,6 +2000,34 @@ export default function PixelPass({ windowRuntime }) {
           disabled={!canExport || cameraOn}
           onActivate={handleExport}
         />
+        <div className={styles.configMenu}>
+          <TopMenuAction
+            label="Config"
+            active={showConfigMenu}
+            expanded={showConfigMenu}
+            onActivate={() => setShowConfigMenu((value) => !value)}
+          />
+          {showConfigMenu && (
+            <div
+              className={`${styles.topMenuDropdown} ${styles.configDropdown}`}
+              role="menu"
+            >
+              <XpButton onClick={saveToPixelPassFileSystem}>
+                Save Config...
+              </XpButton>
+              <XpButton onClick={loadFromPixelPassFileSystem}>
+                Load Config...
+              </XpButton>
+              <div className={styles.configSeparator} />
+              <XpButton onClick={copyPixelPassConfig}>
+                Copy Configuration
+              </XpButton>
+              <XpButton onClick={pastePixelPassConfig}>
+                Paste Configuration
+              </XpButton>
+            </div>
+          )}
+        </div>
         <TopMenuAction
           label={cameraOn ? "Stop Camera" : "Use Camera"}
           disabled={!webgpuSupported}
@@ -1864,7 +2052,7 @@ export default function PixelPass({ windowRuntime }) {
           </span>
 
           {showMaskSettings && (
-            <div className={styles.maskMenuDropdown}>
+            <div className={styles.topMenuDropdown}>
               <div className={styles.maskStatusLine}>
                 Editing: {maskContextBadgeLabel}
               </div>

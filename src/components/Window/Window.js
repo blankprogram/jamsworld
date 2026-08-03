@@ -193,11 +193,13 @@ const Window = memo(
           onDoubleClick={handleDoubleClick}
           $isFocused={isFocused}
         >
-          <HeaderIcon
-            src={icon}
-            alt={title}
-            draggable={false}
-          />
+          {icon && (
+            <HeaderIcon
+              src={icon}
+              alt={title}
+              draggable={false}
+            />
+          )}
           <HeaderTitle>{title}</HeaderTitle>
           <HeaderButtons
             buttons={buttons}
