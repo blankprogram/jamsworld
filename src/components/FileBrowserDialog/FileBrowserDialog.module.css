@@ -45,19 +45,26 @@
   justify-content: center;
   width: 24px;
   height: 22px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
   padding: 2px;
   border: 1px solid transparent;
   background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.iconButton:hover:not(:disabled),
-.iconButton:focus-visible:not(:disabled) {
+.iconButton:hover:not([aria-disabled="true"]),
+.iconButton:focus-visible:not([aria-disabled="true"]) {
   border-color: #316ac5;
   background: #dbe8fa;
   outline: none;
 }
 
-.iconButton:disabled {
+.iconButton[aria-disabled="true"] {
   opacity: 0.45;
 }
 
@@ -79,48 +86,44 @@
   display: flex;
   flex: 0 0 118px;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
+  gap: 2px;
+  padding: 4px;
   border-right: 1px solid #c4c0b0;
   background: #f5f3e8;
 }
 
 .quickPlace {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  width: 96px;
-  min-height: 52px;
-  padding: 3px 2px;
+  gap: 2px;
+  width: 100%;
+  min-height: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 1px 4px;
   border: 1px solid transparent;
   background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   color: #000;
   font: inherit;
-  text-align: center;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.quickPlace:hover,
+.quickPlace:focus,
 .quickPlace:focus-visible {
-  border-color: #316ac5;
-  background: #dbe8fa;
+  border-color: transparent;
   outline: none;
 }
 
 .quickPlace img,
 .entry img {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
   object-fit: contain;
-}
-
-.quickPlace img {
-  flex-basis: 28px;
-  width: 28px;
-  height: 28px;
 }
 
 .quickPlace span,
@@ -143,33 +146,39 @@
   flex: 1;
   flex-direction: column;
   overflow: auto;
-  padding: 3px;
+  padding: 0;
 }
 
 .entry {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   width: 100%;
-  min-height: 25px;
-  padding: 2px 5px;
+  min-height: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 1px 4px;
   border: 1px solid transparent;
   background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   color: #000;
   font: inherit;
   text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.entry:hover,
-.selected {
+.entry:focus {
+  border-color: transparent;
+  outline: none;
+}
+
+.entry.selected,
+.quickPlace.selected {
   border-color: #316ac5;
   background: #316ac5;
   color: #fff;
-}
-
-.empty {
-  padding: 12px 8px;
-  color: #555;
 }
 
 .fileOptions {

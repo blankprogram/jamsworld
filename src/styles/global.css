@@ -33,6 +33,10 @@ textarea:not(:disabled),
   cursor: var(--xp-cursor-text), text;
 }
 
+input[type="range"]:not(:disabled) {
+  cursor: var(--xp-cursor-pointer), pointer;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;

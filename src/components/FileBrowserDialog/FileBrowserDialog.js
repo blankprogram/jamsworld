@@ -3,9 +3,9 @@ import { getParentPath, normalizePath } from "../../fileSystem/pathUtils";
 import computerIcon from "../../assets/Icons/Computer.png";
 import desktopIcon from "../../assets/Icons/Desktop.png";
 import documentsIcon from "../../assets/Icons/Document.png";
-import fileIcon from "../../assets/Icons/nofile.png";
 import folderIcon from "../../assets/Icons/Folder.png";
 import folderUpIcon from "../../assets/Icons/FolderUp.png";
+import notepadIcon from "../../assets/Icons/notepad.png";
 import XpButton from "../XpButton/XpButton";
 import styles from "./FileBrowserDialog.module.css";
 
@@ -16,6 +16,35 @@ const QUICK_PLACES = [
   { label: "My Documents", path: "C:/My Documents", icon: documentsIcon },
   { label: "My Computer", path: COMPUTER_PATH, icon: computerIcon },
 ];
+
+function FileBrowserControl({
+  className,
+  role = "button",
+  disabled = false,
+  onActivate,
+  onDoubleClick,
+  children,
+  ...props
+}) {
+  return (
+    <span
+      {...props}
+      role={role}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      className={className}
+      onClick={disabled ? undefined : onActivate}
+      onDoubleClick={disabled ? undefined : onDoubleClick}
+      onKeyDown={(event) => {
+        if (disabled || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onActivate?.();
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 export default function FileBrowserDialog({
   windowProps = {},
@@ -56,14 +85,16 @@ export default function FileBrowserDialog({
     setSelectedPath(null);
   };
 
-  const handleSave = () => {
-    const name = fileName.trim();
+  const resolveSave = (value) => {
+    const name = String(value || "").trim();
     if (!name) return;
     const normalizedName = name.toLowerCase().endsWith(fileExtension)
       ? name
       : `${name}${fileExtension}`;
     resolve({ action: "save", parentPath: currentPath, name: normalizedName });
   };
+
+  const handleSave = () => resolveSave(fileName);
 
   const handleLoad = () => {
     if (selectedNode) resolve({ action: "load", path: selectedNode.path });
@@ -72,6 +103,20 @@ export default function FileBrowserDialog({
   const handleFileClick = (node) => {
     setSelectedPath(node.path);
     setFileName(node.name);
+  };
+
+  const handleFileDoubleClick = (node) => {
+    if (node.type === "folder") {
+      navigate(node.path);
+      return;
+    }
+
+    if (mode === "load") {
+      resolve({ action: "load", path: node.path });
+      return;
+    }
+
+    resolveSave(node.name);
   };
 
   return (
@@ -84,30 +129,28 @@ export default function FileBrowserDialog({
           readOnly
           className={styles.location}
         />
-        <button
-          type="button"
+        <FileBrowserControl
           className={styles.iconButton}
           disabled={!parentPath}
-          onClick={() => parentPath && navigate(parentPath)}
+          onActivate={() => parentPath && navigate(parentPath)}
           title="Up one level"
           aria-label="Up one level"
         >
           <img src={folderUpIcon} alt="" />
-        </button>
+        </FileBrowserControl>
       </div>
 
       <div className={styles.browser}>
         <aside className={styles.quickPlaces} aria-label="Quick places">
           {QUICK_PLACES.map((place) => (
-            <button
-              type="button"
+            <FileBrowserControl
               key={place.path}
-              className={styles.quickPlace}
-              onClick={() => navigate(place.path)}
+              className={`${styles.quickPlace} ${normalizePath(currentPath) === normalizePath(place.path) ? styles.selected : ""}`}
+              onActivate={() => navigate(place.path)}
             >
               <img src={place.icon} alt="" />
               <span>{place.label}</span>
-            </button>
+            </FileBrowserControl>
           ))}
         </aside>
 
@@ -118,31 +161,31 @@ export default function FileBrowserDialog({
             aria-label="Folders and configurations"
           >
             {folders.map((folder) => (
-              <button
-                type="button"
+              <FileBrowserControl
                 key={folder.path}
-                className={styles.entry}
-                onClick={() => setSelectedPath(folder.path)}
+                role="option"
+                aria-selected={selectedPath === folder.path}
+                className={`${styles.entry} ${selectedPath === folder.path ? styles.selected : ""}`}
+                onActivate={() => setSelectedPath(folder.path)}
                 onDoubleClick={() => navigate(folder.path)}
               >
                 <img src={folderIcon} alt="" />
                 <span>{folder.name}</span>
-              </button>
+              </FileBrowserControl>
             ))}
             {configFiles.map((file) => (
-              <button
-                type="button"
+              <FileBrowserControl
                 key={file.path}
+                role="option"
+                aria-selected={selectedPath === file.path}
                 className={`${styles.entry} ${selectedPath === file.path ? styles.selected : ""}`}
-                onClick={() => handleFileClick(file)}
+                onActivate={() => handleFileClick(file)}
+                onDoubleClick={() => handleFileDoubleClick(file)}
               >
-                <img src={fileIcon} alt="" />
+                <img src={notepadIcon} alt="" />
                 <span>{file.name}</span>
-              </button>
+              </FileBrowserControl>
             ))}
-            {!folders.length && !configFiles.length && (
-              <div className={styles.empty}>This folder is empty.</div>
-            )}
           </div>
 
           <div className={styles.fileOptions}>
