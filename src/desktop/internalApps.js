@@ -1,10 +1,10 @@
 import { createAppManifest } from "../applications/createAppManifest";
-import SystemConfirmDialog from "../components/SystemConfirmDialog/SystemConfirmDialog";
+import SystemDialog from "../components/SystemDialog/SystemDialog";
 import FileBrowserDialog from "../components/FileBrowserDialog/FileBrowserDialog";
 
-const SYSTEM_CONFIRM_DIALOG = {
+const SYSTEM_DIALOG = {
   ...createAppManifest({
-    id: "system-confirm-dialog",
+    id: "system-dialog",
     title: "Confirm",
     icon: null,
     windowDefaults: {
@@ -15,7 +15,7 @@ const SYSTEM_CONFIRM_DIALOG = {
       resizable: false,
     },
   }),
-  component: SystemConfirmDialog,
+  component: SystemDialog,
   showInTaskbar: false,
 };
 
@@ -37,7 +37,7 @@ const FILE_BROWSER_DIALOG = {
 };
 
 export const INTERNAL_APP_REGISTRY = Object.freeze([
-  SYSTEM_CONFIRM_DIALOG,
+  SYSTEM_DIALOG,
   FILE_BROWSER_DIALOG,
 ]);
 

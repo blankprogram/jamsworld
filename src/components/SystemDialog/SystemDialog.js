@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import errorIcon from "../../assets/Icons/Error.png";
 import questionIcon from "../../assets/Icons/Question.png";
 import XpButton from "../XpButton/XpButton";
-import styles from "./SystemConfirmDialog.module.css";
+import styles from "./SystemDialog.module.css";
 
 const toMessageLines = (message) => {
   if (Array.isArray(message)) {
@@ -14,7 +14,7 @@ const toMessageLines = (message) => {
   return ["Are you sure?"];
 };
 
-export default function SystemConfirmDialog({ windowProps = {}, windowRuntime }) {
+export default function SystemDialog({ windowProps = {}, windowRuntime }) {
   const confirmButtonRef = useRef(null);
   const cancelButtonRef = useRef(null);
   const isError = windowProps.variant === "error";

@@ -17,6 +17,10 @@ function PointerBlockingContent() {
   );
 }
 
+function EmbeddedWebampWindow() {
+  return <div data-testid="embedded-webamp" id="main-window" className="window" />;
+}
+
 test("focuses before child pointer handlers prevent or stop the event", () => {
   const onFocus = jest.fn();
 
@@ -44,4 +48,50 @@ test("focuses before child pointer handlers prevent or stop the event", () => {
   );
 
   expect(onFocus).toHaveBeenCalledTimes(1);
+});
+
+test("keeps embedded Webamp outside the XP frame wrapper", () => {
+  render(
+    <Window
+      title="Winamp"
+      onFocus={jest.fn()}
+      onClose={jest.fn()}
+      onMinimize={jest.fn()}
+      onToggleMaximize={jest.fn()}
+      onRectChange={jest.fn()}
+      isFocused
+      isMinimized={false}
+      maximized={false}
+      useStyledWindow={false}
+      rect={{ x: 0, y: 0, width: 350, height: 240 }}
+    >
+      <EmbeddedWebampWindow />
+    </Window>,
+  );
+
+  expect(screen.getByTestId("embedded-webamp")).toBeInTheDocument();
+  const frame = screen.getByTestId("window-frame");
+
+  expect(frame).toHaveAttribute("data-window-root", "true");
+  expect(frame).toHaveAttribute("data-window-frame", "none");
+  expect(frame).toHaveAttribute(
+    "style",
+    expect.stringContaining("padding: 0px"),
+  );
+  expect(frame).toHaveAttribute(
+    "style",
+    expect.stringContaining("background: transparent"),
+  );
+  expect(frame).toHaveAttribute(
+    "style",
+    expect.stringContaining("border: 0px"),
+  );
+  expect(frame).toHaveAttribute(
+    "style",
+    expect.stringContaining("border-radius: 0"),
+  );
+  expect(frame).toHaveAttribute(
+    "style",
+    expect.stringContaining("box-shadow: none"),
+  );
 });

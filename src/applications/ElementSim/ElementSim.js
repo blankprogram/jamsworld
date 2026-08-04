@@ -12,7 +12,7 @@ function ElementSim({ isFocused }) {
   return (
     <ExternalAppFrame
       src="https://blankprogram.github.io/elementsim/"
-      title="sim"
+      title="elementsim"
       isFocused={isFocused}
     />
   );

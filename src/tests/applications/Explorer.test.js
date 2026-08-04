@@ -245,7 +245,7 @@ test("Delete sends writable selected items through one batch action", async () =
 
   await waitFor(() => {
     expect(windowRuntime.openDialog).toHaveBeenCalledWith(
-      "system-confirm-dialog",
+      "system-dialog",
       expect.objectContaining({
         windowProps: expect.objectContaining({
           message: [
@@ -280,7 +280,7 @@ test("deleting a protected preset opens the system error dialog", async () => {
 
   await waitFor(() => {
     expect(windowRuntime.openDialog).toHaveBeenCalledWith(
-      "system-confirm-dialog",
+      "system-dialog",
       expect.objectContaining({
         titleOverride: "Error",
         windowProps: expect.objectContaining({

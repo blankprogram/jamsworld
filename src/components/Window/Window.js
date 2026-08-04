@@ -160,11 +160,22 @@ const Window = memo(
     const containerProps = {
       ref: windowRef,
       "data-window-root": "true",
+      "data-window-frame": useStyledWindow ? undefined : "none",
+      "data-testid": process.env.NODE_ENV === "test" ? "window-frame" : undefined,
       "aria-hidden": interactionLocked || undefined,
       inert: interactionLocked ? "" : undefined,
       onPointerDownCapture: handleFocus,
       style: {
         ...containerStyle,
+        ...(useStyledWindow
+          ? {}
+          : {
+              padding: 0,
+              background: "transparent",
+              border: 0,
+              borderRadius: 0,
+              boxShadow: "none",
+            }),
         pointerEvents:
           interactionLocked || clickThroughWindow ? "none" : undefined,
       },

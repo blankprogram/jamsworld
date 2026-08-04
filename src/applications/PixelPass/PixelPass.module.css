@@ -170,6 +170,27 @@
   background: #d5d3c3;
 }
 
+.configPasteArea {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.2rem;
+}
+
+.configPasteArea textarea {
+  width: 100%;
+  min-height: 6rem;
+  box-sizing: border-box;
+  resize: vertical;
+  font: 11px Consolas, "Courier New", monospace;
+}
+
+.configPasteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
 .maskContextBookmark {
   position: relative;
   display: inline-flex;

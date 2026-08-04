@@ -12,7 +12,7 @@ function Minesweeper({ isFocused }) {
   return (
     <ExternalAppFrame
       src="https://mines.now.sh"
-      title="paint"
+      title="minesweeper"
       isFocused={isFocused}
     />
   );

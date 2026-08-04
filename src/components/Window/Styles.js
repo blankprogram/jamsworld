@@ -303,10 +303,12 @@ export const HeaderButton = styled.button`
   ${headerButtonVariantStyles}
 
   &:hover {
-    filter: ${({ disabled }) => (disabled ? "brightness(100%)" : "brightness(120%)")};
+    filter: ${({ disabled }) =>
+      disabled ? "brightness(100%)" : "brightness(120%)"};
   }
 
   &:hover:active {
-    filter: ${({ disabled }) => (disabled ? "brightness(100%)" : "brightness(90%)")};
+    filter: ${({ disabled }) =>
+      disabled ? "brightness(100%)" : "brightness(90%)"};
   }
 `;

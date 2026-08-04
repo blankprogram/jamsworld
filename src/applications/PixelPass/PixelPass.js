@@ -1322,6 +1322,8 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
   const [globalFilters, setGlobalFilters] = useState([]);
   const [filterUiById, setFilterUiById] = useState({});
   const [showConfigMenu, setShowConfigMenu] = useState(false);
+  const [showPasteConfig, setShowPasteConfig] = useState(false);
+  const [pasteConfigText, setPasteConfigText] = useState("");
 
   useEffect(() => {
     loadFonts().then(setFonts);
@@ -1689,6 +1691,29 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
       cameraOn,
       videoRef,
     });
+
+  const confirmPixelPassAction = useCallback(
+    async ({ message, title = "Confirm", windowDefaultsOverride } = {}) => {
+      if (windowRuntime?.openDialog) {
+        const result = await windowRuntime.openDialog("system-dialog", {
+          titleOverride: title,
+          windowDefaultsOverride,
+          windowProps: {
+            message,
+            confirmLabel: "Yes",
+            cancelLabel: "No",
+          },
+        });
+        return result === true;
+      }
+
+      return typeof window !== "undefined" && window.confirm
+        ? window.confirm(Array.isArray(message) ? message.join("\n") : message)
+        : false;
+    },
+    [windowRuntime],
+  );
+
   const requestRemoveGroup = useCallback(async () => {
     if (!maskEnabled || !removeGroupPlan || !selectedMaskGroupId) return;
     const groupId = selectedMaskGroupId;
@@ -1696,31 +1721,17 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
       removeGroupPlan;
     const deleteLabel = `${deletedCount} segment${deletedCount === 1 ? "" : "s"} in this group will be deleted.`;
 
-    let confirmed = false;
-    if (windowRuntime?.openDialog) {
-      const result = await windowRuntime.openDialog("system-confirm-dialog", {
-        titleOverride: "Confirm Group Removal",
-        parentWindowId: windowRuntime.windowId,
-        windowDefaultsOverride: {
-          width: 390,
-          height: 198,
-          minWidth: 350,
-          minHeight: 190,
-          resizable: false,
-        },
-        windowProps: {
-          title: "Confirm Group Removal",
-          message: [`Remove "${selectedGroupLabel}"?`, deleteLabel],
-          confirmLabel: "Delete Group",
-          cancelLabel: "Cancel",
-        },
-      });
-      confirmed = result === true;
-    } else if (typeof window !== "undefined" && window.confirm) {
-      confirmed = window.confirm(
-        `Remove "${selectedGroupLabel}"?\n${deleteLabel}`,
-      );
-    }
+    const confirmed = await confirmPixelPassAction({
+      title: "Confirm Group Removal",
+      message: [`Remove "${selectedGroupLabel}"?`, deleteLabel],
+      windowDefaultsOverride: {
+        width: 390,
+        height: 198,
+        minWidth: 350,
+        minHeight: 190,
+        resizable: false,
+      },
+    });
 
     if (confirmed) {
       removeSelectedMaskGroup(groupId);
@@ -1729,8 +1740,23 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
     maskEnabled,
     removeGroupPlan,
     selectedMaskGroupId,
-    windowRuntime,
+    confirmPixelPassAction,
     removeSelectedMaskGroup,
+  ]);
+
+  const requestRemoveSelectedMask = useCallback(async () => {
+    if (!maskEnabled || !selectedMaskSegmentId) return;
+
+    const confirmed = await confirmPixelPassAction({
+      message: "Are you sure you want to delete the selected mask?",
+    });
+
+    if (confirmed) removeSelectedMaskSegment();
+  }, [
+    confirmPixelPassAction,
+    maskEnabled,
+    removeSelectedMaskSegment,
+    selectedMaskSegmentId,
   ]);
 
   const handleFile = useCallback(
@@ -1886,6 +1912,35 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
     ],
   );
 
+  const clearPixelPassConfig = useCallback(() => {
+    setGlobalFilters([]);
+    setMaskEnabled(false);
+    setMaskInvert(false);
+    setPipelineMode(PIPELINE_MODE_GLOBAL);
+    setMaskGroups([createMaskGroup(1)]);
+    replaceMaskSegments([]);
+    setSelectedMaskGroupId(null);
+    setSelectedMaskSegmentId(null);
+    setFilterUiById({});
+    setShowConfigMenu(false);
+  }, [
+    replaceMaskSegments,
+    setMaskEnabled,
+    setMaskGroups,
+    setMaskInvert,
+    setPipelineMode,
+    setSelectedMaskGroupId,
+    setSelectedMaskSegmentId,
+  ]);
+
+  const requestClearPixelPassConfig = useCallback(async () => {
+    const confirmed = await confirmPixelPassAction({
+      message: "Are you sure you want to clear this configuration?",
+    });
+
+    if (confirmed) clearPixelPassConfig();
+  }, [clearPixelPassConfig, confirmPixelPassAction]);
+
   const saveToPixelPassFileSystem = useCallback(async () => {
     if (!windowRuntime?.openDialog || !fileSystemRuntime) return;
     setShowConfigMenu(false);
@@ -1959,23 +2014,79 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
     } catch {}
   }, [pixelPassConfig]);
 
-  const pastePixelPassConfig = useCallback(async () => {
-    try {
-      const config = parsePixelPassConfig(await navigator.clipboard.readText());
-      applyPixelPassConfig(config);
-    } catch {}
-  }, [applyPixelPassConfig]);
+  const applyPastedPixelPassConfig = useCallback(
+    (value) => {
+      if (!String(value || "").trim()) return;
+
+      try {
+        const config = parsePixelPassConfig(value);
+        applyPixelPassConfig(config);
+        setPasteConfigText("");
+        setShowPasteConfig(false);
+      } catch {}
+    },
+    [applyPixelPassConfig],
+  );
+
+  const openPasteConfig = useCallback(() => {
+    setPasteConfigText("");
+    setShowPasteConfig(true);
+  }, []);
+
+  const handlePasteConfigInput = useCallback(
+    (event) => {
+      const value = event.clipboardData.getData("text");
+      if (!value) return;
+      event.preventDefault();
+      setPasteConfigText(value);
+      applyPastedPixelPassConfig(value);
+    },
+    [applyPastedPixelPassConfig],
+  );
+
+  const pastePixelPassConfig = useCallback(() => {
+    applyPastedPixelPassConfig(pasteConfigText);
+  }, [applyPastedPixelPassConfig, pasteConfigText]);
+
+  const closeConfigMenu = useCallback(() => {
+    setShowConfigMenu(false);
+    setShowPasteConfig(false);
+  }, []);
+
+  const handleConfigMenuToggle = useCallback(() => {
+    setShowConfigMenu((value) => !value);
+    setShowPasteConfig(false);
+  }, []);
+
+  /*
+   * Clipboard reads require browser permission. Paste events do not, because
+   * the user explicitly initiated the paste into this field.
+   */
+  const handlePasteConfigKeyDown = useCallback(
+    (event) => {
+      if (event.key === "Escape") closeConfigMenu();
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        pastePixelPassConfig();
+      }
+    },
+    [closeConfigMenu, pastePixelPassConfig],
+  );
+
+  /* Keep the menu open while the paste field is being used. */
+  const handleConfigPointerDown = useCallback((event) => {
+    if (!event.target.closest(`.${styles.configMenu}`)) {
+      setShowConfigMenu(false);
+      setShowPasteConfig(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!showConfigMenu) return undefined;
-    const handlePointerDown = (event) => {
-      if (!event.target.closest(`.${styles.configMenu}`)) {
-        setShowConfigMenu(false);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [showConfigMenu]);
+    document.addEventListener("pointerdown", handleConfigPointerDown);
+    return () =>
+      document.removeEventListener("pointerdown", handleConfigPointerDown);
+  }, [handleConfigPointerDown, showConfigMenu]);
 
   return (
     <div className={styles.mainContainer}>
@@ -2005,7 +2116,7 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
             label="Config"
             active={showConfigMenu}
             expanded={showConfigMenu}
-            onActivate={() => setShowConfigMenu((value) => !value)}
+            onActivate={handleConfigMenuToggle}
           />
           {showConfigMenu && (
             <div
@@ -2019,12 +2130,34 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
                 Load Config...
               </XpButton>
               <div className={styles.configSeparator} />
+              <XpButton onClick={requestClearPixelPassConfig}>
+                Clear Config
+              </XpButton>
               <XpButton onClick={copyPixelPassConfig}>
                 Copy Configuration
               </XpButton>
-              <XpButton onClick={pastePixelPassConfig}>
-                Paste Configuration
+              <XpButton onClick={openPasteConfig}>
+                Paste Config
               </XpButton>
+              {showPasteConfig && (
+                <div className={styles.configPasteArea}>
+                  <textarea
+                    autoFocus
+                    value={pasteConfigText}
+                    onChange={(event) => setPasteConfigText(event.target.value)}
+                    onPaste={handlePasteConfigInput}
+                    onKeyDown={handlePasteConfigKeyDown}
+                    placeholder="Paste here!"
+                    aria-label="Paste configuration JSON"
+                  />
+                  <div className={styles.configPasteActions}>
+                    <XpButton onClick={pastePixelPassConfig}>Apply</XpButton>
+                    <XpButton onClick={() => setShowPasteConfig(false)}>
+                      Cancel
+                    </XpButton>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2251,7 +2384,7 @@ export default function PixelPass({ windowRuntime, fileSystemRuntime }) {
                   <div className={styles.maskButtonsRow}>
                     <XpButton
                       disabled={!maskEnabled}
-                      onClick={removeSelectedMaskSegment}
+                      onClick={requestRemoveSelectedMask}
                     >
                       Delete Selected
                     </XpButton>

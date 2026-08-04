@@ -47,10 +47,11 @@ export const appManifest = createAppManifest({
   },
 });
 
-function Winamp({ onClose, onMinimize, isMinimized, onFocus }) {
+function Winamp({ onClose, onMinimize, isMinimized, isFocused, onFocus }) {
   const ref = useRef(null);
   const webamp = useRef(null);
   const webampElementRef = useRef(null);
+  const focusFrameRef = useRef(null);
   const isMinimizedRef = useRef(isMinimized);
   const onFocusRef = useRef(onFocus);
 
@@ -65,6 +66,17 @@ function Winamp({ onClose, onMinimize, isMinimized, onFocus }) {
   useEffect(() => {
     onFocusRef.current = onFocus;
   }, [onFocus]);
+
+  useEffect(() => {
+    const webampElement = webampElementRef.current;
+    if (!webampElement || isMinimized) return undefined;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      webampElement.querySelector("#main-window > [tabindex]")?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [isFocused, isMinimized]);
 
   useEffect(() => {
     const target = ref.current;
@@ -83,7 +95,14 @@ function Winamp({ onClose, onMinimize, isMinimized, onFocus }) {
 
         webampElementRef.current = webampElement;
         webampElement.style.display = isMinimizedRef.current ? "none" : "block";
+
+        const focusFrame = window.requestAnimationFrame(() => {
+          webampElement.querySelector("#main-window > [tabindex]")?.focus();
+        });
+
         webampElement.addEventListener("pointerdown", handlePointerDown, true);
+
+        focusFrameRef.current = focusFrame;
       })
       .catch((error) => {
         console.error("Error rendering Webamp:", error);
@@ -93,6 +112,10 @@ function Winamp({ onClose, onMinimize, isMinimized, onFocus }) {
       didDispose = true;
       const webampElement = webampElementRef.current;
       if (webampElement) {
+        if (focusFrameRef.current) {
+          window.cancelAnimationFrame(focusFrameRef.current);
+          focusFrameRef.current = null;
+        }
         webampElement.removeEventListener(
           "pointerdown",
           handlePointerDown,

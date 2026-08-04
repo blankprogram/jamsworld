@@ -26,7 +26,7 @@ export function useDesktopFileSystem({
 
   const showProtectedNodeError = useCallback(
     (node) =>
-      openDialog("system-confirm-dialog", {
+      openDialog("system-dialog", {
         titleOverride: "Error",
         windowProps: {
           variant: "error",
@@ -93,7 +93,7 @@ export function useDesktopFileSystem({
         return false;
       }
 
-      const confirmed = await openDialog("system-confirm-dialog", {
+      const confirmed = await openDialog("system-dialog", {
         titleOverride: "Confirm",
         windowProps: {
           message: [getRecycleBinConfirmationMessage(nodes.length)],

@@ -1,13 +1,13 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import SystemConfirmDialog from "../../components/SystemConfirmDialog/SystemConfirmDialog";
+import SystemDialog from "../../components/SystemDialog/SystemDialog";
 
 const renderDialog = (windowProps = {}) => {
   const windowRuntime = {
     resolveDialog: jest.fn(),
   };
   render(
-    <SystemConfirmDialog
+    <SystemDialog
       windowProps={{
         message: ["Delete this item?"],
         confirmLabel: "Yes",

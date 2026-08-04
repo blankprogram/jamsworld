@@ -12,7 +12,7 @@ function Minecraft({ isFocused }) {
   return (
     <ExternalAppFrame
       src="https://minecraft-threejs.netlify.app/"
-      title="sim"
+      title="minecraft"
       isFocused={isFocused}
     />
   );

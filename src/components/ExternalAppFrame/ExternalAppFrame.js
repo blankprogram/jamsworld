@@ -11,7 +11,8 @@ function ExternalAppFrame({ src, title, isFocused }) {
     >
       <iframe
         src={src}
-        title={title}
+        title=" "
+        aria-label={title}
         style={{
           width: "100%",
           height: "100%",

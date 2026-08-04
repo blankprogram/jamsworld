@@ -1,10 +1,27 @@
 :global(#webamp) {
   pointer-events: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 :global(#webamp .window),
 :global(#webamp .gen-window) {
   pointer-events: auto;
+}
+
+:global(#webamp .window) {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+:global(#webamp .equalizer-top.title-bar) {
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 :global(#webamp-context-menu) {

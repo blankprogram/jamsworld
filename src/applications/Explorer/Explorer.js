@@ -685,7 +685,7 @@ function Explorer({ windowProps = {}, windowRuntime, fileSystemRuntime, appsById
   const showProtectedNodeError = async (node) => {
     const message = getProtectedNodeMessage(node);
     if (windowRuntime?.openDialog) {
-      await windowRuntime.openDialog("system-confirm-dialog", {
+      await windowRuntime.openDialog("system-dialog", {
         titleOverride: "Error",
         windowProps: {
           variant: "error",
@@ -754,7 +754,7 @@ function Explorer({ windowProps = {}, windowRuntime, fileSystemRuntime, appsById
 
     let confirmed = true;
     if (windowRuntime?.openDialog) {
-      const result = await windowRuntime.openDialog("system-confirm-dialog", {
+      const result = await windowRuntime.openDialog("system-dialog", {
         titleOverride: "Confirm",
         windowProps: {
           message: [message],
