@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/jamsworld/static/css/main.92ed4800.css",
-    "main.js": "/jamsworld/static/js/main.46f19b0e.js",
+    "main.css": "/jamsworld/static/css/main.43dc365d.css",
+    "main.js": "/jamsworld/static/js/main.4972c51f.js",
     "static/js/746.c18823e7.chunk.js": "/jamsworld/static/js/746.c18823e7.chunk.js",
     "static/js/558.6b7da045.chunk.js": "/jamsworld/static/js/558.6b7da045.chunk.js",
     "static/js/667.e7a86dd1.chunk.js": "/jamsworld/static/js/667.e7a86dd1.chunk.js",
@@ -47,8 +47,8 @@
     "static/media/ms_sans_serif.woff2": "/jamsworld/static/media/ms_sans_serif.0348082abb503fb6a8c2.woff2",
     "static/media/ms_sans_serif_bold.woff2": "/jamsworld/static/media/ms_sans_serif_bold.7fcf57cc6e87ecddbf64.woff2",
     "index.html": "/jamsworld/index.html",
-    "main.92ed4800.css.map": "/jamsworld/static/css/main.92ed4800.css.map",
-    "main.46f19b0e.js.map": "/jamsworld/static/js/main.46f19b0e.js.map",
+    "main.43dc365d.css.map": "/jamsworld/static/css/main.43dc365d.css.map",
+    "main.4972c51f.js.map": "/jamsworld/static/js/main.4972c51f.js.map",
     "746.c18823e7.chunk.js.map": "/jamsworld/static/js/746.c18823e7.chunk.js.map",
     "558.6b7da045.chunk.js.map": "/jamsworld/static/js/558.6b7da045.chunk.js.map",
     "667.e7a86dd1.chunk.js.map": "/jamsworld/static/js/667.e7a86dd1.chunk.js.map",
@@ -82,7 +82,7 @@
     "488.92edee09.chunk.js.map": "/jamsworld/static/js/488.92edee09.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.92ed4800.css",
-    "static/js/main.46f19b0e.js"
+    "static/css/main.43dc365d.css",
+    "static/js/main.4972c51f.js"
   ]
 }
