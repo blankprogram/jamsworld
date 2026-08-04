@@ -17,6 +17,15 @@
   --xp-color-menu-bg: #edead8;
   --xp-color-menu-border: #96abff;
   --xp-color-menu-hover: #1660e8;
+  --xp-cursor-default: url("../assets/Cursors/xp-arrow.png") 10 10;
+  --xp-cursor-pointer: url("../assets/Cursors/xp-link.png") 10 10;
+  --xp-cursor-text: url("../assets/Cursors/xp-beam.png") 4 9;
+  --xp-cursor-unavailable: url("../assets/Cursors/xp-no.png") 10 10;
+  --xp-cursor-move: url("../assets/Cursors/xp-arrow.png") 10 10;
+  --xp-cursor-resize-ew: url("../assets/Cursors/xp-ew.png") 10 10;
+  --xp-cursor-resize-ns: url("../assets/Cursors/xp-ns.png") 16 15;
+  --xp-cursor-resize-nwse: url("../assets/Cursors/xp-nwse.png") 10 10;
+  --xp-cursor-resize-nesw: url("../assets/Cursors/xp-nesw.png") 21 10;
   --xp-color-ie-shell: #c0c0c0;
   --xp-color-ie-toolbar: #edebda;
   --xp-color-ie-toolbar-border: #bab8aa;

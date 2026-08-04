@@ -68,7 +68,6 @@
   font-size: 12px;
   line-height: 1.2;
   padding: 4px 8px;
-  cursor: pointer;
   user-select: none;
   min-width: 0;
   min-height: 0;
@@ -84,7 +83,6 @@
 .topMenuButtonDisabled,
 .topMenuButton:disabled {
   color: #666;
-  cursor: default;
 }
 
 .topMenuButtonDisabled:hover,
@@ -198,7 +196,7 @@
   user-select: none;
   margin-bottom: -16px;
   z-index: 25;
-  cursor: ns-resize;
+  cursor: var(--xp-cursor-resize-ns), ns-resize;
 }
 
 .maskContextBookmark::after {
@@ -312,11 +310,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  cursor: grab;
 }
 
 .filterHeader:active {
-  cursor: grabbing;
 }
 
 .filterIcons {
@@ -365,7 +361,6 @@
   );
   padding: 0;
   font-size: 0.9rem;
-  cursor: pointer;
   min-width: 0;
   min-height: 0;
 }
@@ -380,7 +375,6 @@
 
 .iconBtn.disable {
   opacity: 0.5;
-  cursor: default;
   filter: none;
 }
 

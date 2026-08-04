@@ -47,10 +47,10 @@ export const StyledHeader = styled.header`
   border-top-left-radius: 0;
   border-top-right-radius: 0;
   overflow: visible;
-  cursor: grab;
+  cursor: var(--xp-cursor-move), move;
 
   &:active {
-    cursor: grabbing;
+    cursor: var(--xp-cursor-move), move;
   }
 `;
 
@@ -85,7 +85,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         left: 0;
         width: 16px;
         height: 16px;
-        cursor: nwse-resize;
+        cursor: var(--xp-cursor-resize-nwse), nwse-resize;
       `;
     case "topRight":
       return css`
@@ -93,7 +93,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         right: 0;
         width: 16px;
         height: 16px;
-        cursor: nesw-resize;
+        cursor: var(--xp-cursor-resize-nesw), nesw-resize;
       `;
     case "bottomLeft":
       return css`
@@ -101,7 +101,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         left: 0;
         width: 16px;
         height: 16px;
-        cursor: nesw-resize;
+        cursor: var(--xp-cursor-resize-nesw), nesw-resize;
       `;
     case "bottomRight":
       return css`
@@ -109,7 +109,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         right: 0;
         width: 16px;
         height: 16px;
-        cursor: nwse-resize;
+        cursor: var(--xp-cursor-resize-nwse), nwse-resize;
       `;
     case "top":
       return css`
@@ -117,7 +117,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         left: 16px;
         width: calc(100% - 32px);
         height: 5px;
-        cursor: ns-resize;
+        cursor: var(--xp-cursor-resize-ns), ns-resize;
       `;
     case "right":
       return css`
@@ -125,7 +125,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         right: 0;
         width: 10px;
         height: calc(100% - 32px);
-        cursor: ew-resize;
+        cursor: var(--xp-cursor-resize-ew), ew-resize;
       `;
     case "bottom":
       return css`
@@ -133,7 +133,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         left: 16px;
         width: calc(100% - 32px);
         height: 10px;
-        cursor: ns-resize;
+        cursor: var(--xp-cursor-resize-ns), ns-resize;
       `;
     case "left":
       return css`
@@ -141,7 +141,7 @@ const resizeHandleEdgeStyles = ({ $edge }) => {
         left: 0;
         width: 10px;
         height: calc(100% - 32px);
-        cursor: ew-resize;
+        cursor: var(--xp-cursor-resize-ew), ew-resize;
       `;
     default:
       return css`

@@ -109,7 +109,7 @@
     transparent
   );
   background-size: 10px 10px;
-  cursor: pointer;
+  cursor: var(--xp-cursor-pointer), pointer;
 }
 
 .colorPickerPopover {

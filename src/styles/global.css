@@ -10,14 +10,27 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  cursor: var(--xp-cursor-default), default;
 }
 
-button:not(:disabled) {
-  cursor: pointer;
+button:not(:disabled),
+a,
+select,
+[role="button"],
+[role="option"],
+[role="menuitem"]:not([aria-disabled="true"]) {
+  cursor: var(--xp-cursor-pointer), pointer;
 }
 
-button:disabled {
-  cursor: not-allowed;
+button:disabled,
+[aria-disabled="true"] {
+  cursor: var(--xp-cursor-unavailable), not-allowed;
+}
+
+input:not(:disabled),
+textarea:not(:disabled),
+[contenteditable="true"] {
+  cursor: var(--xp-cursor-text), text;
 }
 
 code {

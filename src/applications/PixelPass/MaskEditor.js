@@ -172,14 +172,14 @@ const SHAPE_STROKE_WIDTH = 0.002;
 const SHAPE_STROKE_WIDTH_SELECTED = 0.0026;
 const RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 const HANDLE_CURSOR = {
-  nw: "nwse-resize",
-  n: "ns-resize",
-  ne: "nesw-resize",
-  e: "ew-resize",
-  se: "nwse-resize",
-  s: "ns-resize",
-  sw: "nesw-resize",
-  w: "ew-resize",
+  nw: "var(--xp-cursor-resize-nwse), nwse-resize",
+  n: "var(--xp-cursor-resize-ns), ns-resize",
+  ne: "var(--xp-cursor-resize-nesw), nesw-resize",
+  e: "var(--xp-cursor-resize-ew), ew-resize",
+  se: "var(--xp-cursor-resize-nwse), nwse-resize",
+  s: "var(--xp-cursor-resize-ns), ns-resize",
+  sw: "var(--xp-cursor-resize-nesw), nesw-resize",
+  w: "var(--xp-cursor-resize-ew), ew-resize",
 };
 
 const isBoxShape = (segment) =>
