@@ -116,7 +116,18 @@ export function useMediaExport({
       }
 
       if (!source.frames?.length) {
-        canvas.toBlob((blob) => {
+        // WebGPU's presentation canvas is transient. Read the rendered texture
+        // instead so exporting after presentation/backgrounding keeps the pixels.
+        if (source.source) pipeline.prepareImage(source.source);
+        const imageData = await pipeline.renderFrameToImageData();
+        if (!imageData) return;
+        const exportCanvas = document.createElement("canvas");
+        exportCanvas.width = imageData.width;
+        exportCanvas.height = imageData.height;
+        exportCanvas
+          .getContext("2d", { willReadFrequently: true })
+          .putImageData(imageData, 0, 0);
+        exportCanvas.toBlob((blob) => {
           if (!blob) return;
           downloadBlob(blob, `${name}.png`);
         });

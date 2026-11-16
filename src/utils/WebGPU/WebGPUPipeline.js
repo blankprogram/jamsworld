@@ -91,7 +91,8 @@ export default class WebGPUPipeline {
     this.context = canvas.getContext("webgpu");
     if (!this.context) throw new Error("Failed to create WebGPU context");
 
-    this.format = navigator.gpu.getPreferredCanvasFormat();
+    // Match the processing textures to prevent red and blue from swapping.
+    this.format = "rgba8unorm";
     this.context.configure({
       device,
       format: this.format,

@@ -149,13 +149,16 @@ export function useProcessMedia(canvasRef, config, camera) {
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (!document.hidden) resetGifClock(false);
+      if (!document.hidden) {
+        resetGifClock(false);
+        invalidate();
+      }
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () =>
       document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [resetGifClock]);
+  }, [invalidate, resetGifClock]);
 
   const resetForNewFile = useCallback(() => {
     cancelScheduledRender();
